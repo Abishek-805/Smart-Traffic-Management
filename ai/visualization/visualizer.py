@@ -1,6 +1,6 @@
 """
 Visualizer engine for rendering multi-stage DEBUG overlays: perception bounding boxes, centroids,
-track IDs, motion speeds, lane ROIs, and active decision phase countdown HUDs.
+track IDs, motion speeds, lane ROIs, PipelineHealth diagnostics, and active decision phase countdown HUDs.
 """
 
 from pathlib import Path
@@ -23,6 +23,7 @@ from ai.detection.detection_types import Detection
 from ai.lane.lane_manager import LaneManager, Lane
 from ai.analytics.analytics_exporter import LaneStatistics
 from ai.signal.signal_decision import SignalDecision
+from ai.pipeline.pipeline_health import PipelineHealth, HealthSeverity
 from ai.utils.statistics import StatisticsTracker
 from ai.utils.logger import get_logger
 
@@ -32,7 +33,7 @@ logger = get_logger("Visualizer")
 class Visualizer:
     """
     Decoupled rendering engine for annotating frames with debug perception vectors,
-    lane ROIs, vehicle state badges, and active signal decision HUD cards.
+    lane ROIs, vehicle state badges, PipelineHealth cards, and active signal decision HUDs.
     """
 
     def __init__(self, save_video: bool = True, output_path: Optional[Path] = None):
@@ -72,11 +73,12 @@ class Visualizer:
         lane_stats: Optional[Dict[str, LaneStatistics]] = None,
         decision: Optional[SignalDecision] = None,
         remaining_green_sec: int = 0,
+        health: Optional[PipelineHealth] = None,
         stats: Optional[StatisticsTracker] = None,
         source_fps: float = 30.0,
     ) -> np.ndarray:
         """
-        Draw debug perception vectors, lane ROIs, vehicle badges, and analytics HUD onto frame.
+        Draw debug perception vectors, lane ROIs, vehicle badges, health status, and analytics HUD onto frame.
         """
         annotated_frame = frame.copy()
 
@@ -97,13 +99,17 @@ class Visualizer:
             total_live = sum(s.live_count for s in lane_stats.values()) if lane_stats else len(detections)
             self._draw_performance_hud(annotated_frame, total_live, stats)
 
-        # 4. Render Per-Lane Analytics & Active Decision Side Panel
+        # 4. Render Left-Side PipelineHealth Diagnostic Card
+        if health:
+            self._draw_pipeline_health_card(annotated_frame, health)
+
+        # 5. Render Per-Lane Analytics & Active Decision Side Panel
         if lane_stats:
             self._draw_analytics_side_panel(
                 annotated_frame, lane_stats, decision, remaining_green_sec
             )
 
-        # 5. Write to Output Video File
+        # 6. Write to Output Video File
         if self.save_video and self.video_writer is not None:
             self.video_writer.write(annotated_frame)
 
@@ -197,6 +203,50 @@ class Visualizer:
         cv2.putText(frame, f"Live Vehicles: {vehicle_count}", (310, 23), font, scale, HUD_TEXT_COLOR, thick, cv2.LINE_AA)
         cv2.putText(frame, f"Frame #{stats.frame_count}", (width - 140, 23), font, scale, (200, 200, 200), thick, cv2.LINE_AA)
 
+    def _draw_pipeline_health_card(
+        self,
+        frame: np.ndarray,
+        health: PipelineHealth,
+    ) -> None:
+        """Draw left-side PipelineHealth Diagnostic HUD Card with severity color-coding."""
+        panel_w = 265
+        panel_h = 195
+        panel_x = 15
+        panel_y = 48
+
+        # Draw dark glassmorphism container panel
+        panel_overlay = frame[panel_y:panel_y + panel_h, panel_x:panel_x + panel_w].copy()
+        cv2.rectangle(panel_overlay, (0, 0), (panel_w, panel_h), (18, 18, 18), -1)
+        cv2.addWeighted(panel_overlay, 0.82, frame[panel_y:panel_y + panel_h, panel_x:panel_x + panel_w], 0.18, 0, frame[panel_y:panel_y + panel_h, panel_x:panel_x + panel_w])
+        
+        # Border color based on overall health severity
+        border_color = (0, 255, 0) if health.severity == HealthSeverity.INFO else ((0, 215, 255) if health.severity == HealthSeverity.WARNING else (0, 0, 255))
+        cv2.rectangle(frame, (panel_x, panel_y), (panel_x + panel_w, panel_y + panel_h), border_color, 1)
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+
+        # Header Title
+        cv2.putText(frame, "PIPELINE HEALTH DIAGNOSTICS", (panel_x + 12, panel_y + 22), font, 0.38, (0, 215, 255), 1, cv2.LINE_AA)
+        cv2.line(frame, (panel_x + 12, panel_y + 28), (panel_x + panel_w - 12, panel_y + 28), (60, 60, 60), 1)
+
+        y_offset = panel_y + 46
+        scale = 0.38
+
+        items = [
+            ("Detection", f"PASS ({health.detection_count})" if health.detection_count > 0 else "IDLE (0)"),
+            ("Tracking", f"PASS ({health.tracked_count})" if health.tracked_count > 0 else "IDLE (0)"),
+            ("Lane Mapping", f"PASS ({health.mapped_count})" if health.mapped_count > 0 else ("WARN (0)" if health.tracked_count > 0 else "IDLE")),
+            ("Analytics", "PASS" if health.analytics_ok else "EMPTY"),
+            ("Decision", "ACTIVE" if health.decision_active else "IDLE"),
+            ("Phase Timer", f"Phase #{health.phase_id} ({health.remaining_time_sec}s)"),
+        ]
+
+        for label, val in items:
+            status_color = (0, 255, 0) if ("PASS" in val or "ACTIVE" in val) else ((0, 215, 255) if ("Phase #" in val or "IDLE" in val) else (0, 0, 255))
+            cv2.putText(frame, f"{label:<14}:", (panel_x + 12, y_offset), font, scale, (200, 200, 200), 1)
+            cv2.putText(frame, f"{val}", (panel_x + 120, y_offset), font, scale, status_color, 1)
+            y_offset += 22
+
     def _draw_analytics_side_panel(
         self,
         frame: np.ndarray,
@@ -222,10 +272,11 @@ class Visualizer:
         # Active Signal Decision Header Box
         if decision:
             green_str = str(decision.green_lane).upper()
+            phase_id = decision.phase_id
             cv2.rectangle(frame, (panel_x + 10, panel_y + 10), (panel_x + panel_w - 10, panel_y + 48), (0, 180, 0), -1)
             cv2.putText(
                 frame,
-                f"GREEN PHASE: {green_str} ({remaining_green_sec}s remaining)",
+                f"PHASE #{phase_id}: {green_str} ({remaining_green_sec}s left)",
                 (panel_x + 20, panel_y + 34),
                 font,
                 0.45,

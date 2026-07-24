@@ -6580,3 +6580,85 @@ ValueError: too many values to unpack (expected 3)
 [2026-07-24 21:55:16] [INFO] [TrafficSystem.TrafficPipeline]: Shutting down Traffic Pipeline...
 [2026-07-24 21:55:16] [INFO] [TrafficSystem.CameraManager]: Video stream released successfully.
 [2026-07-24 21:55:16] [INFO] [TrafficSystem.TrafficPipeline]: Pipeline Session Summary: Processed 30 frames in 2.74s (Avg FPS: 11.0, Avg Latency: 81.98ms)
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.Main]: ==================================================
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.Main]:        Smart Traffic Management System           
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.Main]:  AI Perception + Analytics + Adaptive Signal Engine
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.Main]: ==================================================
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.TrafficPipeline]: Initializing Smart Traffic Management System Pipeline...
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.CameraManager]: Opening video source: 'C:\Users\ashek\Desktop\smart-traffic-management\videos\traffic.mp4'...
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.CameraManager]: Stream opened successfully. Resolution: (1280, 720), FPS: 30.0
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.ModelManager]: Initializing YOLO model: 'yolo11n.pt'...
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.ModelManager]: Model 'yolo11n.pt' loaded successfully!
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.VehicleDetector]: VehicleDetector initialized focusing on classes: {2: 'car', 3: 'motorcycle', 5: 'bus', 7: 'truck'}
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.ByteTracker]: ByteTracker initialized using Ultralytics ByteTrack algorithm.
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.LaneManager]: LaneManager initialized with 4 lanes covering 1280x720 resolution: ['North', 'South', 'East', 'West']
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.PriorityCalculator]: PriorityCalculator initialized with normalized weights: {'pce': 0.45, 'queue': 0.35, 'congestion': 0.2}
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.FairnessManager]: FairnessManager initialized (Bonus/cycle: 5.0, Max Cap: 25.0)
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.EmergencyOverride]: EmergencyOverride initialized with boost score: 1000.0
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.SignalScheduler]: SignalScheduler initialized (Min Green: 10s, Max Green: 60s, Yellow: 3s)
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.SignalController]: SignalController initialized and ready for ESP32 hardware command generation.
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.TrafficPipeline]: Smart Traffic Management System Pipeline fully initialized and ready!
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.Main]: Starting video processing. Press 'q' in the window to exit.
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler Phase #1] Winner: North  | Score: 0.00  | Green: 10s | Reason: NORMAL
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'North' (Reset to 0). Waiting cycles: {'North': 0, 'South': 1, 'East': 1, 'West': 1}
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #1] GREEN -> 'North' (10s) | Reason: NORMAL
+[2026-07-24 22:07:22] [INFO] [TrafficSystem.Visualizer]: Output VideoWriter initialized: 'C:\Users\ashek\Desktop\smart-traffic-management\outputs\traffic_system_20260724_220722.mp4' (1280x720 @ 30.0 FPS)
+[2026-07-24 22:07:23] [INFO] [TrafficSystem.Main]: Frame #11 | Live Vehicles: 0 | Active Green: 'LaneName.NORTH' (9s remaining) | Phase Changed: False
+[2026-07-24 22:07:24] [INFO] [TrafficSystem.Main]: Frame #25 | Live Vehicles: 0 | Active Green: 'LaneName.NORTH' (8s remaining) | Phase Changed: False
+[2026-07-24 22:07:26] [INFO] [TrafficSystem.Main]: Frame #30 | Live Vehicles: 0 | Active Green: 'LaneName.NORTH' (7s remaining) | Phase Changed: False
+[2026-07-24 22:07:27] [INFO] [TrafficSystem.Main]: Frame #41 | Live Vehicles: 0 | Active Green: 'LaneName.NORTH' (6s remaining) | Phase Changed: False
+[2026-07-24 22:07:28] [INFO] [TrafficSystem.Main]: Frame #56 | Live Vehicles: 0 | Active Green: 'LaneName.NORTH' (5s remaining) | Phase Changed: False
+[2026-07-24 22:07:29] [INFO] [TrafficSystem.Main]: Frame #71 | Live Vehicles: 0 | Active Green: 'LaneName.NORTH' (4s remaining) | Phase Changed: False
+[2026-07-24 22:07:30] [INFO] [TrafficSystem.Main]: Frame #86 | Live Vehicles: 0 | Active Green: 'LaneName.NORTH' (3s remaining) | Phase Changed: False
+[2026-07-24 22:07:31] [INFO] [TrafficSystem.Main]: Frame #101 | Live Vehicles: 0 | Active Green: 'LaneName.NORTH' (1s remaining) | Phase Changed: False
+[2026-07-24 22:07:32] [INFO] [TrafficSystem.Main]: Frame #116 | Live Vehicles: 0 | Active Green: 'LaneName.NORTH' (0s remaining) | Phase Changed: False
+[2026-07-24 22:07:33] [INFO] [TrafficSystem.Main]: Frame #132 | Live Vehicles: 0 | Active Green: 'LaneName.NORTH' (0s remaining) | Phase Changed: False
+[2026-07-24 22:07:34] [INFO] [TrafficSystem.Main]: Frame #147 | Live Vehicles: 0 | Active Green: 'LaneName.NORTH' (0s remaining) | Phase Changed: False
+[2026-07-24 22:07:35] [INFO] [TrafficSystem.Main]: Frame #162 | Live Vehicles: 0 | Active Green: 'LaneName.NORTH' (0s remaining) | Phase Changed: False
+[2026-07-24 22:07:35] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 22:07:35] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 22:07:35] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 22:07:35] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 22:07:35] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 22:07:35] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 22:07:35] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 22:07:35] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler Phase #2] Winner: South  | Score: 5.00  | Green: 27s | Reason: NORMAL
+[2026-07-24 22:07:35] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'South' (Reset to 0). Waiting cycles: {'North': 1, 'South': 0, 'East': 2, 'West': 2}
+[2026-07-24 22:07:35] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #2] GREEN -> 'South' (27s) | Reason: NORMAL
+[2026-07-24 22:07:36] [INFO] [TrafficSystem.Main]: Frame #177 | Live Vehicles: 0 | Active Green: 'LaneName.SOUTH' (26s remaining) | Phase Changed: False
+[2026-07-24 22:07:37] [INFO] [TrafficSystem.Main]: Frame #192 | Live Vehicles: 0 | Active Green: 'LaneName.SOUTH' (25s remaining) | Phase Changed: False
+[2026-07-24 22:07:38] [INFO] [TrafficSystem.Main]: Frame #207 | Live Vehicles: 0 | Active Green: 'LaneName.SOUTH' (24s remaining) | Phase Changed: False
+[2026-07-24 22:07:39] [INFO] [TrafficSystem.Main]: Window closed by user.
+[2026-07-24 22:07:39] [INFO] [TrafficSystem.TrafficPipeline]: Shutting down Traffic Pipeline...
+[2026-07-24 22:07:39] [INFO] [TrafficSystem.CameraManager]: Video stream released successfully.
+[2026-07-24 22:07:39] [INFO] [TrafficSystem.Visualizer]: VideoWriter released successfully.
+[2026-07-24 22:07:39] [INFO] [TrafficSystem.TrafficPipeline]: Pipeline Session Summary: Processed 218 frames in 16.85s (Avg FPS: 14.6, Avg Latency: 57.62ms)
+[2026-07-24 22:07:39] [INFO] [TrafficSystem.Main]: Clean shutdown complete.
+[2026-07-24 22:09:43] [INFO] [TrafficSystem.TrafficPipeline]: Initializing Smart Traffic Management System Pipeline...
+[2026-07-24 22:09:43] [INFO] [TrafficSystem.CameraManager]: Opening video source: 'C:\Users\ashek\Desktop\smart-traffic-management\videos\traffic.mp4'...
+[2026-07-24 22:09:43] [INFO] [TrafficSystem.CameraManager]: Stream opened successfully. Resolution: (1280, 720), FPS: 30.0
+[2026-07-24 22:09:43] [INFO] [TrafficSystem.ModelManager]: Initializing YOLO model: 'yolo11n.pt'...
+[2026-07-24 22:09:43] [INFO] [TrafficSystem.ModelManager]: Model 'yolo11n.pt' loaded successfully!
+[2026-07-24 22:09:43] [INFO] [TrafficSystem.VehicleDetector]: VehicleDetector initialized focusing on classes: {2: 'car', 3: 'motorcycle', 5: 'bus', 7: 'truck'}
+[2026-07-24 22:09:43] [INFO] [TrafficSystem.ByteTracker]: ByteTracker initialized using Ultralytics ByteTrack algorithm.
+[2026-07-24 22:09:43] [INFO] [TrafficSystem.LaneManager]: LaneManager initialized with 4 lanes covering 1280x720 resolution: ['North', 'South', 'East', 'West']
+[2026-07-24 22:09:43] [INFO] [TrafficSystem.PriorityCalculator]: PriorityCalculator initialized with normalized weights: {'pce': 0.45, 'queue': 0.35, 'congestion': 0.2}
+[2026-07-24 22:09:43] [INFO] [TrafficSystem.FairnessManager]: FairnessManager initialized (Bonus/cycle: 5.0, Max Cap: 25.0)
+[2026-07-24 22:09:43] [INFO] [TrafficSystem.EmergencyOverride]: EmergencyOverride initialized with boost score: 1000.0
+[2026-07-24 22:09:43] [INFO] [TrafficSystem.SignalScheduler]: SignalScheduler initialized (Min Green: 10s, Max Green: 60s, Yellow: 3s)
+[2026-07-24 22:09:43] [INFO] [TrafficSystem.SignalController]: SignalController initialized and ready for ESP32 hardware command generation.
+[2026-07-24 22:09:43] [INFO] [TrafficSystem.TrafficPipeline]: Smart Traffic Management System Pipeline fully initialized and ready!
+[2026-07-24 22:09:44] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 22:09:44] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 22:09:44] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 22:09:44] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 22:09:44] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler Phase #1] Winner: North  | Score: 0.00  | Green: 10s | Reason: NORMAL
+[2026-07-24 22:09:44] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'North' (Reset to 0). Waiting cycles: {'North': 0, 'South': 1, 'East': 1, 'West': 1}
+[2026-07-24 22:09:44] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #1] GREEN -> 'North' (10s) | Reason: NORMAL
+[2026-07-24 22:09:44] [INFO] [TrafficSystem.TrafficPipeline]: Shutting down Traffic Pipeline...
+[2026-07-24 22:09:44] [INFO] [TrafficSystem.CameraManager]: Video stream released successfully.
+[2026-07-24 22:09:44] [INFO] [TrafficSystem.TrafficPipeline]: Pipeline Session Summary: Processed 1 frames in 1.18s (Avg FPS: 0.9, Avg Latency: 1018.91ms)

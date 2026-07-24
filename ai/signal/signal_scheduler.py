@@ -39,12 +39,13 @@ class SignalScheduler:
             f"Max Green: {self.max_green_sec}s, Yellow: {self.yellow_sec}s)"
         )
 
-    def schedule(self, priority_result: PriorityResult) -> SignalDecision:
+    def schedule(self, priority_result: PriorityResult, phase_id: int = 1) -> SignalDecision:
         """
         Public API method to schedule a traffic light phase decision.
         
         Args:
             priority_result (PriorityResult): Validated container holding lane priority scores.
+            phase_id (int): Monotonic sequential phase ID.
             
         Returns:
             SignalDecision: Strongly-typed decision payload.
@@ -63,13 +64,13 @@ class SignalScheduler:
         green_duration_sec = self._calculate_green_time(winner, priority_result)
 
         # Step 3: Construct SignalDecision Object
-        decision = self._build_decision(winner, green_duration_sec, priority_result)
+        decision = self._build_decision(winner, green_duration_sec, priority_result, phase_id)
 
         # Log concise cycle summary
         green_str = winner.lane.value if hasattr(winner.lane, "value") else str(winner.lane)
         reason_str = decision.reason.value if hasattr(decision.reason, "value") else str(decision.reason)
         logger.info(
-            f"[Scheduler] Winner: {green_str:<6} | Score: {winner.score:<5.2f} | "
+            f"[Scheduler Phase #{phase_id}] Winner: {green_str:<6} | Score: {winner.score:<5.2f} | "
             f"Green: {green_duration_sec}s | Reason: {reason_str}"
         )
 
@@ -114,6 +115,7 @@ class SignalScheduler:
         winner: PriorityScore,
         green_duration_sec: int,
         priority_result: PriorityResult,
+        phase_id: int,
     ) -> SignalDecision:
         """
         Construct strongly-typed SignalDecision payload.
@@ -122,6 +124,7 @@ class SignalScheduler:
         winner_str = winner.lane.value if hasattr(winner.lane, "value") else str(winner.lane)
 
         return SignalDecision(
+            phase_id=phase_id,
             green_lane=winner.lane,
             green_duration_sec=green_duration_sec,
             yellow_duration_sec=self.yellow_sec,

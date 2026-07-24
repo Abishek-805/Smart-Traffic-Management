@@ -10,6 +10,7 @@ from ai.detection.detection_types import Detection
 from ai.analytics.analytics_exporter import LaneStatistics
 from ai.signal.signal_types import PriorityResult, HardwareCommand
 from ai.signal.signal_decision import SignalDecision
+from ai.pipeline.pipeline_health import PipelineHealth
 
 
 @dataclass
@@ -25,5 +26,6 @@ class PipelineResult:
     priority_result: Optional[PriorityResult] = None
     signal_decision: Optional[SignalDecision] = None
     hardware_command: Optional[HardwareCommand] = None
+    health: Optional[PipelineHealth] = None
     remaining_green_sec: int = 0
     is_phase_change: bool = False

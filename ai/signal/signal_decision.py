@@ -17,6 +17,7 @@ class SignalDecision:
     Immutable representation of an adaptive traffic signal phase decision.
     
     Attributes:
+        phase_id (int): Monotonic sequential phase identifier (e.g., Phase #1, Phase #2).
         green_lane (Union[LaneName, str]): The lane granted the green signal phase.
         green_duration_sec (int): Allocated duration of the green light phase in seconds.
         yellow_duration_sec (int): Duration of the transition yellow light phase in seconds.
@@ -26,6 +27,7 @@ class SignalDecision:
         reason_details (str): Detailed human-readable explanation for why this decision was reached.
         timestamp (float): UNIX timestamp when the decision was generated.
     """
+    phase_id: int
     green_lane: Union[LaneName, str]
     green_duration_sec: int
     yellow_duration_sec: int
@@ -45,6 +47,7 @@ class SignalDecision:
         reason_str = self.reason.value if isinstance(self.reason, Enum) else str(self.reason)
 
         return {
+            "phase_id": self.phase_id,
             "green_lane": green_str,
             "green_duration_sec": self.green_duration_sec,
             "yellow_duration_sec": self.yellow_duration_sec,
@@ -81,6 +84,7 @@ class SignalDecision:
             reason = DecisionReason.NORMAL
 
         return cls(
+            phase_id=int(data.get("phase_id", 1)),
             green_lane=green_lane,
             green_duration_sec=int(data.get("green_duration_sec", 10)),
             yellow_duration_sec=int(data.get("yellow_duration_sec", 3)),
@@ -102,8 +106,9 @@ class SignalDecision:
         time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self.timestamp))
         
         return (
-            f"=================== SIGNAL DECISION ===================\n"
+            f"=================== SIGNAL DECISION #{self.phase_id} ===================\n"
             f" Timestamp      : {time_str}\n"
+            f" PHASE ID       : #{self.phase_id}\n"
             f" GREEN PHASE    : Lane '{green_str}' ({self.green_duration_sec}s)\n"
             f" YELLOW PHASE   : {self.yellow_duration_sec}s\n"
             f" RED PHASES     : [{reds}]\n"
