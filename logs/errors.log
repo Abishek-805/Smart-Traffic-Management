@@ -1,0 +1,8 @@
+[2026-07-24 21:07:45] [ERROR] [TrafficSystem.SignalScheduler]: Schedule called with empty or None PriorityResult.
+[2026-07-24 21:07:45] [ERROR] [TrafficSystem.SignalScheduler]: Schedule called with empty or None PriorityResult.
+[2026-07-24 21:17:07] [ERROR] [TrafficSystem.Main]: Unhandled error during frame execution: too many values to unpack (expected 3)
+Traceback (most recent call last):
+  File "C:\Users\ashek\Desktop\smart-traffic-management\main.py", line 51, in main
+    has_frame, annotated_frame, detections = pipeline.process_step()
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: too many values to unpack (expected 3)
