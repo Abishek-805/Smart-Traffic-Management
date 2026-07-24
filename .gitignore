@@ -1,0 +1,24 @@
+# Python Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environment & IDE
+.venv/
+venv/
+ENV/
+env/
+.idea/
+.vscode/
+
+# Project Generated Files & Large Media
+models/*.pt
+videos/*.mp4
+outputs/*.mp4
+logs/*.log
+
+# Pytest & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
