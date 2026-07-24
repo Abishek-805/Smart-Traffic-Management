@@ -25,3 +25,5 @@ class PipelineResult:
     priority_result: Optional[PriorityResult] = None
     signal_decision: Optional[SignalDecision] = None
     hardware_command: Optional[HardwareCommand] = None
+    remaining_green_sec: int = 0
+    is_phase_change: bool = False

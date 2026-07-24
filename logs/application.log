@@ -6173,3 +6173,410 @@ ValueError: too many values to unpack (expected 3)
 [2026-07-24 21:32:17] [INFO] [TrafficSystem.Visualizer]: VideoWriter released successfully.
 [2026-07-24 21:32:17] [INFO] [TrafficSystem.TrafficPipeline]: Pipeline Session Summary: Processed 300 frames in 122.54s (Avg FPS: 2.2, Avg Latency: 389.34ms)
 [2026-07-24 21:32:17] [INFO] [TrafficSystem.Main]: Clean shutdown complete.
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.Main]: ==================================================
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.Main]:        Smart Traffic Management System           
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.Main]:  AI Perception + Analytics + Adaptive Signal Engine
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.Main]: ==================================================
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.TrafficPipeline]: Initializing Smart Traffic Management System Pipeline...
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.CameraManager]: Opening video source: 'C:\Users\ashek\Desktop\smart-traffic-management\videos\traffic.mp4'...
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.CameraManager]: Stream opened successfully. Resolution: (1280, 720), FPS: 30.0
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.ModelManager]: Initializing YOLO model: 'yolo11n.pt'...
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.ModelManager]: Model 'yolo11n.pt' loaded successfully!
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.VehicleDetector]: VehicleDetector initialized focusing on classes: {2: 'car', 3: 'motorcycle', 5: 'bus', 7: 'truck'}
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.ByteTracker]: ByteTracker initialized using Ultralytics ByteTrack algorithm.
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.LaneManager]: LaneManager initialized with 4 lanes: ['North', 'South', 'East', 'West']
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.PriorityCalculator]: PriorityCalculator initialized with normalized weights: {'pce': 0.45, 'queue': 0.35, 'congestion': 0.2}
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.FairnessManager]: FairnessManager initialized (Bonus/cycle: 5.0, Max Cap: 25.0)
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.EmergencyOverride]: EmergencyOverride initialized with boost score: 1000.0
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.SignalScheduler]: SignalScheduler initialized (Min Green: 10s, Max Green: 60s, Yellow: 3s)
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.SignalController]: SignalController initialized and ready for ESP32 hardware command generation.
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.TrafficPipeline]: Smart Traffic Management System Pipeline fully initialized and ready!
+[2026-07-24 21:44:50] [INFO] [TrafficSystem.Main]: Starting video processing. Press 'q' in the window to exit.
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: North  | Score: 0.00  | Green: 10s | Reason: NORMAL
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'North' (Reset to 0). Waiting cycles: {'North': 0, 'South': 1, 'East': 1, 'West': 1}
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #1] GREEN -> 'North' (10s) | Reason: NORMAL
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.Visualizer]: Output VideoWriter initialized: 'C:\Users\ashek\Desktop\smart-traffic-management\outputs\traffic_system_20260724_214450.mp4' (1280x720 @ 30.0 FPS)
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: South  | Score: 5.00  | Green: 27s | Reason: NORMAL
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'South' (Reset to 0). Waiting cycles: {'North': 1, 'South': 0, 'East': 2, 'West': 2}
+[2026-07-24 21:44:51] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #2] GREEN -> 'South' (27s) | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: East   | Score: 10.00 | Green: 30s | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'East' (Reset to 0). Waiting cycles: {'North': 2, 'South': 1, 'East': 0, 'West': 3}
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #3] GREEN -> 'East' (30s) | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: West   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'West' (Reset to 0). Waiting cycles: {'North': 3, 'South': 2, 'East': 1, 'West': 0}
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #4] GREEN -> 'West' (35s) | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: North  | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'North' (Reset to 0). Waiting cycles: {'North': 0, 'South': 3, 'East': 2, 'West': 1}
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #5] GREEN -> 'North' (35s) | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: South  | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'South' (Reset to 0). Waiting cycles: {'North': 1, 'South': 0, 'East': 3, 'West': 2}
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #6] GREEN -> 'South' (35s) | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: East   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'East' (Reset to 0). Waiting cycles: {'North': 2, 'South': 1, 'East': 0, 'West': 3}
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #7] GREEN -> 'East' (35s) | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: West   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'West' (Reset to 0). Waiting cycles: {'North': 3, 'South': 2, 'East': 1, 'West': 0}
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #8] GREEN -> 'West' (35s) | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: North  | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'North' (Reset to 0). Waiting cycles: {'North': 0, 'South': 3, 'East': 2, 'West': 1}
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #9] GREEN -> 'North' (35s) | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: South  | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'South' (Reset to 0). Waiting cycles: {'North': 1, 'South': 0, 'East': 3, 'West': 2}
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #10] GREEN -> 'South' (35s) | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: East   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'East' (Reset to 0). Waiting cycles: {'North': 2, 'South': 1, 'East': 0, 'West': 3}
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #11] GREEN -> 'East' (35s) | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: West   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'West' (Reset to 0). Waiting cycles: {'North': 3, 'South': 2, 'East': 1, 'West': 0}
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #12] GREEN -> 'West' (35s) | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: North  | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'North' (Reset to 0). Waiting cycles: {'North': 0, 'South': 3, 'East': 2, 'West': 1}
+[2026-07-24 21:44:52] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #13] GREEN -> 'North' (35s) | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: South  | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'South' (Reset to 0). Waiting cycles: {'North': 1, 'South': 0, 'East': 3, 'West': 2}
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #14] GREEN -> 'South' (35s) | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: East   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'East' (Reset to 0). Waiting cycles: {'North': 2, 'South': 1, 'East': 0, 'West': 3}
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #15] GREEN -> 'East' (35s) | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: West   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'West' (Reset to 0). Waiting cycles: {'North': 3, 'South': 2, 'East': 1, 'West': 0}
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #16] GREEN -> 'West' (35s) | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: North  | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'North' (Reset to 0). Waiting cycles: {'North': 0, 'South': 3, 'East': 2, 'West': 1}
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #17] GREEN -> 'North' (35s) | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: South  | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'South' (Reset to 0). Waiting cycles: {'North': 1, 'South': 0, 'East': 3, 'West': 2}
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #18] GREEN -> 'South' (35s) | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: East   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'East' (Reset to 0). Waiting cycles: {'North': 2, 'South': 1, 'East': 0, 'West': 3}
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #19] GREEN -> 'East' (35s) | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: West   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'West' (Reset to 0). Waiting cycles: {'North': 3, 'South': 2, 'East': 1, 'West': 0}
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #20] GREEN -> 'West' (35s) | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: North  | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'North' (Reset to 0). Waiting cycles: {'North': 0, 'South': 3, 'East': 2, 'West': 1}
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #21] GREEN -> 'North' (35s) | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: South  | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'South' (Reset to 0). Waiting cycles: {'North': 1, 'South': 0, 'East': 3, 'West': 2}
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #22] GREEN -> 'South' (35s) | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: East   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'East' (Reset to 0). Waiting cycles: {'North': 2, 'South': 1, 'East': 0, 'West': 3}
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #23] GREEN -> 'East' (35s) | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: West   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'West' (Reset to 0). Waiting cycles: {'North': 3, 'South': 2, 'East': 1, 'West': 0}
+[2026-07-24 21:44:53] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #24] GREEN -> 'West' (35s) | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: North  | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'North' (Reset to 0). Waiting cycles: {'North': 0, 'South': 3, 'East': 2, 'West': 1}
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #25] GREEN -> 'North' (35s) | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: South  | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'South' (Reset to 0). Waiting cycles: {'North': 1, 'South': 0, 'East': 3, 'West': 2}
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #26] GREEN -> 'South' (35s) | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: East   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'East' (Reset to 0). Waiting cycles: {'North': 2, 'South': 1, 'East': 0, 'West': 3}
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #27] GREEN -> 'East' (35s) | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: West   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'West' (Reset to 0). Waiting cycles: {'North': 3, 'South': 2, 'East': 1, 'West': 0}
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #28] GREEN -> 'West' (35s) | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: North  | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'North' (Reset to 0). Waiting cycles: {'North': 0, 'South': 3, 'East': 2, 'West': 1}
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #29] GREEN -> 'North' (35s) | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: South  | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'South' (Reset to 0). Waiting cycles: {'North': 1, 'South': 0, 'East': 3, 'West': 2}
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #30] GREEN -> 'South' (35s) | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: East   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'East' (Reset to 0). Waiting cycles: {'North': 2, 'South': 1, 'East': 0, 'West': 3}
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #31] GREEN -> 'East' (35s) | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: West   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'West' (Reset to 0). Waiting cycles: {'North': 3, 'South': 2, 'East': 1, 'West': 0}
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #32] GREEN -> 'West' (35s) | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: North  | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'North' (Reset to 0). Waiting cycles: {'North': 0, 'South': 3, 'East': 2, 'West': 1}
+[2026-07-24 21:44:54] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #33] GREEN -> 'North' (35s) | Reason: NORMAL
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: South  | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'South' (Reset to 0). Waiting cycles: {'North': 1, 'South': 0, 'East': 3, 'West': 2}
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #34] GREEN -> 'South' (35s) | Reason: NORMAL
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: East   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: East   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'East' (Reset to 0). Waiting cycles: {'North': 2, 'South': 1, 'East': 0, 'West': 3}
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #35] GREEN -> 'East' (35s) | Reason: NORMAL
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: West   | Base Score: 0.00 | Wait Cycles: 3 | Bonus: +15.00 | Adjusted: 15.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: North  | Base Score: 0.00 | Wait Cycles: 2 | Bonus: +10.00 | Adjusted: 10.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.FairnessManager]: [Fairness] Lane: South  | Base Score: 0.00 | Wait Cycles: 1 | Bonus: +5.00 | Adjusted: 5.00
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: West   | Score: 15.00 | Green: 35s | Reason: NORMAL
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'West' (Reset to 0). Waiting cycles: {'North': 3, 'South': 2, 'East': 1, 'West': 0}
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #36] GREEN -> 'West' (35s) | Reason: NORMAL
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.Main]: Window closed by user.
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.TrafficPipeline]: Shutting down Traffic Pipeline...
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.CameraManager]: Video stream released successfully.
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.Visualizer]: VideoWriter released successfully.
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.TrafficPipeline]: Pipeline Session Summary: Processed 36 frames in 5.17s (Avg FPS: 10.3, Avg Latency: 80.61ms)
+[2026-07-24 21:44:55] [INFO] [TrafficSystem.Main]: Clean shutdown complete.
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.TrafficPipeline]: Initializing Smart Traffic Management System Pipeline...
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.CameraManager]: Opening video source: 'C:\Users\ashek\Desktop\smart-traffic-management\videos\traffic.mp4'...
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.CameraManager]: Stream opened successfully. Resolution: (1280, 720), FPS: 30.0
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.ModelManager]: Initializing YOLO model: 'yolo11n.pt'...
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.ModelManager]: Model 'yolo11n.pt' loaded successfully!
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.VehicleDetector]: VehicleDetector initialized focusing on classes: {2: 'car', 3: 'motorcycle', 5: 'bus', 7: 'truck'}
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.ByteTracker]: ByteTracker initialized using Ultralytics ByteTrack algorithm.
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.LaneManager]: LaneManager initialized with 4 lanes covering 1280x720 resolution: ['North', 'South', 'East', 'West']
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.PriorityCalculator]: PriorityCalculator initialized with normalized weights: {'pce': 0.45, 'queue': 0.35, 'congestion': 0.2}
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.FairnessManager]: FairnessManager initialized (Bonus/cycle: 5.0, Max Cap: 25.0)
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.EmergencyOverride]: EmergencyOverride initialized with boost score: 1000.0
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.SignalScheduler]: SignalScheduler initialized (Min Green: 10s, Max Green: 60s, Yellow: 3s)
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.SignalController]: SignalController initialized and ready for ESP32 hardware command generation.
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.TrafficPipeline]: Smart Traffic Management System Pipeline fully initialized and ready!
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #1] Lane: North  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #2] Lane: South  | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #3] Lane: East   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.PriorityCalculator]: [Rank #4] Lane: West   | PCE: 0.00  | Queue: 0.00  | Congestion: 0.00  | Total: 0.00
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.SignalScheduler]: [Scheduler] Winner: North  | Score: 0.00  | Green: 10s | Reason: NORMAL
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.FairnessManager]: [Fairness Updated] Green: 'North' (Reset to 0). Waiting cycles: {'North': 0, 'South': 1, 'East': 1, 'West': 1}
+[2026-07-24 21:55:13] [INFO] [TrafficSystem.SignalController]: [ESP32 Hardware Command #1] GREEN -> 'North' (10s) | Reason: NORMAL
+[2026-07-24 21:55:16] [INFO] [TrafficSystem.TrafficPipeline]: Shutting down Traffic Pipeline...
+[2026-07-24 21:55:16] [INFO] [TrafficSystem.CameraManager]: Video stream released successfully.
+[2026-07-24 21:55:16] [INFO] [TrafficSystem.TrafficPipeline]: Pipeline Session Summary: Processed 30 frames in 2.74s (Avg FPS: 11.0, Avg Latency: 81.98ms)

@@ -31,49 +31,50 @@ class LaneManager:
     """
 
     def __init__(self, frame_width: int = 1280, frame_height: int = 720):
-        self.frame_width = frame_width
-        self.frame_height = frame_height
+        self.frame_width = frame_width if frame_width > 0 else 1280
+        self.frame_height = frame_height if frame_height > 0 else 720
         self.lanes: Dict[str, Lane] = {}
 
-        self._setup_default_lanes(frame_width, frame_height)
+        self._setup_default_lanes(self.frame_width, self.frame_height)
 
     def _setup_default_lanes(self, width: int, height: int) -> None:
         """
         Setup default 4-quadrant junction ROI polygons:
-        North, South, East, West.
+        North (Top), South (Bottom), West (Left), East (Right).
         """
         w, h = width, height
+        cx, cy = w // 2, h // 2
 
-        # North Polygon (Top quadrant)
+        # North Polygon (Top triangular/trapezoidal quadrant)
         north_poly = np.array([
-            [int(w * 0.25), 0],
-            [int(w * 0.75), 0],
-            [int(w * 0.65), int(h * 0.40)],
-            [int(w * 0.35), int(h * 0.40)],
+            [0, 0],
+            [w, 0],
+            [cx + int(w * 0.1), cy],
+            [cx - int(w * 0.1), cy],
         ], dtype=np.int32)
 
-        # South Polygon (Bottom quadrant)
+        # South Polygon (Bottom triangular/trapezoidal quadrant)
         south_poly = np.array([
-            [int(w * 0.35), int(h * 0.60)],
-            [int(w * 0.65), int(h * 0.60)],
-            [int(w * 0.75), h],
-            [int(w * 0.25), h],
+            [cx - int(w * 0.1), cy],
+            [cx + int(w * 0.1), cy],
+            [w, h],
+            [0, h],
         ], dtype=np.int32)
 
         # West Polygon (Left quadrant)
         west_poly = np.array([
-            [0, int(h * 0.20)],
-            [int(w * 0.35), int(h * 0.40)],
-            [int(w * 0.35), int(h * 0.60)],
-            [0, int(h * 0.80)],
+            [0, 0],
+            [cx, cy - int(h * 0.1)],
+            [cx, cy + int(h * 0.1)],
+            [0, h],
         ], dtype=np.int32)
 
         # East Polygon (Right quadrant)
         east_poly = np.array([
-            [int(w * 0.65), int(h * 0.40)],
-            [w, int(h * 0.20)],
-            [w, int(h * 0.80)],
-            [int(w * 0.65), int(h * 0.60)],
+            [w, 0],
+            [cx, cy - int(h * 0.1)],
+            [cx, cy + int(h * 0.1)],
+            [w, h],
         ], dtype=np.int32)
 
         self.lanes = {
@@ -82,7 +83,7 @@ class LaneManager:
             "East": Lane("East", east_poly, direction="Westbound", priority=1, signal_group="Phase_B"),
             "West": Lane("West", west_poly, direction="Eastbound", priority=1, signal_group="Phase_B"),
         }
-        logger.info(f"LaneManager initialized with {len(self.lanes)} lanes: {list(self.lanes.keys())}")
+        logger.info(f"LaneManager initialized with 4 lanes covering {w}x{h} resolution: {list(self.lanes.keys())}")
 
     def assign_lanes(self, detections: List[Detection]) -> List[Detection]:
         """
@@ -93,14 +94,14 @@ class LaneManager:
             point = (float(cx), float(cy))
             assigned_lane = None
 
+            # Primary: Point-in-polygon check
             for lane_name, lane in self.lanes.items():
-                # cv2.pointPolygonTest returns >= 0 if inside or on edge
                 res = cv2.pointPolygonTest(lane.polygon, point, measureDist=False)
                 if res >= 0:
                     assigned_lane = lane_name
                     break
 
-            # Fallback if vehicle is outside strict polygons: assign nearest polygon quadrant
+            # Fallback: Assign nearest quadrant based on centroid position relative to center
             if assigned_lane is None:
                 assigned_lane = self._get_fallback_quadrant(cx, cy)
 
@@ -110,10 +111,14 @@ class LaneManager:
 
     def _get_fallback_quadrant(self, cx: int, cy: int) -> str:
         """Assign lane by simple midpoint quadrant fallback if outside ROI polygons."""
-        half_w = self.frame_width / 2.0
-        half_h = self.frame_height / 2.0
+        mid_x = self.frame_width / 2.0
+        mid_y = self.frame_height / 2.0
 
-        if cy < half_h:
-            return "North" if cx < half_w else "East"
+        dx = cx - mid_x
+        dy = cy - mid_y
+
+        # Compare horizontal vs vertical distance from center
+        if abs(dx) > abs(dy):
+            return "East" if dx > 0 else "West"
         else:
-            return "West" if cx < half_w else "South"
+            return "South" if dy > 0 else "North"

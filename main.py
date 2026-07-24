@@ -5,6 +5,7 @@ traffic analytics, adaptive signal decision engine, and performance HUD renderin
 """
 
 import sys
+import time
 import cv2
 from pathlib import Path
 
@@ -47,6 +48,9 @@ def main():
     cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(WINDOW_NAME, 1280, 720)
 
+    last_log_time = time.time()
+    frame_counter = 0
+
     try:
         while True:
             # Process single step in pipeline, returning a strongly-typed PipelineResult
@@ -55,6 +59,21 @@ def main():
             if not res.has_frame or res.annotated_frame is None:
                 logger.info("Video playback completed.")
                 break
+
+            frame_counter += 1
+
+            # Concise 1-second status log summary
+            current_time = time.time()
+            if current_time - last_log_time >= 1.0:
+                last_log_time = current_time
+                green_str = str(res.signal_decision.green_lane) if res.signal_decision else "None"
+                total_vehicles = sum(s.live_count for s in res.lane_stats.values()) if res.lane_stats else len(res.detections)
+                
+                logger.info(
+                    f"Frame #{frame_counter} | Live Vehicles: {total_vehicles} | "
+                    f"Active Green: '{green_str}' ({res.remaining_green_sec}s remaining) | "
+                    f"Phase Changed: {res.is_phase_change}"
+                )
 
             # Render frame to OpenCV GUI window
             cv2.imshow(WINDOW_NAME, res.annotated_frame)
