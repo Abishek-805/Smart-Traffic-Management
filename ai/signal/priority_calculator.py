@@ -54,9 +54,12 @@ class PriorityCalculator:
 
         for lane_name_str, stats in lane_stats.items():
             try:
-                lane_enum = LaneName(lane_name_str)
+                lane_enum = LaneName(lane_name_str.capitalize())
             except ValueError:
-                lane_enum = lane_name_str
+                try:
+                    lane_enum = LaneName(lane_name_str)
+                except ValueError:
+                    lane_enum = lane_name_str
 
             # 1. Component Score Contributions
             pce_contrib = w_pce * stats.pce_score

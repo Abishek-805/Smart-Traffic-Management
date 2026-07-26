@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}System Overview — Smart Traffic Control{% endblock %}
+{% block page_title %}System Overview{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  <!-- Status Cards -->
+  <div class="col-md-3">
+    <div class="card-custom">
+      <div class="card-title-custom">
+        <span>AI Perception Engine</span>
+        <i class="bi bi-cpu-fill text-info"></i>
+      </div>
+      <div class="metric-value text-success" id="index-ai-status">ACTIVE</div>
+      <div class="metric-label">YOLO11 + ByteTrack Pipeline</div>
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <div class="card-custom">
+      <div class="card-title-custom">
+        <span>Communication Server</span>
+        <i class="bi bi-wifi text-info"></i>
+      </div>
+      <div class="metric-value text-info">ws://8000</div>
+      <div class="metric-label">FastAPI WebSockets</div>
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <div class="card-custom">
+      <div class="card-title-custom">
+        <span>Connected Nodes</span>
+        <i class="bi bi-phone-vibrate text-info"></i>
+      </div>
+      <div class="metric-value text-primary" id="index-nodes-val">1 Node</div>
+      <div class="metric-label">Mobile Camera Stream</div>
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <div class="card-custom">
+      <div class="card-title-custom">
+        <span>ESP32 Hardware</span>
+        <i class="bi bi-hardware-chip text-warning"></i>
+      </div>
+      <div class="metric-value text-warning">SIMULATION</div>
+      <div class="metric-label">Non-Blocking Serial Protocol</div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Action Controls & Active Phase Overview -->
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card-custom h-100">
+      <div class="card-title-custom">
+        <span>System Operations Control</span>
+        <i class="bi bi-play-circle text-info"></i>
+      </div>
+      <p class="text-secondary" style="font-size: 13px;">
+        Control the active multi-camera AI traffic management system loop. Starting the system triggers real-time YOLO11 vehicle detection, ByteTrack tracking, PCE queue calculation, and signal timing scheduling.
+      </p>
+
+      <div class="d-flex gap-2 mt-3">
+        <button class="btn btn-cyan px-4" onclick="startSystem()">
+          <i class="bi bi-play-fill me-1"></i> Start System
+        </button>
+        <button class="btn btn-outline-danger px-4" onclick="stopSystem()">
+          <i class="bi bi-stop-fill me-1"></i> Stop System
+        </button>
+        <button class="btn btn-outline-custom px-4" onclick="restartSystem()">
+          <i class="bi bi-arrow-clockwise me-1"></i> Restart Loop
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card-custom h-100">
+      <div class="card-title-custom">
+        <span>Active Signal Controller HUD</span>
+        <i class="bi bi-traffic-light text-info"></i>
+      </div>
+
+      <div class="d-flex align-items-center justify-content-between my-2">
+        <div>
+          <div class="metric-label">CURRENT GREEN PHASE</div>
+          <div class="fs-2 fw-black text-success" id="hud-green-lane">NORTH</div>
+        </div>
+
+        <div class="text-center bg-dark p-3 rounded-3 border border-secondary" style="min-width: 110px;">
+          <div class="metric-label">COUNTDOWN</div>
+          <div class="fs-1 fw-bold text-info" id="hud-countdown">10s</div>
+        </div>
+      </div>
+
+      <div class="mt-2 text-secondary" style="font-size: 12px;">
+        <span class="badge bg-info text-dark me-2">NORMAL SCHEDULE</span>
+        Priority Score: <strong class="text-light">0.00</strong> (PCE Queue Weighted)
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- System Audit Logs Feed -->
+<div class="card-custom">
+  <div class="card-title-custom">
+    <span>Live System Audit Logs</span>
+    <a href="/dashboard" class="btn btn-sm btn-outline-custom">Open Full Operations Dashboard</a>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-dark table-hover align-middle mb-0" style="font-size: 12px;">
+      <thead>
+        <tr class="text-secondary">
+          <th>TIMESTAMP</th>
+          <th>EVENT TYPE</th>
+          <th>SOURCE</th>
+          <th>DETAILS</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>13:21:04</td>
+          <td><span class="badge bg-success">CONNECTED</span></td>
+          <td>SessionManager</td>
+          <td>Node 'CAM-LANE1-9F8A' registered for NORTH direction.</td>
+        </tr>
+        <tr>
+          <td>13:22:15</td>
+          <td><span class="badge bg-info">HEARTBEAT</span></td>
+          <td>WebSocketServer</td>
+          <td>Heartbeat ACK received from CAM-LANE1-9F8A (Latency: 24ms).</td>
+        </tr>
+        <tr>
+          <td>13:23:40</td>
+          <td><span class="badge bg-warning text-dark">PHASE CHANGE</span></td>
+          <td>SignalScheduler</td>
+          <td>Phase switched to GREEN -> NORTH (Duration: 10s). Reason: PCE Queue.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

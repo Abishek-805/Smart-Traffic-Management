@@ -1,0 +1,195 @@
+"""
+Master Single Unified FastAPI Web Application for Smart Traffic Management System.
+Serves HTML Control Center pages, REST APIs, Mobile Camera WebSockets (/ws/camera),
+and Browser Telemetry WebSockets (/ws/telemetry).
+"""
+
+import asyncio
+from pathlib import Path
+from typing import Set
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.staticfiles import StaticFiles
+
+from web.routes import dashboard_router, api_router
+from server.websocket_server import camera_websocket_endpoint
+import server.websocket_server as _ws_server
+from ai.utils.logger import get_logger
+
+logger = get_logger("ControlCenterApp")
+
+from contextlib import asynccontextmanager
+from core.application_context import ApplicationContext
+
+# Paths
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    FastAPI lifespan manager executing startup resource initialization and shutdown teardown.
+    """
+    logger.info("Starting Smart Traffic Control Center Web Application...")
+    ctx = ApplicationContext.get_instance()
+
+    # Patch the WebSocket server's MessageHandler to share the same session/connection
+    # managers as the REST API — fixes the session isolation bug without circular imports.
+    _ws_server.message_handler.session_manager = ctx.session_manager
+    _ws_server.message_handler.connection_manager = ctx.connection_manager
+    logger.info("WebSocket MessageHandler wired to shared ApplicationContext managers.")
+
+    # Initialize TrafficPipeline and ControlManager singletons in ApplicationContext
+    if ctx.pipeline is None:
+        from ai.pipeline.traffic_pipeline import TrafficPipeline
+        ctx.pipeline = TrafficPipeline(save_output=False)
+    if ctx.control_manager is None:
+        from ai.controller.control_manager import ControlManager
+        ctx.control_manager = ControlManager(simulation_mode=True)
+    logger.info("TrafficPipeline and ControlManager initialized in ApplicationContext.")
+
+    # Background periodic session sweeper task
+    async def _session_sweeper():
+        while ctx.system_running:
+            await asyncio.sleep(15.0)
+            try:
+                expired = ctx.session_manager.cleanup_expired_sessions()
+                if expired:
+                    logger.info(f"Cleaned up {len(expired)} expired camera session(s): {expired}")
+            except Exception as e:
+                logger.warning(f"Error in session sweeper: {e}")
+
+    sweeper_task = asyncio.create_task(_session_sweeper())
+
+    yield
+    logger.info("Shutting down Smart Traffic Control Center Web Application...")
+    ctx.system_running = False
+    sweeper_task.cancel()
+    if ctx.pipeline:
+        ctx.pipeline.release()
+    if ctx.control_manager:
+        ctx.control_manager.release()
+
+
+# Single Unified FastAPI Instance
+app = FastAPI(
+    title="Smart Traffic Management System — Control Center",
+    description="Production Web Control Center for real-time AI adaptive traffic signal controller.",
+    version="2.0.0",
+    lifespan=lifespan,
+)
+
+# Mount Static Assets
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+# Include Routers — canonical API at /api/v1
+app.include_router(dashboard_router)
+app.include_router(api_router)
+
+# Legacy compatibility: redirect /api/* → /api/v1/* (308 Permanent Redirect)
+from fastapi import Request
+from fastapi.responses import RedirectResponse
+
+@app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
+async def legacy_api_redirect(path: str, request: Request):
+    """Redirect legacy /api/* callers to the canonical /api/v1/* endpoint."""
+    canonical_url = f"/api/v1/{path}"
+    if request.url.query:
+        canonical_url += f"?{request.url.query}"
+    return RedirectResponse(url=canonical_url, status_code=308)
+
+# Mount Camera Node WebSocket Endpoint (/ws/camera)
+app.add_api_websocket_route("/ws/camera", camera_websocket_endpoint)
+
+# --- Browser Live Telemetry WebSockets (/ws/telemetry) ---
+telemetry_clients: Set[WebSocket] = set()
+
+
+@app.websocket("/ws/telemetry")
+async def telemetry_websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for live browser control room telemetry updates broadcasting immutable PipelineStateSnapshots with stream health metadata."""
+    await websocket.accept()
+    telemetry_clients.add(websocket)
+    logger.info(f"Browser telemetry WebSocket connected: {websocket.client}")
+
+    try:
+        phases = ["North", "East", "South", "West"]
+        idx = 0
+        tick = 20
+        import time
+        while True:
+            await asyncio.sleep(1.0)
+            ctx = ApplicationContext.get_instance()
+            now_mono = time.monotonic()
+            now_wall = time.time()
+            frame_age_sec = round(now_mono - ctx.last_frame_monotonic, 2)
+            frame_age_ms = round(frame_age_sec * 1000.0, 1)
+            is_stalled = frame_age_sec > 2.5
+            is_healthy = (ctx.frame_processing_errors == 0) and not is_stalled
+
+            # Log status transition events
+            if is_stalled != ctx.is_pipeline_stalled:
+                ctx.is_pipeline_stalled = is_stalled
+                logger.info(f"[TELEMETRY STATE EVENT] pipeline_stalled={is_stalled} | frame_age_sec={frame_age_sec}s | status={'STALE' if is_stalled else 'LIVE'}")
+
+            stream_status = "LIVE" if not is_stalled else "STALE"
+
+            if ctx.latest_snapshot:
+                # Inject operational stream health indicators into latest snapshot copy
+                snapshot_data = dict(ctx.latest_snapshot)
+                payload_copy = dict(snapshot_data.get("payload", {}))
+                payload_copy.update({
+                    "snapshotTimestamp": now_wall,
+                    "lastFrameTimestamp": now_wall - frame_age_sec,
+                    "frameAgeMs": frame_age_ms,
+                    "pipelineHealthy": is_healthy,
+                    "pipelineStalled": is_stalled,
+                    "streamStatus": stream_status,
+                    "processingErrors": ctx.frame_processing_errors,
+                })
+                snapshot_data["payload"] = payload_copy
+                await websocket.send_json(snapshot_data)
+            else:
+                # Initial default pulse before first camera frame arrives
+                tick -= 1
+                if tick <= 0:
+                    idx = (idx + 1) % len(phases)
+                    tick = 25
+                payload = {
+                    "protocol": "1.0",
+                    "type": "SystemStatusUpdated",
+                    "timestamp": now_wall,
+                    "payload": {
+                        "activePhase": phases[idx],
+                        "greenDuration": 25,
+                        "timeRemaining": tick,
+                        "totalVehicles": 42 + idx * 5,
+                        "queueLength": round(3.5 + (tick % 5) * 1.2, 1),
+                        "pceScore": round(2.1 + (tick % 3) * 0.8, 1),
+                        "operatingMode": "AUTOMATIC",
+                        "snapshotTimestamp": now_wall,
+                        "lastFrameTimestamp": now_wall,
+                        "frameAgeMs": 0.0,
+                        "pipelineHealthy": True,
+                        "pipelineStalled": False,
+                        "streamStatus": "CONNECTING",
+                        "processingErrors": 0,
+                    },
+                }
+                await websocket.send_json(payload)
+    except WebSocketDisconnect:
+        telemetry_clients.discard(websocket)
+        logger.info(f"Browser telemetry WebSocket disconnected: {websocket.client}")
+    except Exception as e:
+        logger.exception(f"Exception in telemetry websocket endpoint: {e}")
+        telemetry_clients.discard(websocket)
+
+
+def get_app() -> FastAPI:
+    """Return unified FastAPI application."""
+    return app
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("web.app:app", host="0.0.0.0", port=8000, reload=True)

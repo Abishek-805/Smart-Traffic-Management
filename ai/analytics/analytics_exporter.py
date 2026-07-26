@@ -20,15 +20,15 @@ class LaneStatistics:
     Strongly-typed analytics object representing real-time metrics for a single lane.
     """
     lane_name: str
-    live_count: int
-    pce_score: float
-    stopped_count: int
-    total_queue_time_sec: float
-    max_queue_time_sec: float
-    avg_motion_px_sec: float
-    congestion_index: float
-    density: str
-    historical_count: int
+    live_count: int = 0
+    pce_score: float = 0.0
+    stopped_count: int = 0
+    total_queue_time_sec: float = 0.0
+    max_queue_time_sec: float = 0.0
+    avg_motion_px_sec: float = 0.0
+    congestion_index: float = 0.0
+    density: str = "LOW"
+    historical_count: int = 0
     has_priority_vehicle: bool = False
     vehicle_breakdown: Dict[str, int] = field(default_factory=dict)
 

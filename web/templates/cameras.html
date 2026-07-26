@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Camera Management — Smart Traffic Control{% endblock %}
+{% block page_title %}Camera Management Center{% endblock %}
+
+{% block content %}
+<div class="card-custom mb-4">
+  <div class="card-title-custom">
+    <span>Active Input Source Mode</span>
+    <span class="badge bg-cyan text-dark fw-bold">MOBILE MODE</span>
+  </div>
+  <p class="text-secondary" style="font-size: 13px;">
+    Select and configure the operational multi-camera source mode. The AI pipeline processes frames simultaneously across 4 directions (North, South, East, West).
+  </p>
+
+  <div class="row g-3 mt-1">
+    <div class="col-md-3">
+      <div class="p-3 rounded-3 border border-cyan bg-dark text-center">
+        <i class="bi bi-phone fs-2 text-cyan"></i>
+        <div class="fw-bold mt-2 text-light">Mobile Cameras</div>
+        <div class="text-secondary" style="font-size: 11px;">WebSocket App Streams</div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="p-3 rounded-3 border border-secondary bg-dark text-center opacity-75">
+        <i class="bi bi-webcam fs-2 text-info"></i>
+        <div class="fw-bold mt-2 text-light">USB Webcams</div>
+        <div class="text-secondary" style="font-size: 11px;">Local Camera Devices</div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="p-3 rounded-3 border border-secondary bg-dark text-center opacity-75">
+        <i class="bi bi-broadcast fs-2 text-warning"></i>
+        <div class="fw-bold mt-2 text-light">RTSP Streams</div>
+        <div class="text-secondary" style="font-size: 11px;">IP Security Cameras</div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="p-3 rounded-3 border border-secondary bg-dark text-center opacity-75">
+        <i class="bi bi-file-earmark-play fs-2 text-success"></i>
+        <div class="fw-bold mt-2 text-light">Demo MP4 Videos</div>
+        <div class="text-secondary" style="font-size: 11px;">Testing & Validation</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 4 Camera Direction Operational Cards -->
+<div class="row g-3">
+  <!-- North Camera -->
+  <div class="col-md-6">
+    <div class="card-custom">
+      <div class="card-title-custom">
+        <span><i class="bi bi-camera-video-fill text-info me-2"></i> NORTH CAMERA STREAM</span>
+        <span class="status-pill online"><span class="dot-indicator"></span> CONNECTED</span>
+      </div>
+
+      <div class="camera-placeholder mb-3">
+        <i class="bi bi-camera-video fs-1"></i>
+        <span>Live Annotated Stream Preview</span>
+        <span class="camera-overlay-badge">1280x720 @ 30.0 FPS | 24ms</span>
+      </div>
+
+      <div class="row g-2">
+        <div class="col-6">
+          <label class="form-label text-muted" style="font-size: 11px;">SOURCE URL / ID</label>
+          <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" value="ws://192.168.1.2:8000/ws/camera">
+        </div>
+        <div class="col-6">
+          <label class="form-label text-muted" style="font-size: 11px;">ASSIGNED LANE</label>
+          <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" value="North Intersection - Lane 1">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- South Camera -->
+  <div class="col-md-6">
+    <div class="card-custom">
+      <div class="card-title-custom">
+        <span><i class="bi bi-camera-video-fill text-info me-2"></i> SOUTH CAMERA STREAM</span>
+        <span class="status-pill online"><span class="dot-indicator"></span> CONNECTED</span>
+      </div>
+
+      <div class="camera-placeholder mb-3">
+        <i class="bi bi-camera-video fs-1"></i>
+        <span>Live Annotated Stream Preview</span>
+        <span class="camera-overlay-badge">1280x720 @ 30.0 FPS | 26ms</span>
+      </div>
+
+      <div class="row g-2">
+        <div class="col-6">
+          <label class="form-label text-muted" style="font-size: 11px;">SOURCE URL / ID</label>
+          <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" value="videos/south.mp4">
+        </div>
+        <div class="col-6">
+          <label class="form-label text-muted" style="font-size: 11px;">ASSIGNED LANE</label>
+          <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" value="South Intersection - Lane 2">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- East Camera -->
+  <div class="col-md-6">
+    <div class="card-custom">
+      <div class="card-title-custom">
+        <span><i class="bi bi-camera-video-fill text-info me-2"></i> EAST CAMERA STREAM</span>
+        <span class="status-pill online"><span class="dot-indicator"></span> CONNECTED</span>
+      </div>
+
+      <div class="camera-placeholder mb-3">
+        <i class="bi bi-camera-video fs-1"></i>
+        <span>Live Annotated Stream Preview</span>
+        <span class="camera-overlay-badge">1280x720 @ 30.0 FPS | 28ms</span>
+      </div>
+
+      <div class="row g-2">
+        <div class="col-6">
+          <label class="form-label text-muted" style="font-size: 11px;">SOURCE URL / ID</label>
+          <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" value="videos/east.mp4">
+        </div>
+        <div class="col-6">
+          <label class="form-label text-muted" style="font-size: 11px;">ASSIGNED LANE</label>
+          <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" value="East Intersection - Lane 3">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- West Camera -->
+  <div class="col-md-6">
+    <div class="card-custom">
+      <div class="card-title-custom">
+        <span><i class="bi bi-camera-video-fill text-info me-2"></i> WEST CAMERA STREAM</span>
+        <span class="status-pill online"><span class="dot-indicator"></span> CONNECTED</span>
+      </div>
+
+      <div class="camera-placeholder mb-3">
+        <i class="bi bi-camera-video fs-1"></i>
+        <span>Live Annotated Stream Preview</span>
+        <span class="camera-overlay-badge">1280x720 @ 30.0 FPS | 25ms</span>
+      </div>
+
+      <div class="row g-2">
+        <div class="col-6">
+          <label class="form-label text-muted" style="font-size: 11px;">SOURCE URL / ID</label>
+          <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" value="videos/west.mp4">
+        </div>
+        <div class="col-6">
+          <label class="form-label text-muted" style="font-size: 11px;">ASSIGNED LANE</label>
+          <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" value="West Intersection - Lane 4">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

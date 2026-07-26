@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}System Settings — Smart Traffic Control{% endblock %}
+{% block page_title %}System Configuration & Profiles{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <!-- General Settings -->
+  <div class="col-md-6">
+    <div class="card-custom">
+      <div class="card-title-custom">
+        <span><i class="bi bi-gear-fill me-2 text-cyan"></i> GENERAL SYSTEM SETTINGS</span>
+        <span class="badge bg-secondary">SYSTEM LEVEL</span>
+      </div>
+
+      <form id="form-general-settings">
+        <div class="mb-3">
+          <label class="form-label text-muted" style="font-size: 11px;">CAMERA STREAM MODE</label>
+          <select class="form-select bg-dark text-light border-secondary">
+            <option value="mobile" selected>Mobile IP Cameras (WebSocket App)</option>
+            <option value="usb">USB Webcams</option>
+            <option value="rtsp">RTSP Security Cameras</option>
+            <option value="demo">Demo MP4 Test Videos</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label text-muted" style="font-size: 11px;">ESP32 SERIAL COM PORT</label>
+          <select class="form-select bg-dark text-light border-secondary">
+            <option value="COM5">COM5 (Silicon Labs CP210x Driver)</option>
+            <option value="simulation" selected>Simulation Mode (No Physical ESP32)</option>
+          </select>
+        </div>
+
+        <div class="row g-2 mb-3">
+          <div class="col-4">
+            <label class="form-label text-muted" style="font-size: 11px;">MIN GREEN (SEC)</label>
+            <input type="number" class="form-control bg-dark text-light border-secondary" value="10">
+          </div>
+          <div class="col-4">
+            <label class="form-label text-muted" style="font-size: 11px;">MAX GREEN (SEC)</label>
+            <input type="number" class="form-control bg-dark text-light border-secondary" value="60">
+          </div>
+          <div class="col-4">
+            <label class="form-label text-muted" style="font-size: 11px;">YELLOW TIME (SEC)</label>
+            <input type="number" class="form-control bg-dark text-light border-secondary" value="3">
+          </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-4">
+          <button type="button" class="btn btn-cyan btn-sm px-3" onclick="alert('General Settings Saved!')">Save General Settings</button>
+          <button type="button" class="btn btn-outline-custom btn-sm px-3" onclick="alert('Runtime Profile Reloaded!')">Load Profile</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Advanced AI Settings -->
+  <div class="col-md-6">
+    <div class="card-custom">
+      <div class="card-title-custom">
+        <span><i class="bi bi-cpu-fill me-2 text-warning"></i> ADVANCED AI PERCEPTION TUNING</span>
+        <span class="badge bg-warning text-dark">AI ENGINE</span>
+      </div>
+
+      <form id="form-ai-settings">
+        <div class="mb-3">
+          <label class="form-label text-muted" style="font-size: 11px;">YOLO11 DETECTION CONFIDENCE THRESHOLD</label>
+          <div class="d-flex align-items-center gap-3">
+            <input type="range" class="form-range" min="0.1" max="0.9" step="0.05" value="0.25" id="slider-conf" oninput="document.getElementById('val-conf').textContent = this.value">
+            <span class="badge bg-cyan text-dark fw-bold" id="val-conf">0.25</span>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label text-muted" style="font-size: 11px;">BYTETRACK TRACKING THRESHOLD</label>
+          <div class="d-flex align-items-center gap-3">
+            <input type="range" class="form-range" min="0.1" max="0.9" step="0.05" value="0.45" id="slider-track" oninput="document.getElementById('val-track').textContent = this.value">
+            <span class="badge bg-cyan text-dark fw-bold" id="val-track">0.45</span>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label text-muted" style="font-size: 11px;">FAIRNESS WAITING BONUS WEIGHT</label>
+          <input type="number" class="form-control bg-dark text-light border-secondary" value="5.0" step="0.5">
+        </div>
+
+        <div class="d-flex gap-2 mt-4">
+          <button type="button" class="btn btn-warning btn-sm text-dark fw-bold px-3" onclick="alert('Advanced AI Parameters Saved!')">Save AI Parameters</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

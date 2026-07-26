@@ -27,10 +27,10 @@ class SignalDecision:
         reason_details (str): Detailed human-readable explanation for why this decision was reached.
         timestamp (float): UNIX timestamp when the decision was generated.
     """
-    phase_id: int
-    green_lane: Union[LaneName, str]
-    green_duration_sec: int
-    yellow_duration_sec: int
+    phase_id: int = 1
+    green_lane: Union[LaneName, str] = "North"
+    green_duration_sec: int = 25
+    yellow_duration_sec: int = 3
     red_lanes: List[Union[LaneName, str]] = field(default_factory=list)
     priority_score: float = 0.0
     reason: DecisionReason = DecisionReason.NORMAL

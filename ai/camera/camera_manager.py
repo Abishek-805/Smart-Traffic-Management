@@ -1,13 +1,13 @@
 """
-CameraManager manages video stream acquisition, frame extraction, and video metadata.
+CameraManager manages multiple CameraStream instances dynamically using dictionary-based collection logic.
 """
 
 from pathlib import Path
-from typing import Tuple, Optional, Union
-import cv2
+from typing import Dict, Union, Optional, Tuple, Any
 import numpy as np
 
-from config.paths import DEFAULT_VIDEO_PATH
+from ai.camera.camera_stream import CameraStream
+from ai.camera.stream_config import STREAM_CONFIG, validate_stream_sources
 from ai.utils.logger import get_logger
 
 logger = get_logger("CameraManager")
@@ -15,79 +15,135 @@ logger = get_logger("CameraManager")
 
 class CameraManager:
     """
-    Manages continuous video stream ingestion from video files or webcam inputs.
+    Manages continuous video stream ingestion across multiple camera sources
+    (e.g., North, South, East, West approaches).
     """
 
-    def __init__(self, source: Union[str, Path, int] = DEFAULT_VIDEO_PATH):
-        self.source = str(source) if isinstance(source, Path) else source
-        self.cap: Optional[cv2.VideoCapture] = None
-        self.frame_number = 0
-
-        self._open_stream()
-
-    def _open_stream(self) -> None:
-        """Initialize OpenCV VideoCapture."""
-        logger.info(f"Opening video source: '{self.source}'...")
-        self.cap = cv2.VideoCapture(self.source)
-
-        if not self.cap.isOpened():
-            logger.error(f"Failed to open video source: '{self.source}'")
-            raise ValueError(f"Could not open video stream at: {self.source}")
-
-        logger.info(f"Stream opened successfully. Resolution: {self.resolution}, FPS: {self.fps:.1f}")
-
-    def get_frame(self) -> Tuple[bool, Optional[np.ndarray], int, float]:
+    def __init__(self, config: Optional[Union[Dict[str, Union[str, int, Path]], str, Path]] = None):
         """
-        Fetch the next frame from the stream.
+        Initialize CameraManager.
+        
+        Args:
+            config: Optional stream source mapping dictionary or single source path.
+                    Defaults to STREAM_CONFIG if None.
+        """
+        if config is None:
+            config = STREAM_CONFIG
+        elif isinstance(config, (str, Path)):
+            # Wrap single source as 'north' for backward compatibility
+            config = {"north": config}
+
+        # Validate video files exist before starting streams
+        validate_stream_sources(config)
+
+        self.streams: Dict[str, CameraStream] = {}
+        for lane_name, source in config.items():
+            self.streams[lane_name] = CameraStream(source=source, lane_name=lane_name)
+
+        logger.info(f"CameraManager initialized managing {len(self.streams)} stream(s): {list(self.streams.keys())}")
+
+    def start_all(self) -> None:
+        """Open and connect all camera streams."""
+        logger.info("Starting all camera streams...")
+        for stream in self.streams.values():
+            if not stream.is_connected():
+                stream.open()
+
+    def stop_all(self) -> None:
+        """Stop and release all camera streams."""
+        logger.info("Stopping all camera streams...")
+        for stream in self.streams.values():
+            stream.release()
+
+    def release(self) -> None:
+        """Alias for stop_all to ensure resource cleanup interface consistency."""
+        self.stop_all()
+
+    def read_all(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Read next frame and metadata from all camera streams.
         
         Returns:
-            Tuple[bool, Optional[np.ndarray], int, float]:
-                (success, frame_image, frame_number, timestamp_seconds)
+            Dict[str, Dict[str, Any]]: Dictionary mapping lane name to rich stream payload:
+                {
+                    "north": {
+                        "frame": frame_ndarray or None,
+                        "connected": bool,
+                        "fps": float,
+                        "resolution": Tuple[int, int],
+                        "timestamp": float,
+                        "frame_number": int,
+                        "lane_name": str,
+                    },
+                    ...
+                }
         """
-        if not self.is_opened():
-            return False, None, self.frame_number, 0.0
+        results = {}
+        for lane_name, stream in self.streams.items():
+            success, frame, meta = stream.read()
+            payload = dict(meta)
+            payload["frame"] = frame
+            results[lane_name] = payload
+        return results
 
-        ret, frame = self.cap.read()
-        if not ret:
-            logger.info("Reached end of video stream or lost connection.")
-            return False, None, self.frame_number, 0.0
+    def get_frames(self) -> Dict[str, Optional[np.ndarray]]:
+        """
+        Convenience method to retrieve raw frame images for all streams.
+        
+        Returns:
+            Dict[str, Optional[np.ndarray]]: Dictionary mapping lane name to frame image array.
+        """
+        data = self.read_all()
+        return {lane: item["frame"] for lane, item in data.items()}
 
-        self.frame_number += 1
-        timestamp = self.cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+    def get_status(self) -> Dict[str, bool]:
+        """
+        Get connection status for all camera streams.
+        
+        Returns:
+            Dict[str, bool]: Dictionary mapping lane name to boolean connection state.
+        """
+        return {lane: stream.is_connected() for lane, stream in self.streams.items()}
 
-        return True, frame, self.frame_number, timestamp
+    def get_health(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Get detailed camera health statistics across all streams.
+        """
+        health = {}
+        for lane_name, stream in self.streams.items():
+            health[lane_name] = {
+                "connected": stream.is_connected(),
+                "fps": round(stream.fps, 1),
+                "resolution": stream.resolution,
+                "frame_number": stream.frame_number,
+                "source": stream.source,
+            }
+        return health
 
-    def is_opened(self) -> bool:
-        """Check if video stream capture is active."""
-        return self.cap is not None and self.cap.isOpened()
+    # Backward compatibility methods for legacy single-stream callers
+    def get_frame(self) -> Tuple[bool, Optional[np.ndarray], int, float]:
+        """
+        Legacy single-camera frame reader (reads primary stream).
+        """
+        primary_lane = next(iter(self.streams.keys())) if self.streams else "north"
+        if primary_lane in self.streams:
+            stream = self.streams[primary_lane]
+            success, frame, meta = stream.read()
+            return success, frame, meta["frame_number"], meta["timestamp"]
+        return False, None, 0, 0.0
 
     @property
     def fps(self) -> float:
-        """Get source stream nominal FPS."""
-        if not self.cap:
+        """Get primary stream FPS."""
+        if not self.streams:
             return 30.0
-        fps = self.cap.get(cv2.CAP_PROP_FPS)
-        return fps if fps > 0 else 30.0
+        primary_lane = next(iter(self.streams.keys()))
+        return self.streams[primary_lane].fps
 
     @property
     def resolution(self) -> Tuple[int, int]:
-        """Get source stream frame resolution (width, height)."""
-        if not self.cap:
-            return (0, 0)
-        width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        return (width, height)
-
-    @property
-    def total_frames(self) -> int:
-        """Get total number of frames in video file."""
-        if not self.cap:
-            return 0
-        return int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    def release(self) -> None:
-        """Release VideoCapture resources."""
-        if self.cap is not None:
-            self.cap.release()
-            self.cap = None
-            logger.info("Video stream released successfully.")
+        """Get primary stream resolution."""
+        if not self.streams:
+            return (1280, 720)
+        primary_lane = next(iter(self.streams.keys()))
+        return self.streams[primary_lane].resolution

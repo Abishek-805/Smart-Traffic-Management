@@ -1,84 +1,94 @@
 """
-Smart Traffic Management System Entry Point
-Main execution script for video ingestion, YOLO detection, ByteTrack tracking, lane management,
-traffic analytics, adaptive signal decision engine, and performance HUD rendering.
+Smart Traffic Management System — Production AI Traffic Controller Entry Point.
+Orchestrates Startup Wizard (StartupConfig / ProfileManager), Multi-Camera Ingestion (CameraManager),
+Multi-Camera AI Pipeline (TrafficPipeline), and Post-Decision Control Layer (ControlManager -> Logger, ESP32, Dashboard).
 """
 
 import sys
 import time
 import cv2
-from pathlib import Path
 
-from config.paths import DEFAULT_VIDEO_PATH
 from config.ui import WINDOW_NAME
+from startup import StartupManager, StartupConfig
+from ai.camera import CameraManager
 from ai.pipeline.traffic_pipeline import TrafficPipeline
 from ai.pipeline.pipeline_result import PipelineResult
+from ai.controller.control_manager import ControlManager
 from ai.utils.logger import get_logger
-from videos.generate_sample_video import generate_synthetic_traffic_video
 
 logger = get_logger("Main")
 
 
 def main():
     """
-    Main application loop for Smart Traffic Management System.
+    Main application entry point for Smart Traffic Management System.
     """
-    logger.info("==================================================")
-    logger.info("       Smart Traffic Management System           ")
-    logger.info(" AI Perception + Analytics + Adaptive Signal Engine")
-    logger.info("==================================================")
+    # 1. Startup Setup Wizard (CLI Prompting, Validation & Profile Management)
+    startup_cfg: StartupConfig = StartupManager.run(interactive=True)
 
-    # Ensure input video exists; if missing, generate a sample synthetic video
-    video_path = DEFAULT_VIDEO_PATH
-    if not video_path.exists():
-        logger.warning(f"Video file not found at '{video_path}'. Generating sample video...")
-        video_path = generate_synthetic_traffic_video()
+    cam_sources = startup_cfg.camera.to_stream_config()
+    hw_port = startup_cfg.hardware.port
+    is_sim = startup_cfg.hardware.simulation
 
-    # Initialize Pipeline
+    logger.info(f"Initializing CameraManager with mode '{startup_cfg.camera.mode.upper()}'...")
+    logger.info(f"Initializing ESP32 Hardware Interface on port '{hw_port}' (Simulation={is_sim})...")
+
     pipeline = None
+    control_manager = None
     try:
-        pipeline = TrafficPipeline(video_source=video_path, save_output=True)
+        # 2. Camera Acquisition Layer
+        camera_manager = CameraManager(config=cam_sources)
+
+        # 3. Control Layer & Hardware Interface
+        control_manager = ControlManager(esp32_port=hw_port, simulation_mode=is_sim)
+
+        # 4. Perception & Decision Engine Pipeline
+        pipeline = TrafficPipeline(camera_manager=camera_manager, save_output=True)
     except Exception as e:
-        logger.error(f"Failed to initialize Traffic Pipeline: {e}", exc_info=True)
+        logger.error(f"Failed to initialize Traffic Controller subsystems: {e}", exc_info=True)
         sys.exit(1)
 
-    logger.info(f"Starting video processing. Press 'q' in the window to exit.")
+    logger.info("Starting Production Traffic Control System. Press 'q' in dashboard window to exit.")
 
-    # OpenCV Display Window
+    # OpenCV GUI Display Window
     cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(WINDOW_NAME, 1280, 720)
+    cv2.resizeWindow(WINDOW_NAME, 1280, 870)
 
     last_log_time = time.time()
     frame_counter = 0
 
     try:
         while True:
-            # Process single step in pipeline, returning a strongly-typed PipelineResult
+            # Step 1: Perception & Decision Engine step -> returns PipelineResult
             res: PipelineResult = pipeline.process_step()
-            
-            if not res.has_frame or res.annotated_frame is None:
-                logger.info("Video playback completed.")
+
+            if not res.has_frame:
+                logger.info("Camera stream ingestion completed.")
                 break
 
             frame_counter += 1
 
-            # Concise 1-second status log summary
+            # Step 2: Control Layer -> handles CSV/JSONL logging, ESP32 hardware transmission, and renders Dashboard
+            dashboard_frame = control_manager.process_result(res)
+
+            # Step 3: Periodic 1-second status log summary
             current_time = time.time()
             if current_time - last_log_time >= 1.0:
                 last_log_time = current_time
-                green_str = str(res.signal_decision.green_lane) if res.signal_decision else "None"
-                total_vehicles = sum(s.live_count for s in res.lane_stats.values()) if res.lane_stats else len(res.detections)
-                
+                green_str = str(res.signal_decision.green_lane).upper() if res.signal_decision else "NONE"
+                total_vehicles = res.intersection_state.total_vehicles if res.intersection_state else 0
+                hw_status = control_manager.esp32_interface.get_status()
+                hw_mode = "SIMULATED" if hw_status.simulation_mode else "HARDWARE"
+
                 logger.info(
-                    f"Frame #{frame_counter} | Live Vehicles: {total_vehicles} | "
-                    f"Active Green: '{green_str}' ({res.remaining_green_sec}s remaining) | "
-                    f"Phase Changed: {res.is_phase_change}"
+                    f"Frame #{frame_counter} | Active Green: '{green_str}' ({res.remaining_green_sec}s left) | "
+                    f"Vehicles: {total_vehicles} | ESP32 Mode: {hw_mode} | Phase Changed: {res.is_phase_change}"
                 )
 
-            # Render frame to OpenCV GUI window
-            cv2.imshow(WINDOW_NAME, res.annotated_frame)
+            # Step 4: Render to OpenCV GUI display window
+            cv2.imshow(WINDOW_NAME, dashboard_frame)
 
-            # Check for user input: exit when 'q' key is pressed or window closed
+            # Check key press (exit on 'q')
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q"):
                 logger.info("User requested exit (pressed 'q').")
@@ -90,13 +100,15 @@ def main():
                 break
 
     except KeyboardInterrupt:
-        logger.info("Pipeline interrupted by user (Ctrl+C).")
+        logger.info("Traffic System interrupted by user (Ctrl+C).")
     except Exception as e:
-        logger.error(f"Unhandled error during frame execution: {e}", exc_info=True)
+        logger.error(f"Unhandled error during execution loop: {e}", exc_info=True)
     finally:
-        # Cleanup pipeline resources
+        # Resource cleanup
         if pipeline:
             pipeline.release()
+        if control_manager:
+            control_manager.release()
         cv2.destroyAllWindows()
         logger.info("Clean shutdown complete.")
 

@@ -18,6 +18,11 @@ videos/*.mp4
 outputs/*.mp4
 logs/*.log
 
+# Node & Frontend Build
+node_modules/
+web-ui/node_modules/
+web-ui/dist/
+
 # Pytest & Coverage
 .pytest_cache/
 .coverage

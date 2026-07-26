@@ -1,0 +1,294 @@
+/* Smart Traffic Management System — Commercial Control Room CSS Design System */
+
+:root {
+  --bg-primary: #0a0f1d;
+  --bg-secondary: #121929;
+  --bg-card: #1a233a;
+  --bg-card-hover: #222d4a;
+  --border-color: #2a3756;
+  --accent-cyan: #00e5ff;
+  --accent-blue: #29b6f6;
+  --accent-green: #00e676;
+  --accent-yellow: #ffab00;
+  --accent-red: #ff5252;
+  --text-primary: #f0f4f9;
+  --text-muted: #8ca0ba;
+  --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+/* Sidebar Styling */
+.sidebar {
+  width: 240px;
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  min-height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-brand {
+  padding: 20px 16px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sidebar-brand-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #00e5ff, #29b6f6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  font-weight: 900;
+}
+
+.sidebar-brand-text {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.sidebar-subtext {
+  font-size: 10px;
+  color: var(--accent-cyan);
+  display: block;
+}
+
+.sidebar-nav {
+  padding: 16px 8px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-link-custom {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.nav-link-custom:hover {
+  color: var(--text-primary);
+  background-color: rgba(0, 229, 255, 0.08);
+}
+
+.nav-link-custom.active {
+  color: #000;
+  background: linear-gradient(135deg, #00e5ff, #29b6f6);
+  font-weight: 700;
+}
+
+.nav-link-custom i {
+  font-size: 18px;
+}
+
+/* Header & Content Area */
+.main-wrapper {
+  margin-left: 240px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.top-navbar {
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 999;
+}
+
+.header-status-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-primary);
+}
+
+.status-pill.online {
+  border-color: rgba(0, 230, 118, 0.4);
+  color: var(--accent-green);
+  background-color: rgba(0, 230, 118, 0.08);
+}
+
+.status-pill.offline {
+  border-color: rgba(255, 82, 82, 0.4);
+  color: var(--accent-red);
+  background-color: rgba(255, 82, 82, 0.08);
+}
+
+.status-pill.warning {
+  border-color: rgba(255, 171, 0, 0.4);
+  color: var(--accent-yellow);
+  background-color: rgba(255, 171, 0, 0.08);
+}
+
+.dot-indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.page-container {
+  padding: 24px;
+  flex: 1;
+}
+
+/* Glassmorphism Cards */
+.card-custom {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.card-title-custom {
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Metric Display Boxes */
+.metric-value {
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.metric-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Buttons */
+.btn-cyan {
+  background: linear-gradient(135deg, #00e5ff, #29b6f6);
+  color: #000;
+  font-weight: 700;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  transition: all 0.2s ease;
+}
+
+.btn-cyan:hover {
+  opacity: 0.9;
+  color: #000;
+  transform: translateY(-1px);
+}
+
+.btn-outline-custom {
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 8px 16px;
+}
+
+.btn-outline-custom:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--accent-cyan);
+}
+
+/* 4-Camera Grid Layout */
+.camera-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.camera-tile {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.camera-header {
+  padding: 8px 12px;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.camera-placeholder {
+  height: 220px;
+  background-color: #050811;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  gap: 8px;
+  position: relative;
+}
+
+.camera-overlay-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background-color: rgba(0, 0, 0, 0.7);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+}

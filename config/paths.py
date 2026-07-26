@@ -26,6 +26,11 @@ DEFAULT_OUTPUT_PATH = OUTPUTS_DIR / "detection.mp4"
 APP_LOG_PATH = LOGS_DIR / "application.log"
 DETECTION_LOG_PATH = LOGS_DIR / "detection.log"
 ERROR_LOG_PATH = LOGS_DIR / "errors.log"
+DECISION_CSV_LOG_PATH = LOGS_DIR / "decisions.csv"
+DECISION_JSON_LOG_PATH = LOGS_DIR / "decisions.jsonl"
+# Config directory and runtime config profile
+CONFIG_DIR = ROOT_DIR / "config"
+RUNTIME_CONFIG_PATH = CONFIG_DIR / "runtime_config.json"
 
 
 def get_timestamped_output_path(prefix: str = "detection") -> Path:

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}System Logs — Smart Traffic Control{% endblock %}
+{% block page_title %}System Logs & Diagnostic Console{% endblock %}
+
+{% block content %}
+<div class="card-custom mb-4">
+  <div class="card-title-custom">
+    <span>Live System Event Logs</span>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-custom" onclick="alert('Logs Filter Applied!')"><i class="bi bi-filter me-1"></i> Filter Logs</button>
+      <button class="btn btn-sm btn-cyan" onclick="alert('Exporting Log Files...')"><i class="bi bg-download me-1"></i> Export Logs</button>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2 mb-3">
+    <span class="badge bg-cyan text-dark fw-bold">ALL LOGS</span>
+    <span class="badge bg-secondary">AI PIPELINE</span>
+    <span class="badge bg-secondary">CAMERA NODES</span>
+    <span class="badge bg-secondary">ESP32 SERIAL</span>
+    <span class="badge bg-secondary">WARNINGS & ERRORS</span>
+  </div>
+
+  <div class="bg-dark p-3 rounded-3 border border-secondary font-monospace text-light" style="height: 480px; overflow-y: auto; font-size: 12px; line-height: 1.6;">
+    <div class="text-cyan">[2026-07-25 13:40:01] [INFO] [ApplicationContext]: Central ApplicationContext initialized.</div>
+    <div class="text-cyan">[2026-07-25 13:40:01] [INFO] [FastAPI.Lifespan]: Starting Smart Traffic Web Control Center Services...</div>
+    <div class="text-success">[2026-07-25 13:40:01] [INFO] [CameraManager]: CameraManager initialized managing 4 stream(s): ['north', 'south', 'east', 'west']</div>
+    <div class="text-success">[2026-07-25 13:40:01] [INFO] [ModelManager]: Initializing YOLO model 'yolo11n.pt'...</div>
+    <div class="text-success">[2026-07-25 13:40:02] [INFO] [ModelManager]: Model 'yolo11n.pt' loaded successfully!</div>
+    <div class="text-info">[2026-07-25 13:40:02] [INFO] [SessionManager]: SessionManager ready for mobile camera node WebSocket registration.</div>
+    <div class="text-warning">[2026-07-25 13:40:02] [INFO] [ESP32Interface]: ESP32 Serial Interface initialized in SIMULATION MODE.</div>
+    <div class="text-light">[2026-07-25 13:40:05] [INFO] [SignalScheduler]: [Phase #1] Selected Winner: NORTH | Green Duration: 10s | Reason: NORMAL</div>
+    <div class="text-light">[2026-07-25 13:40:15] [INFO] [DecisionLogger]: Pre-Transmission Decision logged to decisions.csv & decisions.jsonl</div>
+  </div>
+</div>
+{% endblock %}

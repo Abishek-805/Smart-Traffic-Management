@@ -100,6 +100,43 @@ python -c "from ultralytics import YOLO; print('YOLO Installed Successfully!')"
 
 ### 3. Run the System
 
+The system has two modes: the **Web Control Center** (FastAPI + React SPA) and the **Standalone CLI Pipeline** (OpenCV GUI).
+
+#### Option A — Web Control Center (React SPA + FastAPI Backend)
+
+**Step 1: Start the FastAPI Backend** (from the project root)
+
+```bash
+python -m uvicorn web.app:app --reload --port 8000
+```
+
+The REST API and WebSocket telemetry server will be available at:
+- REST API: `http://localhost:8000/api/v1/`
+- WebSocket: `ws://localhost:8000/ws/telemetry`
+- API Docs: `http://localhost:8000/docs`
+
+**Step 2: Install Frontend Dependencies** (first time only)
+
+```bash
+cd web-ui
+npm install
+```
+
+**Step 3: Start the React Dev Server**
+
+```bash
+cd web-ui
+npm run dev
+```
+
+The React Control Center will open at `http://localhost:5173`
+
+> **Note**: The Vite dev server automatically proxies `/api/v1/*` and `/ws/*` to the FastAPI backend on port 8000.
+
+---
+
+#### Option B — Standalone CLI Pipeline (OpenCV GUI)
+
 ```bash
 python main.py
 ```
@@ -107,6 +144,7 @@ python main.py
 > **Note**: If `videos/traffic.mp4` is not present, `main.py` automatically generates a synthetic traffic video so the pipeline runs immediately out of the box!
 
 ---
+
 
 ## 🎯 Key Features
 

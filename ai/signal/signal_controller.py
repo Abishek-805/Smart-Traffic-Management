@@ -38,14 +38,14 @@ class SignalController:
         self.phase_counter += 1
 
         try:
-            green_enum = LaneName(decision.green_lane)
+            green_enum = LaneName(str(decision.green_lane).capitalize())
         except ValueError:
             green_enum = decision.green_lane
 
         red_enums = []
         for r in decision.red_lanes:
             try:
-                red_enums.append(LaneName(r))
+                red_enums.append(LaneName(str(r).capitalize()))
             except ValueError:
                 red_enums.append(r)
 
