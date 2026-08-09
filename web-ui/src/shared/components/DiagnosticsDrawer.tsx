@@ -9,7 +9,7 @@ interface DiagnosticsDrawerProps {
 }
 
 export const DiagnosticsDrawer: React.FC<DiagnosticsDrawerProps> = ({ isOpen, onClose }) => {
-  const { isConnected, reconnectCount, lastUpdated } = useTelemetry();
+  const { telemetry, isConnected, reconnectCount, lastUpdated } = useTelemetry();
   const { data: health } = useSystemHealth();
   const { data: version } = useVersionInfo();
 
@@ -107,17 +107,55 @@ export const DiagnosticsDrawer: React.FC<DiagnosticsDrawerProps> = ({ isOpen, on
               <span style={{ color: 'var(--text-muted)' }}>AI Processing State</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: isAiHealthy ? 'var(--color-success)' : 'var(--color-warning)' }}>
                 {isAiHealthy ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
-                {isAiHealthy ? 'ACTIVE / 28.5 FPS' : 'INACTIVE'}
+                {isAiHealthy ? `ACTIVE / ${health?.components?.ai?.fps || 30.0} FPS` : 'INACTIVE'}
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>Inference Latency</span>
-              <strong>12.4 ms</strong>
+              <strong>{health?.inference_latency_ms ? `${health.inference_latency_ms} ms` : 'Unavailable'}</strong>
             </div>
           </div>
         </div>
 
-        {/* Section 2: Hardware Controller */}
+        {/* Section 2: End-to-End Diagnostic Pipeline Stage Counters */}
+        <div className="glass-card" style={{ padding: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+            <Radio size={16} color="var(--color-success)" />
+            <h4 style={{ fontSize: '0.88rem', fontWeight: 700 }}>E2E PIPELINE STAGE COUNTERS</h4>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Backend Received</span>
+              <strong>{health?.stage_counters?.received ?? telemetry?.stageCounters?.received ?? 0} frames</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-muted)' }}>JPEG Decoded</span>
+              <strong>{health?.stage_counters?.decoded ?? telemetry?.stageCounters?.decoded ?? 0} frames</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-muted)' }}>YOLO Detections</span>
+              <strong style={{ color: 'var(--color-primary)' }}>{telemetry?.detectedVehicles ?? 0} vehicles</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-muted)' }}>ByteTrack Vehicles</span>
+              <strong style={{ color: 'var(--color-success)' }}>{telemetry?.assignedVehicles ?? telemetry?.totalVehicles ?? 0} tracked</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Backend Dropped</span>
+              <span style={{ color: (health?.stage_counters?.dropped ?? telemetry?.stageCounters?.dropped ?? 0) > 0 ? 'var(--color-warning)' : 'var(--text-muted)' }}>
+                {health?.stage_counters?.dropped ?? telemetry?.stageCounters?.dropped ?? 0} frames
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Decode Failures</span>
+              <span style={{ color: (health?.stage_counters?.decode_failed ?? telemetry?.stageCounters?.decode_failed ?? 0) > 0 ? 'var(--color-danger)' : 'var(--text-muted)' }}>
+                {health?.stage_counters?.decode_failed ?? telemetry?.stageCounters?.decode_failed ?? 0} frames
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3: Hardware Controller */}
         <div className="glass-card" style={{ padding: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
             <Radio size={16} color="var(--color-success)" />
@@ -132,7 +170,7 @@ export const DiagnosticsDrawer: React.FC<DiagnosticsDrawerProps> = ({ isOpen, on
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>Serial Connection</span>
-              <strong>COM3 / TTYUSB0</strong>
+              <strong>{isEsp32Connected ? 'COM3 / TTYUSB0 (Active)' : 'Simulation Mode'}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>Baud Rate</span>
@@ -189,16 +227,16 @@ export const DiagnosticsDrawer: React.FC<DiagnosticsDrawerProps> = ({ isOpen, on
               <strong>{version?.frontend || 'React SPA'}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-muted)' }}>CPU Utilization (Mock)</span>
-              <strong>12%</strong>
+              <span style={{ color: 'var(--text-muted)' }}>CPU Utilization</span>
+              <strong>{health?.cpu_percent !== undefined ? `${health.cpu_percent}%` : 'Unavailable'}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Browser Memory (Mock)</span>
-              <strong>4.2 GB / 8.0 GB</strong>
+              <span style={{ color: 'var(--text-muted)' }}>System Memory</span>
+              <strong>{health?.memory_used_gb !== undefined ? `${health.memory_used_gb} GB / ${health.memory_total_gb || 8.0} GB` : 'Unavailable'}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>System Uptime</span>
-              <strong>{health?.uptime_seconds || 120}s (Operational)</strong>
+              <strong>{health?.uptime_seconds ? `${health.uptime_seconds}s (Operational)` : 'Unavailable'}</strong>
             </div>
           </div>
         </div>

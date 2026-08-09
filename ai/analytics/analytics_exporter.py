@@ -18,6 +18,7 @@ logger = get_logger("AnalyticsExporter")
 class LaneStatistics:
     """
     Strongly-typed analytics object representing real-time metrics for a single lane.
+    Phase 3.5: Added raw_count and smoothed_count for scheduler stabilization.
     """
     lane_name: str
     live_count: int = 0
@@ -31,6 +32,9 @@ class LaneStatistics:
     historical_count: int = 0
     has_priority_vehicle: bool = False
     vehicle_breakdown: Dict[str, int] = field(default_factory=dict)
+    # Phase 3.5 — Stabilization fields
+    raw_count: int = 0          # Unfiltered live_count snapshot before smoothing
+    smoothed_count: float = 0.0  # EMA-smoothed vehicle count passed to scheduler
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert LaneStatistics to dictionary format."""
@@ -47,6 +51,8 @@ class LaneStatistics:
             "historical_count": self.historical_count,
             "priority": self.has_priority_vehicle,
             "breakdown": self.vehicle_breakdown,
+            "raw_count": self.raw_count,
+            "smoothed_count": round(self.smoothed_count, 2),
         }
 
 
@@ -93,6 +99,7 @@ class AnalyticsExporter:
                 historical_count=hist_count,
                 has_priority_vehicle=cong_res["has_priority_vehicle"],
                 vehicle_breakdown=occ_res["counts"],
+                raw_count=occ_res["total_live"],  # Phase 3.5: snapshot raw count
             )
             lane_stats[lane_name] = stats_obj
 

@@ -38,6 +38,8 @@ class SystemService:
             "frame_processing_errors": self.ctx.frame_processing_errors,
             "esp32_mode": "SIMULATION",
             "nodes_connected": len(self.ctx.session_manager.sessions),
+            # Phase 3.5: Scheduler stability telemetry
+            "stability_metrics": payload.get("stabilityMetrics", {}),
         }
 
     def start_system(self) -> bool:

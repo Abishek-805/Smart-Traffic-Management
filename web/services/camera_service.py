@@ -45,10 +45,8 @@ class CameraService:
         """
         dir_clean = direction.lower()
         while self.ctx.system_running:
-            # Check if live frame buffer has recent frames for this approach direction, or fallback to active mobile camera stream
+            # Check if live frame buffer has recent frames for this approach direction
             live_bytes = self.ctx.frame_buffer.get(dir_clean)
-            if not live_bytes and self.ctx.frame_buffer:
-                live_bytes = next(iter(self.ctx.frame_buffer.values()))
 
             if live_bytes:
                 yield (

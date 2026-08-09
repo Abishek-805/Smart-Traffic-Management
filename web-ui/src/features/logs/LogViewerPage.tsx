@@ -21,7 +21,14 @@ export const LogViewerPage: React.FC = () => {
   const [displayedLogs, setDisplayedLogs] = useState<LogEntryItem[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const { data, refetch, isFetching } = useLogs(selectedCategory, selectedLevel, searchQuery);
+  const queryCategory = ['AI', 'NODE', 'ESP32', 'SYSTEM'].includes(selectedCategory)
+    ? (selectedCategory as LogCategory)
+    : 'ALL';
+  const queryLevel = ['INFO', 'WARNING', 'ERROR'].includes(selectedCategory)
+    ? selectedCategory
+    : 'ALL';
+
+  const { data, refetch, isFetching } = useLogs(queryCategory, queryLevel, searchQuery);
   const rawLogs = data?.logs || [];
 
   useEffect(() => {
@@ -124,6 +131,7 @@ export const LogViewerPage: React.FC = () => {
           copiedId={copiedId}
           onTogglePause={handleTogglePause}
           onCopyLog={handleCopyLog}
+          selectedCategory={selectedCategory}
         />
       </div>
     </div>

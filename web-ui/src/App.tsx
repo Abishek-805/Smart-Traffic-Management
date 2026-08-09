@@ -14,6 +14,7 @@ import { DevicesManagerPage } from './features/cameras/DevicesManagerPage';
 import { AnalyticsPage } from './features/analytics/AnalyticsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { LogViewerPage } from './features/logs/LogViewerPage';
+import { NotFoundPage } from './shared/components/NotFoundPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,6 +41,7 @@ export const App: React.FC = () => {
                       <Route path="analytics" element={<AnalyticsPage />} />
                       <Route path="settings" element={<SettingsPage />} />
                       <Route path="logs" element={<LogViewerPage />} />
+                      <Route path="*" element={<NotFoundPage />} />
                     </Route>
                   </Routes>
                 </ErrorBoundary>

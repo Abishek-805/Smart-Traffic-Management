@@ -43,3 +43,5 @@ class PipelineResult:
     remaining_green_sec: int = 0
     is_phase_change: bool = False
     latency_metrics: Dict[str, float] = field(default_factory=dict)
+    # Phase 3.5 — Scheduler stability tracking
+    stability_metrics: Dict[str, Any] = field(default_factory=dict)

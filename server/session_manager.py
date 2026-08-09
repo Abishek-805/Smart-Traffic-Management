@@ -5,7 +5,7 @@ SessionManager tracks active camera node sessions, tokens, heartbeats, and sessi
 from dataclasses import dataclass, field
 import time
 import uuid
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
 
 from server.config import HEARTBEAT_TIMEOUT_SEC
 from ai.utils.logger import get_logger
@@ -38,6 +38,7 @@ class SessionManager:
 
     def __init__(self, timeout_sec: float = HEARTBEAT_TIMEOUT_SEC):
         self.sessions: Dict[str, NodeSession] = {}
+        self.pairing_sessions: Dict[str, Dict[str, Any]] = {}
         self.timeout_sec = timeout_sec
 
     def create_session(self, node_id: str, camera_direction: str) -> NodeSession:
@@ -115,3 +116,37 @@ class SessionManager:
         for nid in expired:
             self.remove_session(nid)
         return expired
+
+    def register_pairing_session(self, direction: str, session_id: str, expires_at: float):
+        """Register a pairing session for a camera direction."""
+        dir_clean = (direction or "north").lower()
+        self.pairing_sessions[dir_clean] = {
+            "session_id": session_id,
+            "expires_at": expires_at,
+        }
+        logger.info(f"Registered pairing session for {dir_clean.upper()}. ID: {session_id}, Expires at: {expires_at}")
+
+    def get_pairing_session(self, direction: str) -> Optional[Dict[str, Any]]:
+        """Retrieve pairing session details if valid and not expired."""
+        dir_clean = (direction or "north").lower()
+        sess = self.pairing_sessions.get(dir_clean)
+        if not sess:
+            return None
+        if time.time() > sess["expires_at"]:
+            logger.info(f"Pairing session for {dir_clean.upper()} has expired.")
+            self.clear_pairing_session(dir_clean)
+            return None
+        return sess
+
+    def clear_pairing_session(self, direction: str):
+        """Clear pairing session for a camera direction."""
+        dir_clean = (direction or "north").lower()
+        self.pairing_sessions.pop(dir_clean, None)
+        logger.info(f"Cleared pairing session for {dir_clean.upper()}.")
+
+    def validate_pairing_session(self, direction: str, token: str) -> bool:
+        """Validate if a token matches the active pairing session for a camera direction."""
+        sess = self.get_pairing_session(direction)
+        if not sess:
+            return False
+        return sess["session_id"] == token

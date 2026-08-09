@@ -1,81 +1,70 @@
 /**
- * SCADA DashboardGrid Component
- * Renders the 2D spatial intersection grid using CSS Grid template areas:
- * "north north north", "west centre east", "south south south".
+ * DashboardGrid Component (2×2 Equal-Sized Camera Grid)
+ * Contract Section: Camera Grid
+ * Equal-sized square camera cards for North, South, East, West.
  */
 
 import React from 'react';
 import { DashboardViewModel } from '../../../features/dashboard/useDashboardViewModel';
 import { LaneCard } from './LaneCard';
-import { SpatialIntersectionSchematic } from './SpatialIntersectionSchematic';
-import { FEATURE_FLAGS } from '../../../config/featureFlags';
 
 interface DashboardGridProps {
   vm: DashboardViewModel;
   onSelectLane?: (direction: string) => void;
+  selectedDirection?: string;
 }
 
-export const DashboardGrid: React.FC<DashboardGridProps> = ({ vm, onSelectLane }) => {
+export const DashboardGrid: React.FC<DashboardGridProps> = ({ vm, onSelectLane, selectedDirection }) => {
+  const isEmergency = vm.statusBar.operatingMode === 'EMERGENCY_OVERRIDE';
+
   return (
-    <div className="dashboard-grid-container" style={{ flex: 1, minHeight: '0' }}>
-      {/* North Approach */}
+    <div
+      style={{
+        flex: 1,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gridTemplateRows: 'repeat(2, 1fr)',
+        gap: '10px',
+        height: '100%',
+        width: '100%',
+        minHeight: 0,
+        minWidth: 0,
+      }}
+    >
+      {/* North Camera Card */}
       <LaneCard
         lane={vm.lanes.north}
-        gridArea="north"
+        remainingSeconds={vm.activePhase.remainingSeconds}
+        isEmergencyMode={isEmergency}
         onSelect={() => onSelectLane?.('north')}
+        isSelected={selectedDirection === 'north'}
       />
 
-      {/* West Approach */}
-      <LaneCard
-        lane={vm.lanes.west}
-        gridArea="west"
-        onSelect={() => onSelectLane?.('west')}
-      />
-
-      {/* Central Spatial Intersection Schematic — feature-flag gated */}
-      {FEATURE_FLAGS.enableIntersectionSchematic ? (
-        <SpatialIntersectionSchematic
-          activePhase={vm.activePhase.activeDirection}
-          remainingTime={vm.activePhase.remainingSeconds}
-        />
-      ) : (
-        <div
-          style={{
-            gridArea: 'centre',
-            width: '220px',
-            height: '220px',
-            margin: 'auto',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '50%',
-            border: '2px solid rgba(255,255,255,0.08)',
-          }}
-        >
-          <div
-            style={{
-              width: '16px',
-              height: '16px',
-              borderRadius: '50%',
-              backgroundColor: '#10b981',
-            }}
-            className="pulse-active"
-          />
-        </div>
-      )}
-
-      {/* East Approach */}
-      <LaneCard
-        lane={vm.lanes.east}
-        gridArea="east"
-        onSelect={() => onSelectLane?.('east')}
-      />
-
-      {/* South Approach */}
+      {/* South Camera Card */}
       <LaneCard
         lane={vm.lanes.south}
-        gridArea="south"
+        remainingSeconds={vm.activePhase.remainingSeconds}
+        isEmergencyMode={isEmergency}
         onSelect={() => onSelectLane?.('south')}
+        isSelected={selectedDirection === 'south'}
+      />
+
+      {/* East Camera Card */}
+      <LaneCard
+        lane={vm.lanes.east}
+        remainingSeconds={vm.activePhase.remainingSeconds}
+        isEmergencyMode={isEmergency}
+        onSelect={() => onSelectLane?.('east')}
+        isSelected={selectedDirection === 'east'}
+      />
+
+      {/* West Camera Card */}
+      <LaneCard
+        lane={vm.lanes.west}
+        remainingSeconds={vm.activePhase.remainingSeconds}
+        isEmergencyMode={isEmergency}
+        onSelect={() => onSelectLane?.('west')}
+        isSelected={selectedDirection === 'west'}
       />
     </div>
   );

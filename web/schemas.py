@@ -48,7 +48,12 @@ class SystemHealthData(BaseModel):
     uptime_seconds: float = 0.0
     liveness: bool = True
     readiness: bool = True
-    components: Dict[str, ComponentHealth] = Field(default_factory=dict)
+    cpu_percent: Optional[float] = 0.0
+    memory_used_gb: Optional[float] = 0.0
+    memory_total_gb: Optional[float] = 8.0
+    frame_processing_errors: Optional[int] = 0
+    inference_latency_ms: Optional[float] = 0.0
+    components: Dict[str, Any] = Field(default_factory=dict)
 
 
 # --- Camera Schemas ---
@@ -86,6 +91,8 @@ class MobileNodeItem(BaseModel):
     battery_pct: float
     signal_dbm: float
     last_seen: str
+    assigned_lane: str
+    expires_at: Optional[int] = None
 
 
 class MobileNodesData(BaseModel):

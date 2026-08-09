@@ -2,9 +2,10 @@
 REST API v1 endpoints for Smart Traffic Management Control Center using Pydantic Response Schemas.
 """
 
+import os
 from typing import Dict, Any, Optional
 from datetime import datetime
-from fastapi import APIRouter, Query, Body
+from fastapi import APIRouter, Query, Body, HTTPException
 from fastapi.responses import StreamingResponse
 
 from web.schemas import (
@@ -74,6 +75,11 @@ async def get_system_health():
         uptime_seconds=raw.get("uptime", 120.0),
         liveness=True,
         readiness=True,
+        cpu_percent=raw.get("cpu_percent", 0.0),
+        memory_used_gb=raw.get("memory_used_gb", 0.0),
+        memory_total_gb=raw.get("memory_total_gb", 8.0),
+        frame_processing_errors=raw.get("frame_processing_errors", 0),
+        inference_latency_ms=raw.get("inference_latency_ms", 0.0),
         components=raw.get("components", {}),
     )
     return wrap_response(health_data)
@@ -124,11 +130,13 @@ async def get_mobile_nodes():
             node_id=n.get("node_id", "NID"),
             name=n.get("device_name", "Mobile Node"),
             status=n.get("status", "CONNECTED"),
-            fps=float(n.get("fps", 30.0)),
-            latency_ms=float(n.get("latency_ms", 24.0)),
-            battery_pct=float(n.get("battery_pct", 84.0)),
-            signal_dbm=-55.0,
+            fps=float(n.get("fps", 30.0) if n.get("fps") is not None else 30.0),
+            latency_ms=float(n.get("latency_ms", 24.0) if n.get("latency_ms") is not None else 24.0),
+            battery_pct=float(n.get("battery_pct", 84.0) if n.get("battery_pct") is not None else 84.0),
+            signal_dbm=float(n.get("signal_dbm", -55.0) if n.get("signal_dbm") is not None else -55.0),
             last_seen=n.get("last_heartbeat", "Just now"),
+            assigned_lane=n.get("assigned_lane", "North Approach - Unpaired"),
+            expires_at=n.get("expires_at"),
         )
         for n in raw_nodes.get("nodes", [])
     ]
@@ -225,3 +233,38 @@ async def restart_system():
     system_svc.restart_system()
     log_svc.add_log(level="INFO", category="SYSTEM", component="SystemController", message="AI System restart initiated.")
     return wrap_response({"status": "SUCCESS", "message": "AI System restart initiated."})
+
+
+DEBUG_MODE = os.environ.get("DEBUG", "true").lower() == "true"
+
+
+@router.post("/system/simulate-connect", response_model=ApiResponse[Dict[str, Any]], include_in_schema=DEBUG_MODE)
+async def simulate_connect(direction: str = Query(..., description="Direction to simulate connection")):
+    if not DEBUG_MODE:
+        raise HTTPException(status_code=403, detail="Simulation endpoints are disabled in production.")
+    dir_clean = direction.lower()
+    nid = f"SIM-{dir_clean.upper()}"
+    
+    from core.application_context import ApplicationContext
+    ctx = ApplicationContext.get_instance()
+    ctx.session_manager.create_session(nid, dir_clean)
+    ctx.session_manager.clear_pairing_session(dir_clean)
+    
+    log_svc.add_log(level="INFO", category="NODE", component="SystemController", message=f"Simulated mobile node connection for direction '{dir_clean}'")
+    return wrap_response({"status": "SUCCESS", "message": f"Simulated mobile node connection for direction '{dir_clean}'"})
+
+
+@router.post("/system/simulate-disconnect", response_model=ApiResponse[Dict[str, Any]], include_in_schema=DEBUG_MODE)
+async def simulate_disconnect(direction: str = Query(..., description="Direction to simulate disconnection")):
+    if not DEBUG_MODE:
+        raise HTTPException(status_code=403, detail="Simulation endpoints are disabled in production.")
+    dir_clean = direction.lower()
+    nid = f"SIM-{dir_clean.upper()}"
+    
+    from core.application_context import ApplicationContext
+    ctx = ApplicationContext.get_instance()
+    ctx.session_manager.remove_session(nid)
+    ctx.session_manager.clear_pairing_session(dir_clean)
+    
+    log_svc.add_log(level="INFO", category="NODE", component="SystemController", message=f"Simulated mobile node disconnection for direction '{dir_clean}'")
+    return wrap_response({"status": "SUCCESS", "message": f"Simulated mobile node disconnection for direction '{dir_clean}'"})

@@ -25,16 +25,18 @@ def generate_synthetic_traffic_video(
     height: int = 720,
     fps: int = 30,
     duration_sec: int = 10,
+    title: str = "DEFAULT TRAFFIC FEED",
 ) -> Path:
     """
     Generates a realistic synthetic road scene with moving vehicle shapes.
     """
+    output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out = cv2.VideoWriter(str(output_path), fourcc, fps, (width, height))
 
     total_frames = fps * duration_sec
-    logger.info(f"Generating synthetic traffic video ({width}x{height} @ {fps} FPS, {total_frames} frames)...")
+    logger.info(f"Generating synthetic traffic video '{output_path.name}' ({width}x{height} @ {fps} FPS)...")
 
     # Define vehicle objects (x, y, speed, width, height, color, label)
     vehicles = [
@@ -87,6 +89,10 @@ def generate_synthetic_traffic_video(
             for wheel_x in [x_pos + 20, x_pos + veh["w"] - 30]:
                 cv2.circle(frame, (int(wheel_x), veh["y"] + veh["h"]), 10, (10, 10, 10), -1)
 
+        # Header title banner
+        cv2.rectangle(frame, (0, 0), (width, 50), (20, 20, 20), -1)
+        cv2.putText(frame, title, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 220, 255), 2, cv2.LINE_AA)
+
         out.write(frame)
 
     out.release()
@@ -94,5 +100,22 @@ def generate_synthetic_traffic_video(
     return output_path
 
 
+def generate_all_directional_videos(duration_sec: int = 10) -> None:
+    """
+    Generate synthetic sample videos for North, South, East, and West cameras.
+    """
+    cameras = [
+        ("north.mp4", "NORTH APPROACH - CAM 01"),
+        ("south.mp4", "SOUTH APPROACH - CAM 02"),
+        ("east.mp4", "EAST APPROACH - CAM 03"),
+        ("west.mp4", "WEST APPROACH - CAM 04"),
+        ("traffic.mp4", "MAIN TRAFFIC INTERSECTION"),
+    ]
+    for filename, title in cameras:
+        path = VIDEOS_DIR / filename
+        generate_synthetic_traffic_video(output_path=path, duration_sec=duration_sec, title=title)
+
+
 if __name__ == "__main__":
-    generate_synthetic_traffic_video()
+    generate_all_directional_videos()
+

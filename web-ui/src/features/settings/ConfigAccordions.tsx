@@ -12,6 +12,7 @@ import React, { useState } from 'react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useObservability } from '../../shared/hooks/useObservability';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { useCameraConfigs } from '../../shared/hooks/useSystemQueries';
 import { StatusBadge } from '../../shared/components/scada/StatusBadge';
 import { FEATURE_FLAGS } from '../../config/featureFlags';
 import {
@@ -80,17 +81,20 @@ export const ConfigAccordions: React.FC = () => {
   const navigate = useNavigate();
   const { settings, updateSettings } = useSettings();
   const { addToast } = useNotifications();
+  const { data: cameraConfigs } = useCameraConfigs();
   const obs = useObservability();
   const [openSection, setOpenSection] = useState<string | null>('ai');
 
   const toggle = (s: string) => setOpenSection(openSection === s ? null : s);
 
   const handleResetFirstLaunch = () => {
-    localStorage.removeItem('scc_connected_cameras');
-    localStorage.removeItem('scc_setup_complete');
-    addToast('warning', 'First Launch Reset', 'System states cleared. Redirecting to setup initialization.');
-    navigate('/');
-    window.location.reload();
+    if (confirm('Are you sure you want to reset the first launch state? This will clear paired cameras and direct you to the initial setup.')) {
+      localStorage.removeItem('scc_connected_cameras');
+      localStorage.removeItem('scc_setup_complete');
+      addToast('warning', 'First Launch Reset', 'System states cleared. Redirecting to setup initialization.');
+      navigate('/');
+      window.location.reload();
+    }
   };
 
   const handleLoadDemoData = () => {
@@ -102,10 +106,12 @@ export const ConfigAccordions: React.FC = () => {
   };
 
   const handleClearLocalStorage = () => {
-    localStorage.clear();
-    addToast('error', 'Local Cache Purged', 'Cleared all local storage settings.');
-    navigate('/');
-    window.location.reload();
+    if (confirm('Are you sure you want to clear all local storage settings? This is destructive and will purge all local preferences.')) {
+      localStorage.clear();
+      addToast('error', 'Local Cache Purged', 'Cleared all local storage settings.');
+      navigate('/');
+      window.location.reload();
+    }
   };
 
   const devBtnStyle = (color: string): React.CSSProperties => ({
@@ -180,10 +186,10 @@ export const ConfigAccordions: React.FC = () => {
               Camera streams are matched dynamically to approach directions.
             </p>
             <div style={{ padding: '12px', borderRadius: '6px', backgroundColor: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-              <div><strong>North Slot:</strong> Galaxy A52 (WS Gateway)</div>
-              <div><strong>South Slot:</strong> Local video feed mp4</div>
-              <div><strong>East Slot:</strong> Local video feed mp4</div>
-              <div><strong>West Slot:</strong> Local video feed mp4</div>
+              <div><strong>North Slot:</strong> {cameraConfigs?.streams?.['north']?.source || 'North Approach Feed'}</div>
+              <div><strong>South Slot:</strong> {cameraConfigs?.streams?.['south']?.source || 'South Approach Feed'}</div>
+              <div><strong>East Slot:</strong> {cameraConfigs?.streams?.['east']?.source || 'East Approach Feed'}</div>
+              <div><strong>West Slot:</strong> {cameraConfigs?.streams?.['west']?.source || 'West Approach Feed'}</div>
             </div>
           </div>
         )}

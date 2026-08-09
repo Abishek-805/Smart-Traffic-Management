@@ -26,6 +26,11 @@ export interface SystemVersionInfo {
 export interface ComponentHealth {
   status: 'HEALTHY' | 'DEGRADED' | 'UNHEALTHY';
   message: string;
+  connected?: boolean;
+  simulation?: boolean;
+  running?: boolean;
+  fps?: number;
+  active?: number;
 }
 
 export interface SystemHealthData {
@@ -34,6 +39,12 @@ export interface SystemHealthData {
   uptime_seconds: number;
   liveness: boolean;
   readiness: boolean;
+  cpu_percent?: number;
+  memory_used_gb?: number;
+  memory_total_gb?: number;
+  frame_processing_errors?: number;
+  inference_latency_ms?: number;
+  stage_counters?: Record<string, number>;
   components: Record<string, ComponentHealth>;
 }
 
@@ -46,21 +57,55 @@ export type TelemetryEventType =
   | 'NodeDisconnected'
   | 'LogEntry';
 
+export interface LaneTelemetryItem {
+  vehicles: number;
+  queue: number;
+  wait: number;
+  pce: number;
+  density: number | string;
+  priority: number;
+}
+
 export interface TelemetryPayload {
   activePhase: string;
   greenDuration: number;
   timeRemaining: number;
   totalVehicles: number;
+  detectedVehicles?: number;
+  assignedVehicles?: number;
   queueLength: number;
   pceScore: number;
   operatingMode: 'AUTOMATIC' | 'MANUAL_OVERRIDE' | 'EMERGENCY_OVERRIDE';
   snapshotTimestamp?: number;
+  captureTimestamp?: number;
+  uploadTimestamp?: number;
+  backendReceiveTimestamp?: number;
+  decodeTimestamp?: number;
+  inferenceTimestamp?: number;
+  schedulerTimestamp?: number;
+  broadcastTimestamp?: number;
+  dashboardReceiveTimestamp?: number;
+  dashboardRenderTimestamp?: number;
   lastFrameTimestamp?: number;
   frameAgeMs?: number;
   pipelineHealthy?: boolean;
   pipelineStalled?: boolean;
   streamStatus?: 'CONNECTING' | 'LIVE' | 'STALE' | 'DISCONNECTED';
   processingErrors?: number;
+  stageCounters?: {
+    received?: number;
+    decoded?: number;
+    decode_failed?: number;
+    processed?: number;
+    dropped?: number;
+  };
+  lanes?: Record<string, LaneTelemetryItem>;
+  latencyMetrics?: {
+    frame_id?: number;
+    timestamp?: number;
+    yolo_ms?: number;
+    total_ms?: number;
+  };
 }
 
 export interface TelemetryMessage {
@@ -96,12 +141,14 @@ export interface NodeHealthSummary {
 export interface MobileNodeItem {
   node_id: string;
   name: string;
-  status: 'CONNECTED' | 'DISCONNECTED' | 'PAIRING';
+  status: 'CONNECTED' | 'DISCONNECTED' | 'PAIRING' | 'PAIRED' | 'OFFLINE';
   fps: number;
   latency_ms: number;
   battery_pct: number;
   signal_dbm: number;
   last_seen: string;
+  assigned_lane: string;
+  expires_at?: number;
 }
 
 export interface MobileNodesData {

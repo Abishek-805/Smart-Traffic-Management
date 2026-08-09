@@ -107,7 +107,16 @@ class MessageHandler:
             or raw_json.get("token")
             or "CAM-001"
         )
-        direction = payload_raw.get("camera_direction") or payload_raw.get("assignedLane") or "north"
+        direction = payload_raw.get("camera_direction") or payload_raw.get("assignedLane")
+        if not direction:
+            # Extract direction from session ID string (e.g. CAM-SOUTH-PAIR -> south)
+            node_id_upper = str(node_id).upper()
+            for d in ["NORTH", "SOUTH", "EAST", "WEST"]:
+                if d in node_id_upper:
+                    direction = d.lower()
+                    break
+        if not direction:
+            direction = "north"
 
         payload_raw["node_id"] = node_id
         payload_raw["camera_direction"] = direction
@@ -207,11 +216,50 @@ class MessageHandler:
         logger.debug(f"[PAIRING] HEARTBEAT → ACK | node={node_id}")
         return d
 
+    async def _process_direction_loop(self, direction: str):
+        """Worker task processing the latest queued frame for a specific lane direction."""
+        logger.info(f"[LATENCY-CONTROL] Starting frame processing loop for lane '{direction}'")
+        while True:
+            if hasattr(self, "latest_frames") and self.latest_frames:
+                logger.info(f"[LATENCY-CONTROL] worker loop for '{direction}' sees keys: {list(self.latest_frames.keys())}")
+            raw_json = self.latest_frames.pop(direction, None) if hasattr(self, "latest_frames") else None
+            if raw_json is None:
+                await asyncio.sleep(0.01)  # 10ms poll interval
+                continue
+
+            try:
+                payload_raw = raw_json.get("payload", {})
+                frame_b64 = payload_raw.get("frame_data")
+                if frame_b64:
+                    from core.application_context import ApplicationContext
+                    ctx = ApplicationContext.get_instance()
+                    
+                    # Read capture, upload, and receive times in milliseconds
+                    cap_ts = payload_raw.get("capture_timestamp")
+                    if cap_ts is None:
+                        cap_ts = payload_raw.get("timestamp", time.time()) * 1000.0
+                    upload_ts = payload_raw.get("upload_timestamp", cap_ts)
+                    rx_ts = raw_json.get("backend_receive_timestamp", time.time() * 1000.0)
+
+                    res = await asyncio.to_thread(_process_frame_worker, frame_b64, direction, cap_ts, upload_ts, rx_ts)
+                    logger.info(f"[LATENCY-CONTROL] Background process worker finished. res is None: {res is None}")
+                    if res:
+                        dir_key, annotated_bytes, snapshot, telemetry = res
+                        logger.info(f"[LATENCY-CONTROL] Updating snapshot in context. Snapshot type: {snapshot.get('type') if snapshot else None}")
+                        await ctx.update_snapshot(snapshot)
+                        ctx.frame_buffer[dir_key] = annotated_bytes
+                        ctx.frame_buffer["active"] = annotated_bytes
+                        ctx.live_telemetry[dir_key] = telemetry
+                        ctx.increment_stage_counter("processed")
+                    else:
+                        ctx.frame_processing_errors += 1
+            except Exception as e:
+                logger.warning(f"Error in background frame processing loop for '{direction}': {e}", exc_info=True)
+
     async def _handle_video_frame(self, raw_json: dict) -> Optional[dict]:
-        """Handle incoming VIDEO_FRAME payload by offloading decoding and TrafficPipeline execution to worker thread."""
+        """Handle incoming VIDEO_FRAME payload by offloading to the corresponding direction queue."""
         payload_raw = raw_json.get("payload", {})
         if isinstance(payload_raw, dict):
-            frame_b64 = payload_raw.get("frame_data")
             direction = (
                 payload_raw.get("direction")
                 or payload_raw.get("camera_direction")
@@ -219,28 +267,31 @@ class MessageHandler:
                 or "north"
             ).lower()
 
-            if frame_b64:
-                from core.application_context import ApplicationContext
-                ctx = ApplicationContext.get_instance()
-                now_mono = time.monotonic()
-                ctx.last_frame_monotonic = now_mono
-                ctx.lane_last_seen[direction] = now_mono
+            # Lazy initialize worker states
+            if not hasattr(self, "latest_frames"):
+                self.latest_frames = {}
+                self.dropped_frames_count = 0
+                self.worker_tasks = {}
 
-                try:
-                    res = await asyncio.to_thread(_process_frame_worker, frame_b64, direction)
-                    if res:
-                        dir_key, annotated_bytes, snapshot, telemetry = res
-                        # Atomic snapshot swap in main event loop
-                        ctx.update_snapshot(snapshot)
-                        ctx.frame_buffer[dir_key] = annotated_bytes
-                        ctx.frame_buffer["active"] = annotated_bytes
-                        ctx.live_telemetry[dir_key] = telemetry
-                    else:
-                        ctx.frame_processing_errors += 1
-                        logger.warning(f"Frame worker returned None (corrupt or un-decodable frame for direction '{direction}')")
-                except Exception as e:
-                    ctx.frame_processing_errors += 1
-                    logger.warning(f"Error processing VIDEO_FRAME worker: {e}")
+            # Log receive timestamp
+            raw_json["backend_receive_timestamp"] = int(time.time() * 1000)
+
+            from core.application_context import ApplicationContext
+            ctx = ApplicationContext.get_instance()
+            ctx.increment_stage_counter("received")
+
+            # Latest Frame Wins Policy: check if there's already an unprocessed frame in the slot
+            if direction in self.latest_frames:
+                self.dropped_frames_count += 1
+                ctx.increment_stage_counter("dropped")
+                logger.info(f"[LATENCY-CONTROL] Dropping stale frame for '{direction}' (Total dropped: {self.dropped_frames_count})")
+
+            self.latest_frames[direction] = raw_json
+
+            # Lazy start loop task
+            if direction not in self.worker_tasks:
+                self.worker_tasks[direction] = asyncio.create_task(self._process_direction_loop(direction))
+
         return None
 
     async def _handle_disconnect(self, raw_json: dict) -> Optional[dict]:
@@ -282,7 +333,7 @@ class MessageHandler:
         return err.model_dump()
 
 
-def _process_frame_worker(frame_b64: str, direction: str):
+def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upload_ts: float, rx_ts: float):
     """
     Worker thread task executing CPU-bound base64/JPEG decoding, passing transport-agnostic np.ndarray
     frame into TrafficPipeline and ControlManager, and building immutable PipelineStateSnapshot.
@@ -294,16 +345,20 @@ def _process_frame_worker(frame_b64: str, direction: str):
     from ai.pipeline.traffic_pipeline import TrafficPipeline
     from ai.controller.control_manager import ControlManager
 
+    decode_start = time.time() * 1000.0
     if "," in frame_b64:
         frame_b64 = frame_b64.split(",")[1]
     frame_bytes = base64.b64decode(frame_b64)
     nparr = np.frombuffer(frame_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-    if img is None:
-        return None
+    decode_ts = time.time() * 1000.0
 
     ctx = ApplicationContext.get_instance()
+    ctx.increment_stage_counter("decoded")
+
+    if img is None:
+        ctx.increment_stage_counter("decode_failed")
+        return None
 
     # Ensure TrafficPipeline and ControlManager are instantiated in ApplicationContext
     if ctx.pipeline is None:
@@ -312,10 +367,13 @@ def _process_frame_worker(frame_b64: str, direction: str):
         ctx.control_manager = ControlManager(simulation_mode=True)
 
     # 1. AI Perception, ByteTrack, Lane Assignment, Analytics & Signal Scheduler via TrafficPipeline
+    yolo_start = int(time.time() * 1000)
     pipeline_result = ctx.pipeline.process_single_frame(img, lane_name=direction)
+    inference_time = int(time.time() * 1000)
 
     # 2. Control Layer execution via ControlManager (handles ESP32 hardware command & decision logging)
     ctx.control_manager.process_result(pipeline_result)
+    scheduler_time = int(time.time() * 1000)
 
     # Extract annotated tile frame
     annotated_tile = pipeline_result.multi_annotated_frames.get(direction, img)
@@ -344,6 +402,40 @@ def _process_frame_worker(frame_b64: str, direction: str):
         queue_len = round(sum(s.total_queue_time_sec for s in pipeline_result.lane_stats.values()), 1)
         pce_score = round(sum(s.pce_score for s in pipeline_result.lane_stats.values()), 1)
 
+    lanes_payload = {}
+    for d_name in ["north", "south", "east", "west"]:
+        l_stat = pipeline_result.lane_stats.get(d_name) if pipeline_result.lane_stats else None
+        if l_stat:
+            v_cnt = int(getattr(l_stat, "live_count", 0))
+            q_val = float(getattr(l_stat, "total_queue_time_sec", 0.0))
+            p_score = float(getattr(l_stat, "pce_score", 0.0))
+            den = str(getattr(l_stat, "density", "LOW"))
+            prio = round(v_cnt * 0.5 + p_score * 0.5, 2)
+            # Phase 3.5: Include stabilization telemetry per lane
+            raw_cnt = int(getattr(l_stat, "raw_count", v_cnt))
+            sm_cnt = float(getattr(l_stat, "smoothed_count", float(v_cnt)))
+            lanes_payload[d_name] = {
+                "vehicles": v_cnt,
+                "queue": round(q_val, 1),
+                "wait": round(q_val, 1),
+                "pce": round(p_score, 1),
+                "density": den,
+                "priority": prio,
+                "rawCount": raw_cnt,
+                "smoothedCount": round(sm_cnt, 2),
+            }
+        else:
+            lanes_payload[d_name] = {
+                "vehicles": 0,
+                "queue": 0.0,
+                "wait": 0.0,
+                "pce": 0.0,
+                "density": "LOW",
+                "priority": 0.0,
+                "rawCount": 0,
+                "smoothedCount": 0.0,
+            }
+
     snapshot = {
         "protocol": "1.0",
         "type": "SystemStatusUpdated",
@@ -360,6 +452,15 @@ def _process_frame_worker(frame_b64: str, direction: str):
             "operatingMode": "AUTOMATIC",
             "frameProcessingErrors": getattr(ctx, "frame_processing_errors", 0),
             "latencyMetrics": getattr(pipeline_result, "latency_metrics", {}),
+            "stabilityMetrics": getattr(pipeline_result, "stability_metrics", {}),
+            "lanes": lanes_payload,
+            "captureTimestamp": int(capture_ts),
+            "uploadTimestamp": int(upload_ts),
+            "backendReceiveTimestamp": int(rx_ts),
+            "decodeTimestamp": int(decode_ts),
+            "inferenceTimestamp": int(inference_time),
+            "schedulerTimestamp": int(scheduler_time),
+            "stageCounters": ctx.get_stage_counters(),
         },
     }
 

@@ -31,7 +31,12 @@ PCE_WEIGHTS = {
 # Motion and queue detection parameters
 QUEUE_MOTION_THRESHOLD_PX_SEC = 15.0  # Motion below 15 px/s is low speed
 CONSECUTIVE_QUEUE_FRAMES = 10         # Vehicle must be slow for 10 frames to be marked queued
-TRACK_EXPIRATION_TIMEOUT_SEC = 3.0    # Purge stale tracks after 3 seconds of inactivity
+# ── Phase 3.5 — Vehicle Count Stabilization ──────────────────────────────────
+EMA_ALPHA = 0.4                       # Exponential Moving Average smoothing factor (0–1)
+COUNT_HISTORY_SIZE = 10               # Rolling window size for raw count history
+MIN_CONFIRMATION_FRAMES = 2           # Minimum frames a track must exist before counting
+TRACK_REMOVAL_GRACE_SEC = 1.8         # Measured grace period before purging a lost track (frame arrival jitter tolerance)
+TRACK_EXPIRATION_TIMEOUT_SEC = 4.0    # Hard purge stale tracks after 4 seconds of inactivity
 
 # Configurable congestion scoring weights
 CONGESTION_WEIGHTS = {

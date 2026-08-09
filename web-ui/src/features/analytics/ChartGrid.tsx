@@ -74,8 +74,8 @@ export const ChartGrid: React.FC<ChartGridProps> = ({ data }) => {
               <YAxis stroke="var(--text-muted)" fontSize={11} />
               <Tooltip {...CHART_TOOLTIP_STYLE} />
               <Legend />
-              <Area type="monotone" dataKey="avgQueueLength" stroke="#3b82f6" fill="rgba(59,130,246,0.2)" name="Avg Queue (m)" />
-              <Area type="monotone" dataKey="maxQueueLength" stroke="#ef4444" fill="rgba(239,68,68,0.2)" name="Max Queue (m)" />
+              <Area type="monotone" dataKey="avgQueueLength" stroke="#3b82f6" fill="rgba(59,130,246,0.2)" name="Avg Queue (veh)" />
+              <Area type="monotone" dataKey="maxQueueLength" stroke="#ef4444" fill="rgba(239,68,68,0.2)" name="Max Queue (veh)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>

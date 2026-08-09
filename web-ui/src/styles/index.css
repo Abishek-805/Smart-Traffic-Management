@@ -1,102 +1,118 @@
-/* SCADA Enterprise Design Tokens & Global CSS System */
+/* SCADA Enterprise Design Tokens & Global CSS System — v2.1.0 Industrial Specification */
 
 :root {
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
 
-  /* Colors - SCADA Dark Theme */
-  --bg-main: #070b14;
-  --bg-card: #0f172a;
-  --bg-card-hover: #1e293b;
-  --bg-sidebar: #04070d;
-  --bg-header: rgba(7, 11, 20, 0.95);
+  /* Colors — Industrial SCADA Dark Theme */
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-surface: #21262d;
+  --bg-main: #0d1117;
+  --bg-card: #161b22;
+  --bg-card-hover: #21262d;
+  --bg-sidebar: #0d1117;
+  --bg-header: #161b22;
 
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --text-subtle: #64748b;
+  --text-primary: #ffffff;
+  --text-secondary: #c9d1d9;
+  --text-main: #ffffff;
+  --text-muted: #8b949e;
+  --text-subtle: #6e7681;
 
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-highlight: rgba(255, 255, 255, 0.16);
+  --border-color: #30363d;
+  --border-highlight: #58a6ff;
 
-  /* SCADA 5-State Operational Color System */
-  --status-green: #10b981;
-  --status-green-glow: rgba(16, 185, 129, 0.25);
+  /* SCADA Traffic Signal Color Contract */
+  --signal-green: #10b981;
+  --signal-yellow: #f59e0b;
+  --signal-red: #ef4444;
+  --signal-offline: #484f58;
 
-  --status-amber: #f59e0b;
-  --status-amber-glow: rgba(245, 158, 11, 0.25);
+  /* Status Colors */
+  --status-healthy: #3fb950;
+  --status-warning: #d29922;
+  --status-critical: #f85149;
+  --status-info: #58a6ff;
+  --status-ai: #bc8cff;
 
-  --status-blue: #3b82f6;
-  --status-blue-glow: rgba(59, 130, 246, 0.25);
-
-  --status-grey: #64748b;
-  --status-grey-glow: rgba(100, 116, 139, 0.15);
-
-  --status-red: #ef4444;
-  --status-red-glow: rgba(239, 68, 68, 0.25);
-
-  /* Category Accents */
-  --color-primary: #3b82f6;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444;
-  --color-info: #06b6d4;
-
-  --shadow-card: 0 4px 20px 0 rgba(0, 0, 0, 0.4);
+  --shadow-card: none;
 }
 
-html.light {
-  --bg-main: #f1f5f9;
-  --bg-card: #ffffff;
-  --bg-card-hover: #f8fafc;
-  --bg-sidebar: #ffffff;
-  --bg-header: rgba(241, 245, 249, 0.95);
-
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --text-subtle: #94a3b8;
-
-  --border-color: rgba(0, 0, 0, 0.08);
-  --border-highlight: rgba(0, 0, 0, 0.15);
-
-  --shadow-card: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
-}
-
-* {
-  box-sizing: border-box;
+html, body, #root {
+  height: 100vh;
+  width: 100vw;
   margin: 0;
   padding: 0;
-}
-
-body {
-  background-color: var(--bg-main);
-  color: var(--text-main);
+  overflow: hidden;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   font-family: var(--font-family);
-  min-height: 100vh;
-  overflow-x: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* SCADA Card Utility */
-.scada-card {
-  background: var(--bg-card);
+/* Tabular Monospace font for data counters, latencies, and timers */
+.font-mono-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* SCADA Industrial Panel Utility Classes */
+.scada-panel {
+  background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow: var(--shadow-card);
-  transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 4px;
 }
 
-.scada-card:hover {
-  border-color: var(--border-highlight);
+.scada-surface {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
 }
 
-/* Active Green Phase Pulse Glow */
-@keyframes green-phase-glow {
-  0% { border-color: var(--status-green); box-shadow: 0 0 12px var(--status-green-glow); }
-  50% { border-color: var(--status-green); box-shadow: 0 0 24px var(--status-green-glow); }
-  100% { border-color: var(--status-green); box-shadow: 0 0 12px var(--status-green-glow); }
+.scada-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  box-shadow: none;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
 }
 
-.active-green-card {
-  animation: green-phase-glow 2s infinite ease-in-out;
+/* Signal state borders */
+.signal-border-green {
+  border: 2px solid var(--signal-green) !important;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.25);
+}
+
+.signal-border-yellow {
+  border: 2px solid var(--signal-yellow) !important;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.25);
+}
+
+.signal-border-red {
+  border: 2px solid var(--signal-red) !important;
+}
+
+.signal-border-offline {
+  border: 1px solid var(--border-color) !important;
+}
+
+/* Emergency State Pulsing Animation */
+@keyframes emergencyPulse {
+  0%, 100% {
+    border-color: #ef4444;
+    box-shadow: 0 0 16px rgba(239, 68, 68, 0.85);
+  }
+  50% {
+    border-color: #7f1d1d;
+    box-shadow: 0 0 4px rgba(239, 68, 68, 0.2);
+  }
+}
+
+.emergency-pulse-card {
+  animation: emergencyPulse 1s infinite ease-in-out !important;
+  border-width: 2px !important;
 }
 
 /* Pulse Dot Indicator */
@@ -110,39 +126,19 @@ body {
   animation: pulse-dot 1.5s infinite;
 }
 
-/* CSS Grid Dashboard Layout Areas */
-.dashboard-grid-container {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: 1fr 220px 1fr;
-  grid-template-rows: auto auto auto;
-  grid-template-areas:
-    "north north north"
-    "west centre east"
-    "south south south";
-}
-
-@media (max-width: 1365px) {
-  .dashboard-grid-container {
-    grid-template-columns: 1fr 1fr;
-    grid-template-areas:
-      "north east"
-      "west south";
-  }
-}
-
-/* Custom Scrollbars */
+/* Custom SCADA Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #0d1117;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
+  background: #30363d;
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: #58a6ff;
 }
+

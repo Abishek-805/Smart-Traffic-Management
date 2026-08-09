@@ -2,6 +2,7 @@
 ModelManager handles vision model initialization, device selection, and abstraction over inference engines.
 """
 
+import threading
 from pathlib import Path
 from typing import Any, Union, Dict
 from ultralytics import YOLO
@@ -30,6 +31,7 @@ class ModelManager:
         self.iou = iou
         self.device = device
         self.model: YOLO = None
+        self._inference_lock = threading.Lock()
 
         self._load_model()
 
@@ -53,12 +55,32 @@ class ModelManager:
     def predict(self, frame: Any, classes: list = None) -> Any:
         """
         Run model inference on a frame with specified class filters and thresholds.
+        Returns detection results only (no track IDs).
         """
-        return self.model.predict(
-            source=frame,
-            conf=self.confidence,
-            iou=self.iou,
-            classes=classes,
-            device=None if self.device == "auto" else self.device,
-            verbose=False,
-        )
+        with self._inference_lock:
+            return self.model.predict(
+                source=frame,
+                conf=self.confidence,
+                iou=self.iou,
+                classes=classes,
+                device=None if self.device == "auto" else self.device,
+                verbose=False,
+            )
+
+    def track(self, frame: Any, classes: list = None) -> Any:
+        """
+        Run unified detect-and-track inference on a frame in a single YOLO forward pass.
+        Returns results with persistent track IDs via ByteTrack.
+        TrafficPipeline must use this instead of calling predict() + track() separately.
+        """
+        with self._inference_lock:
+            return self.model.track(
+                source=frame,
+                conf=self.confidence,
+                iou=self.iou,
+                classes=classes,
+                persist=True,
+                tracker="bytetrack.yaml",
+                device=None if self.device == "auto" else self.device,
+                verbose=False,
+            )

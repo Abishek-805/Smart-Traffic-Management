@@ -48,6 +48,35 @@ async def lifespan(app: FastAPI):
         ctx.control_manager = ControlManager(simulation_mode=True)
     logger.info("TrafficPipeline and ControlManager initialized in ApplicationContext.")
 
+    import time
+    async def broadcast_telemetry(snapshot_data: dict):
+        """Broadcast the telemetry snapshot to all connected browser clients instantly."""
+        if not telemetry_clients:
+            return
+        now_ms = int(time.time() * 1000)
+        payload_copy = dict(snapshot_data.get("payload", {}))
+        payload_copy["broadcastTimestamp"] = now_ms
+        
+        # Calculate pipeline latency if captureTimestamp exists
+        cap_ts = payload_copy.get("captureTimestamp")
+        if cap_ts:
+            payload_copy["pipelineLatencyMs"] = now_ms - cap_ts
+            
+        snapshot_data["payload"] = payload_copy
+
+        disconnected = set()
+        for ws in telemetry_clients:
+            try:
+                await ws.send_json(snapshot_data)
+            except Exception:
+                disconnected.add(ws)
+                
+        for ws in disconnected:
+            if ws in telemetry_clients:
+                telemetry_clients.remove(ws)
+
+    ctx.on_snapshot_updated = broadcast_telemetry
+
     # Background periodic session sweeper task
     async def _session_sweeper():
         while ctx.system_running:
@@ -150,7 +179,38 @@ async def telemetry_websocket_endpoint(websocket: WebSocket):
                 snapshot_data["payload"] = payload_copy
                 await websocket.send_json(snapshot_data)
             else:
-                # Initial default pulse before first camera frame arrives
+                # Build default per-lane metrics from context history or zeros
+                lanes_payload = {}
+                for d_name in ["north", "south", "east", "west"]:
+                    l_stat = ctx.lane_stats_history.get(d_name)
+                    if l_stat:
+                        v_cnt = int(getattr(l_stat, "live_count", 0))
+                        q_val = float(getattr(l_stat, "total_queue_time_sec", 0.0))
+                        p_score = float(getattr(l_stat, "pce_score", 0.0))
+                        den = str(getattr(l_stat, "density", "LOW"))
+                        prio = round(v_cnt * 0.5 + p_score * 0.5, 2)
+                        lanes_payload[d_name] = {
+                            "vehicles": v_cnt,
+                            "queue": round(q_val, 1),
+                            "wait": round(q_val, 1),
+                            "pce": round(p_score, 1),
+                            "density": den,
+                            "priority": prio,
+                        }
+                    else:
+                        lanes_payload[d_name] = {
+                            "vehicles": 0,
+                            "queue": 0.0,
+                            "wait": 0.0,
+                            "pce": 0.0,
+                            "density": "LOW",
+                            "priority": 0.0,
+                        }
+
+                tot_veh = sum(l["vehicles"] for l in lanes_payload.values())
+                tot_q = round(sum(l["queue"] for l in lanes_payload.values()), 1)
+                tot_pce = round(sum(l["pce"] for l in lanes_payload.values()), 1)
+
                 tick -= 1
                 if tick <= 0:
                     idx = (idx + 1) % len(phases)
@@ -163,17 +223,18 @@ async def telemetry_websocket_endpoint(websocket: WebSocket):
                         "activePhase": phases[idx],
                         "greenDuration": 25,
                         "timeRemaining": tick,
-                        "totalVehicles": 42 + idx * 5,
-                        "queueLength": round(3.5 + (tick % 5) * 1.2, 1),
-                        "pceScore": round(2.1 + (tick % 3) * 0.8, 1),
+                        "totalVehicles": tot_veh,
+                        "queueLength": tot_q,
+                        "pceScore": tot_pce,
                         "operatingMode": "AUTOMATIC",
                         "snapshotTimestamp": now_wall,
                         "lastFrameTimestamp": now_wall,
-                        "frameAgeMs": 0.0,
-                        "pipelineHealthy": True,
-                        "pipelineStalled": False,
-                        "streamStatus": "CONNECTING",
+                        "frameAgeMs": frame_age_ms,
+                        "pipelineHealthy": is_healthy,
+                        "pipelineStalled": is_stalled,
+                        "streamStatus": stream_status if frame_age_sec > 5.0 else "CONNECTING",
                         "processingErrors": 0,
+                        "lanes": lanes_payload,
                     },
                 }
                 await websocket.send_json(payload)

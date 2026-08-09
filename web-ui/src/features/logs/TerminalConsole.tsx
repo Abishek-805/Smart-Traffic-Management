@@ -16,6 +16,7 @@ interface TerminalConsoleProps {
   copiedId: string | null;
   onTogglePause: () => void;
   onCopyLog: (log: LogEntryItem) => void;
+  selectedCategory?: string;
 }
 
 export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
@@ -27,6 +28,7 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
   copiedId,
   onTogglePause,
   onCopyLog,
+  selectedCategory = 'ALL',
 }) => {
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -174,8 +176,20 @@ export const TerminalConsole: React.FC<TerminalConsoleProps> = ({
         <div ref={logsEndRef} />
 
         {logs.length === 0 && (
-          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            Console ready. Waiting for backend event streams...
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }} className="font-mono">
+            {searchQuery ? (
+              'No log entries match search query.'
+            ) : selectedCategory === 'INFO' ? (
+              'No INFO logs found.'
+            ) : selectedCategory === 'WARNING' ? (
+              'No WARNING logs found.'
+            ) : selectedCategory === 'ERROR' ? (
+              'No ERROR logs found.'
+            ) : selectedCategory !== 'ALL' ? (
+              'No log entries match your category filter.'
+            ) : (
+              'Console ready. Waiting for backend event streams...'
+            )}
           </div>
         )}
       </div>

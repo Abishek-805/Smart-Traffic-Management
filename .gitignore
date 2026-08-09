@@ -16,7 +16,7 @@ env/
 models/*.pt
 videos/*.mp4
 outputs/*.mp4
-logs/*.log
+logs/
 
 # Node & Frontend Build
 node_modules/

@@ -62,8 +62,11 @@ class TestE2EPipelineWebSocket(unittest.IsolatedAsyncioTestCase):
         # 3. Transmit VIDEO_FRAME message to MessageHandler
         await handler.process_message(frame_packet, mock_ws)
 
-        # Allow worker thread execution to complete
-        await asyncio.sleep(0.3)
+        # Allow worker thread execution to complete (wait up to 40s for model load)
+        for _ in range(400):
+            if ctx.latest_snapshot is not None:
+                break
+            await asyncio.sleep(0.1)
 
         # 4. Verify ApplicationContext snapshot and pipeline state
         snapshot = ctx.latest_snapshot

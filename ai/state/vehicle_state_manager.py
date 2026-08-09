@@ -12,6 +12,8 @@ from config.traffic import (
     QUEUE_MOTION_THRESHOLD_PX_SEC,
     CONSECUTIVE_QUEUE_FRAMES,
     TRACK_EXPIRATION_TIMEOUT_SEC,
+    MIN_CONFIRMATION_FRAMES,
+    TRACK_REMOVAL_GRACE_SEC,
 )
 from ai.utils.logger import get_logger
 
@@ -35,8 +37,10 @@ class VehicleState:
     time_in_lane_sec: float = 0.0
     queue_time_sec: float = 0.0
     consecutive_low_motion_frames: int = 0
+    consecutive_seen_frames: int = 1  # Phase 3.5: track how many frames this vehicle has appeared in
     is_queued: bool = False
     is_alive: bool = True
+    is_confirmed: bool = False        # Phase 3.5: True once consecutive_seen_frames >= MIN_CONFIRMATION_FRAMES
     is_priority: bool = False
 
 
@@ -53,6 +57,8 @@ class VehicleStateManager:
             "East": set(),
             "West": set(),
         }
+        self.min_confirmation_frames = MIN_CONFIRMATION_FRAMES
+        self.track_removal_grace_sec = TRACK_REMOVAL_GRACE_SEC
 
     def update(
         self,
@@ -130,6 +136,11 @@ class VehicleStateManager:
                 else:
                     state.is_queued = False
 
+                # Phase 3.5: Increment seen frames and mark confirmed if threshold met
+                state.consecutive_seen_frames += 1
+                if state.consecutive_seen_frames >= self.min_confirmation_frames:
+                    state.is_confirmed = True
+
                 # Update timestamp and centroid
                 state.last_centroid = (cx, cy)
                 state.last_seen_timestamp = timestamp
@@ -149,14 +160,21 @@ class VehicleStateManager:
 
     def _purge_stale_tracks(self, active_track_ids: set, current_timestamp: float) -> None:
         """
-        Mark tracks as inactive/dead if not seen in current frame or exceeding timeout.
+        Mark tracks as inactive/dead if not seen in current frame.
+        Phase 3.5: Uses a grace period (TRACK_REMOVAL_GRACE_SEC) before purging to
+        tolerate temporary occlusions and prevent one-frame disappearance flicker.
+        Final purge still uses TRACK_EXPIRATION_TIMEOUT_SEC as the hard upper bound.
         """
         stale_ids = []
         for tid, state in self.active_states.items():
             if tid not in active_track_ids:
                 inactivity_duration = current_timestamp - state.last_seen_timestamp
                 state.is_alive = False
+                # Hard purge after full expiration timeout
                 if inactivity_duration > TRACK_EXPIRATION_TIMEOUT_SEC:
+                    stale_ids.append(tid)
+                # Grace-period soft purge: mark unconfirmed after grace period
+                elif inactivity_duration > self.track_removal_grace_sec:
                     stale_ids.append(tid)
 
         for tid in stale_ids:
@@ -169,6 +187,20 @@ class VehicleStateManager:
         grouped: Dict[str, List[VehicleState]] = {}
         for state in self.active_states.values():
             if state.is_alive:
+                lane = state.lane
+                if lane not in grouped:
+                    grouped[lane] = []
+                grouped[lane].append(state)
+        return grouped
+
+    def get_confirmed_vehicles_by_lane(self) -> Dict[str, List[VehicleState]]:
+        """
+        Phase 3.5: Return only confirmed vehicles (seen >= MIN_CONFIRMATION_FRAMES)
+        grouped by lane. Filters out one-frame false positives from scheduling input.
+        """
+        grouped: Dict[str, List[VehicleState]] = {}
+        for state in self.active_states.values():
+            if state.is_alive and state.is_confirmed:
                 lane = state.lane
                 if lane not in grouped:
                     grouped[lane] = []

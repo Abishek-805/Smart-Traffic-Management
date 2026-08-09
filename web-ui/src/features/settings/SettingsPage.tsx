@@ -17,11 +17,13 @@ export const SettingsPage: React.FC = () => {
   const { addToast } = useNotifications();
 
   const handleSave = () =>
-    addToast('success', 'Settings Saved', 'System configuration parameters updated successfully.');
+    addToast('success', 'Local Settings Saved', 'These settings are stored locally in this browser. They do not modify the running backend unless the backend explicitly supports applying them.');
 
   const handleReset = () => {
-    resetSettings();
-    addToast('info', 'Settings Reset', 'Restored system configuration to default values.');
+    if (confirm('Are you sure you want to reset all configurations to their default values?')) {
+      resetSettings();
+      addToast('info', 'Settings Reset', 'Restored local browser configuration to default values.');
+    }
   };
 
   return (
@@ -50,6 +52,27 @@ export const SettingsPage: React.FC = () => {
             <Save size={14} aria-hidden="true" /> Save Changes
           </button>
         </div>
+      </div>
+
+      {/* Disclaimer Banner */}
+      <div
+        className="scada-card"
+        style={{
+          padding: '12px 16px',
+          backgroundColor: 'rgba(245, 158, 11, 0.1)',
+          border: '1px solid rgba(245, 158, 11, 0.25)',
+          borderRadius: '6px',
+          color: '#f59e0b',
+          fontSize: '0.8rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}
+      >
+        <Info size={16} style={{ flexShrink: 0 }} />
+        <span>
+          <strong>System Settings Scope:</strong> These settings are stored locally in this browser. They do not modify the running backend unless the backend explicitly supports applying them.
+        </span>
       </div>
 
       {/* Accordion Panels — delegated to ConfigAccordions */}

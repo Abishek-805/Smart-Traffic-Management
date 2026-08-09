@@ -58,20 +58,37 @@ class NodeService:
                     "last_heartbeat": "Just now",
                 })
             else:
-                node_list.append({
-                    "node_id": f"SLOT-{direction.upper()}",
-                    "assigned_lane": f"{direction.capitalize()} Approach - Unpaired",
-                    "device_name": "No Device Paired",
-                    "signal_quality": "N/A",
-                    "battery_pct": 0,
-                    "latency_ms": 0,
-                    "resolution": "Offline",
-                    "status": "OFFLINE",
-                    "last_heartbeat": "Unregistered",
-                })
+                pairing_sess = self.ctx.session_manager.get_pairing_session(direction)
+                if pairing_sess:
+                    expires_at = pairing_sess["expires_at"]
+                    time_remaining = max(0, int(expires_at - time.time()))
+                    node_list.append({
+                        "node_id": pairing_sess["session_id"],
+                        "assigned_lane": f"{direction.capitalize()} Approach - Pairing",
+                        "device_name": "Pairing Session Active",
+                        "signal_quality": "N/A",
+                        "battery_pct": 0,
+                        "latency_ms": 0,
+                        "resolution": "Offline",
+                        "status": "PAIRED",
+                        "last_heartbeat": f"{time_remaining}s remaining",
+                        "expires_at": int(expires_at * 1000),
+                    })
+                else:
+                    node_list.append({
+                        "node_id": f"SLOT-{direction.upper()}",
+                        "assigned_lane": f"{direction.capitalize()} Approach - Unpaired",
+                        "device_name": "No Device Paired",
+                        "signal_quality": "N/A",
+                        "battery_pct": 0,
+                        "latency_ms": 0,
+                        "resolution": "Offline",
+                        "status": "OFFLINE",
+                        "last_heartbeat": "Unregistered",
+                    })
 
         return {
-            "connected_count": len(node_list),
+            "connected_count": len([n for n in node_list if n["status"] == "CONNECTED"]),
             "nodes": node_list,
         }
 
@@ -81,13 +98,19 @@ class NodeService:
         """
         dir_clean = (direction or "north").lower()
         host_ip = get_local_ip()
+        expires_at = time.time() + 300
+        session_id = f"CAM-{dir_clean.upper()}-PAIR"
+        token_val = f"auth_token_{dir_clean}_9df7c6ab"
+
+        self.ctx.session_manager.register_pairing_session(dir_clean, session_id, expires_at)
+
         qr_payload = {
             "version": "1.0",
             "server": host_ip,
             "port": 8000,
-            "session": f"CAM-{dir_clean.upper()}-PAIR",
-            "token": f"auth_token_{dir_clean}_9df7c6ab",
-            "expires": int((time.time() + 3600) * 1000),
+            "session": session_id,
+            "token": token_val,
+            "expires": int(expires_at * 1000),
             "protocol": "websocket",
             "secure": False,
             "defaultLane": f"{dir_clean.capitalize()} Intersection - Lane 1",

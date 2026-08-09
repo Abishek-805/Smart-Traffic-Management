@@ -34,16 +34,7 @@ const TelemetryContext = createContext<TelemetryContextType>({
 });
 
 export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [telemetry, setTelemetry] = useState<TelemetryPayload | null>({
-    activePhase: 'North',
-    greenDuration: 25,
-    timeRemaining: 18,
-    totalVehicles: 42,
-    queueLength: 4.8,
-    pceScore: 2.4,
-    operatingMode: 'AUTOMATIC',
-    streamStatus: 'CONNECTING',
-  });
+  const [telemetry, setTelemetry] = useState<TelemetryPayload | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(new Date());
   const [reconnectCount, setReconnectCount] = useState<number>(0);
@@ -82,6 +73,24 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           try {
             const msg: TelemetryMessage = JSON.parse(event.data);
             if (msg && msg.payload) {
+              const receiveTime = Date.now();
+              const payload = msg.payload as any;
+              payload.dashboardReceiveTimestamp = receiveTime;
+              
+              const capTime = payload.captureTimestamp;
+              const bcastTime = payload.broadcastTimestamp;
+              if (capTime) {
+                const renderTime = Date.now() + 16; // Estimate React commit phase delay (16ms)
+                payload.dashboardRenderTimestamp = renderTime;
+                const frameAge = renderTime - capTime;
+                const pipelineLatency = payload.schedulerTimestamp ? (payload.schedulerTimestamp - capTime) : 0;
+                const transportLatency = bcastTime ? (receiveTime - bcastTime) : 0;
+                const dashboardLatency = renderTime - receiveTime;
+                
+                payload.frameAgeMs = frameAge;
+                console.log(`[LATENCY-PROFILE] FrameAge: ${frameAge}ms | Pipeline: ${pipelineLatency}ms | Transport: ${transportLatency}ms | Dashboard: ${dashboardLatency}ms`);
+              }
+
               setTelemetry(msg.payload);
               setLastUpdated(new Date());
             }

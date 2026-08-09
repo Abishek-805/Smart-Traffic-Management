@@ -16,6 +16,7 @@ from ai.detection.detector import VehicleDetector
 from ai.tracking.byte_tracker import ByteTracker
 from ai.lane.lane_manager import LaneManager
 from ai.state.vehicle_state_manager import VehicleStateManager
+from ai.state.count_stabilizer import CountStabilizer
 from ai.analytics.analytics_exporter import AnalyticsExporter, LaneStatistics
 from ai.signal import (
     PriorityCalculator,
@@ -43,8 +44,12 @@ logger = get_logger("TrafficPipeline")
 class TrafficPipeline:
     """
     Production multi-camera execution pipeline connecting 4-Camera Ingestion,
-    Perception (YOLO11, ByteTrack per direction), Traffic Analytics (Lane, Vehicle State, PCE, Queue),
-    and Adaptive Signal Decision Engine.
+    Perception (single YOLO11+ByteTrack forward pass per frame), Traffic Analytics
+    (Lane, Vehicle State, PCE, Queue), and Adaptive Signal Decision Engine.
+
+    Phase 3 architecture: VehicleDetector.detect_and_track() performs exactly one
+    YOLO inference per frame, returning detections with track_ids. ByteTracker.update()
+    is a tracking-only pass-through — it never invokes the model.
     """
 
     def __init__(
@@ -56,8 +61,14 @@ class TrafficPipeline:
     ):
         logger.info("Initializing Smart Traffic Management System Pipeline...")
 
-        # Thread Safety Re-entrant Lock
+        # Thread Safety Re-entrant Lock & Per-Lane Locks
         self._lock = threading.Lock()
+        self._lane_locks: Dict[str, threading.Lock] = {
+            "north": threading.Lock(),
+            "south": threading.Lock(),
+            "east": threading.Lock(),
+            "west": threading.Lock(),
+        }
 
         # 1. Ingestion Layer (CameraManager)
         if camera_manager is not None:
@@ -97,6 +108,9 @@ class TrafficPipeline:
         # 5. Output Video Recording Path
         if save_output and output_path is None:
             output_path = get_timestamped_output_path(prefix="multi_camera_system")
+
+        # 5.5 Phase 3.5 — Vehicle Count Stabilizer (EMA smoothing before scheduler)
+        self.count_stabilizer = CountStabilizer()
 
         # 6. Visualizer Engine & Dashboard UI
         self.visualizer = Visualizer(save_video=save_output, output_path=output_path)
@@ -144,11 +158,17 @@ class TrafficPipeline:
     ) -> PipelineResult:
         """
         Execute one multi-camera pipeline step with thread-safe lock acquisition.
-        Infers YOLO detections, tracks objects independently per lane, calculates lane analytics,
-        evaluates the signal decision engine, and returns a strongly-typed PipelineResult.
+        Per-lane processing locks ensure independent camera streams execute perception
+        and analytics concurrently without global worker serialization.
         """
-        with self._lock:
-            return self._process_step_unlocked(frames_data=frames_data)
+        if frames_data and len(frames_data) == 1:
+            lane_key = next(iter(frames_data.keys())).lower()
+            lock = self._lane_locks.get(lane_key, self._lock)
+            with lock:
+                return self._process_step_unlocked(frames_data=frames_data)
+        else:
+            with self._lock:
+                return self._process_step_unlocked(frames_data=frames_data)
 
     def _process_step_unlocked(
         self, frames_data: Optional[Dict[str, Dict[str, Any]]] = None
@@ -201,19 +221,24 @@ class TrafficPipeline:
                 resolution = payload.get("resolution", (1280, 720))
                 self._init_lane_components(lane_name, resolution)
 
-            # Step 1: Perception (YOLO Detection)
-            raw_detections, inference_ms = self.detector.detect(
+            # Step 1+2: Unified Perception — single YOLO forward pass (detect + ByteTrack in one call)
+            # detect_and_track() calls model.track() exactly once, returning detections with track_ids.
+            # ByteTracker.update() below is a tracking-only pass-through — no second inference.
+            tracked_detections, inference_ms = self.detector.detect_and_track(
                 frame, frame_number=frame_num, timestamp=timestamp
             )
             max_inference_ms = max(max_inference_ms, inference_ms)
 
-            # Step 2: Perception (Independent ByteTrack for this camera direction)
+            # Step 2: ByteTracker validation pass (tracking-only, no model inference)
             tracked_detections = self.trackers[lane_name].update(
-                raw_detections, frame=frame, frame_number=frame_num, timestamp=timestamp
+                tracked_detections, frame=frame, frame_number=frame_num, timestamp=timestamp
             )
 
-            # Step 3: Analytics (Geometric Lane Assignment for this camera ROI)
-            lane_detections = self.lane_managers[lane_name].assign_lanes(tracked_detections)
+            # Step 3: Analytics (Geometric Lane Assignment — resolution-aware via normalized polygons)
+            w_f, h_f = frame.shape[1], frame.shape[0]
+            lane_detections = self.lane_managers[lane_name].assign_lanes(
+                tracked_detections, frame_width=w_f, frame_height=h_f
+            )
 
             # Step 4: Analytics (Vehicle Motion Tracking for this camera direction)
             enriched_detections = self.state_managers[lane_name].update(
@@ -306,6 +331,12 @@ class TrafficPipeline:
 
         lane_stats_map = all_intersection_lanes
 
+        # ── Phase 3.5: Vehicle Count Stabilization ───────────────────────────
+        # Apply EMA smoothing to lane counts before scheduler evaluation.
+        # This prevents scheduler flicker from one-frame detection noise,
+        # temporary occlusions, or track ID switches.
+        lane_stats_map = self.count_stabilizer.stabilize(lane_stats_map, timestamp=time.time())
+
         total_intersection_vehicles = sum(s.live_count for s in lane_stats_map.values())
         intersection_state = IntersectionState(
             lanes=lane_stats_map,
@@ -353,6 +384,14 @@ class TrafficPipeline:
 
             # Update Fairness Manager served lane
             self.fairness_manager.update_served(self.active_decision.green_lane)
+
+            # Phase 3.5: Track scheduler decision stability
+            green_lane_str = (
+                self.active_decision.green_lane.value
+                if hasattr(self.active_decision.green_lane, 'value')
+                else str(self.active_decision.green_lane)
+            )
+            self.count_stabilizer.update_decision_stability(green_lane_str, timestamp=time.time())
 
             # Hardware Command Generation for ESP32
             self.active_hardware_cmd = self.signal_controller.generate_command(self.active_decision)
@@ -425,6 +464,7 @@ class TrafficPipeline:
             remaining_green_sec=remaining_green_sec,
             is_phase_change=is_phase_change,
             latency_metrics=latency_metrics,
+            stability_metrics=self.count_stabilizer.metrics.to_dict(),
         )
 
     def release(self) -> None:
@@ -433,6 +473,9 @@ class TrafficPipeline:
         if self.camera_manager:
             self.camera_manager.stop_all()
         self.visualizer.release()
+
+        # Phase 3.5: Flush scheduler input report on shutdown
+        self.count_stabilizer.flush_report()
 
         summary = self.stats.get_summary()
         logger.info(
