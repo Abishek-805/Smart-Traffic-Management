@@ -4,11 +4,14 @@ __pycache__/
 *$py.class
 *.so
 
-# Environment & IDE
+# Environment & Configuration Files
+.env
 .venv/
 venv/
 ENV/
 env/
+
+# IDE
 .idea/
 .vscode/
 
@@ -17,6 +20,8 @@ models/*.pt
 videos/*.mp4
 outputs/*.mp4
 logs/
+*.log
+.venv*
 
 # Node & Frontend Build
 node_modules/

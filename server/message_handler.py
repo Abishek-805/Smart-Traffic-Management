@@ -148,9 +148,14 @@ class MessageHandler:
         d["type"] = "REGISTRATION_ACK"
         logger.info(f"[PAIRING] REGISTER → ACK | node={node_id} | direction={direction} | token={session.session_token[:8]}...")
 
-        # Schedule automatic START_STREAM signal to camera node so mobile app switches to STREAMING state
+        # Schedule single authoritative START_STREAM signal to camera node so mobile app switches to STREAMING state
         async def _send_start_stream():
             await asyncio.sleep(0.1)
+            if not hasattr(self, "start_stream_counts"):
+                self.start_stream_counts = {}
+            self.start_stream_counts[node_id] = self.start_stream_counts.get(node_id, 0) + 1
+            count = self.start_stream_counts[node_id]
+
             start_msg = {
                 "type": "START_STREAM",
                 "message_type": "START_STREAM",
@@ -159,10 +164,11 @@ class MessageHandler:
                     "target_fps": 30,
                     "resolution": "1280x720",
                     "quality": 80,
+                    "session_start_count": count,
                 },
             }
             await self.connection_manager.send_to_node(node_id, start_msg)
-            logger.info(f"[PAIRING] Sent START_STREAM signal to camera node '{node_id}'")
+            logger.info(f"[PAIRING] START_STREAM_SENT | node_id='{node_id}' | session_count={count} | assert_single_owner={count == 1}")
 
         asyncio.create_task(_send_start_stream())
         return d
@@ -230,9 +236,11 @@ class MessageHandler:
             try:
                 payload_raw = raw_json.get("payload", {})
                 frame_b64 = payload_raw.get("frame_data")
+                frame_id = payload_raw.get("frame_id") or f"{direction.upper()}-000000"
                 if frame_b64:
                     from core.application_context import ApplicationContext
                     ctx = ApplicationContext.get_instance()
+                    ctx.last_backend_received_frame_id = frame_id
                     
                     # Read capture, upload, and receive times in milliseconds
                     cap_ts = payload_raw.get("capture_timestamp")
@@ -241,11 +249,12 @@ class MessageHandler:
                     upload_ts = payload_raw.get("upload_timestamp", cap_ts)
                     rx_ts = raw_json.get("backend_receive_timestamp", time.time() * 1000.0)
 
-                    res = await asyncio.to_thread(_process_frame_worker, frame_b64, direction, cap_ts, upload_ts, rx_ts)
-                    logger.info(f"[LATENCY-CONTROL] Background process worker finished. res is None: {res is None}")
+                    res = await asyncio.to_thread(_process_frame_worker, frame_b64, direction, cap_ts, upload_ts, rx_ts, frame_id)
+                    logger.info(f"[LATENCY-CONTROL] Background process worker finished for frame '{frame_id}'. res is None: {res is None}")
                     if res:
                         dir_key, annotated_bytes, snapshot, telemetry = res
-                        logger.info(f"[LATENCY-CONTROL] Updating snapshot in context. Snapshot type: {snapshot.get('type') if snapshot else None}")
+                        ctx.last_telemetry_frame_id = frame_id
+                        logger.info(f"[LATENCY-CONTROL] Updating snapshot in context for frame '{frame_id}'")
                         await ctx.update_snapshot(snapshot)
                         ctx.frame_buffer[dir_key] = annotated_bytes
                         ctx.frame_buffer["active"] = annotated_bytes
@@ -333,7 +342,7 @@ class MessageHandler:
         return err.model_dump()
 
 
-def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upload_ts: float, rx_ts: float):
+def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upload_ts: float, rx_ts: float, frame_id: str = "NORTH-000000"):
     """
     Worker thread task executing CPU-bound base64/JPEG decoding, passing transport-agnostic np.ndarray
     frame into TrafficPipeline and ControlManager, and building immutable PipelineStateSnapshot.
@@ -355,6 +364,7 @@ def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upl
 
     ctx = ApplicationContext.get_instance()
     ctx.increment_stage_counter("decoded")
+    ctx.last_backend_decoded_frame_id = frame_id
 
     if img is None:
         ctx.increment_stage_counter("decode_failed")
@@ -370,6 +380,8 @@ def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upl
     yolo_start = int(time.time() * 1000)
     pipeline_result = ctx.pipeline.process_single_frame(img, lane_name=direction)
     inference_time = int(time.time() * 1000)
+    ctx.last_yolo_frame_id = frame_id
+    ctx.last_tracked_frame_id = frame_id
 
     # 2. Control Layer execution via ControlManager (handles ESP32 hardware command & decision logging)
     ctx.control_manager.process_result(pipeline_result)
@@ -411,7 +423,6 @@ def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upl
             p_score = float(getattr(l_stat, "pce_score", 0.0))
             den = str(getattr(l_stat, "density", "LOW"))
             prio = round(v_cnt * 0.5 + p_score * 0.5, 2)
-            # Phase 3.5: Include stabilization telemetry per lane
             raw_cnt = int(getattr(l_stat, "raw_count", v_cnt))
             sm_cnt = float(getattr(l_stat, "smoothed_count", float(v_cnt)))
             lanes_payload[d_name] = {
@@ -441,6 +452,7 @@ def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upl
         "type": "SystemStatusUpdated",
         "timestamp": time.time(),
         "payload": {
+            "frameId": frame_id,
             "activePhase": active_phase,
             "greenDuration": 25,
             "timeRemaining": rem_sec,
@@ -465,6 +477,7 @@ def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upl
     }
 
     telemetry = {
+        "frame_id": frame_id,
         "vehicle_count": total_vehicles,
         "detected_count": raw_detections_count,
         "assigned_count": assigned_vehicles,

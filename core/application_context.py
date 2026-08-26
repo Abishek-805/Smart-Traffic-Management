@@ -33,6 +33,14 @@ class ApplicationContext:
         self.lane_stats_history: Dict[str, Any] = {}  # Persistent multi-lane statistics map
         self.lane_last_seen: Dict[str, float] = {}  # direction -> monotonic timestamp when last frame arrived
 
+        # Monotonic end-to-end frame_id pipeline trackers
+        self.last_mobile_frame_id: str = "NONE"
+        self.last_backend_received_frame_id: str = "NONE"
+        self.last_backend_decoded_frame_id: str = "NONE"
+        self.last_yolo_frame_id: str = "NONE"
+        self.last_tracked_frame_id: str = "NONE"
+        self.last_telemetry_frame_id: str = "NONE"
+
         # Pipeline stage diagnostic counters
         self.stage_counters: Dict[str, int] = {
             "received": 0,

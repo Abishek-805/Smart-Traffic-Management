@@ -1,0 +1,61 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: smart-traffic-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app-backend:
+    build:
+      context: .
+      dockerfile: app-backend/Dockerfile
+    container_name: smart-traffic-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - REDIS_URL=redis://redis:6379
+      - DEBUG=true
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  websocket-server:
+    build:
+      context: .
+      dockerfile: websocket-server/Dockerfile
+    container_name: smart-traffic-ws-server
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web-ui:
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile
+    container_name: smart-traffic-web-ui
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE=http://localhost:8000/api/v1
+      - VITE_WS_URL=ws://localhost:8001/ws/telemetry
+      - VITE_CAMERA_WS_URL=ws://localhost:8001/ws/camera
+    depends_on:
+      - app-backend
+      - websocket-server
+    restart: unless-stopped

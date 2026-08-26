@@ -107,7 +107,7 @@ class NodeService:
         qr_payload = {
             "version": "1.0",
             "server": host_ip,
-            "port": 8000,
+            "port": 8001,
             "session": session_id,
             "token": token_val,
             "expires": int(expires_at * 1000),
@@ -126,7 +126,7 @@ class NodeService:
             img.save(buf, format="PNG")
             base64_qr = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
         except Exception:
-            base64_qr = f"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><rect width='100%' height='100%' fill='white'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='black' font-size='14'>QR ({dir_clean.upper()}): {host_ip}:8000</text></svg>"
+            base64_qr = f"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><rect width='100%' height='100%' fill='white'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='black' font-size='14'>QR ({dir_clean.upper()}): {host_ip}:8001</text></svg>"
 
         return {
             "payload": qr_payload,
