@@ -54,20 +54,20 @@ const ToastCard: React.FC<{ toast: ToastItem; onClose: () => void }> = ({ toast,
       display: 'flex',
       alignItems: 'flex-start',
       gap: '10px',
-      backgroundColor: '#161b22',
+      backgroundColor: 'var(--bg-secondary)',
       borderLeft: `3px solid ${getBorderColor()}`,
       position: 'relative',
       boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
     }}>
       <div style={{ marginTop: '2px' }}>{getIcon()}</div>
       <div style={{ flex: 1 }}>
-        <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '2px', color: '#ffffff' }}>{toast.title}</h4>
-        <p style={{ fontSize: '0.75rem', color: '#8b949e' }}>{toast.message}</p>
+        <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '2px', color: 'var(--text-main)' }}>{toast.title}</h4>
+        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{toast.message}</p>
       </div>
       <button onClick={onClose} style={{
         background: 'none',
         border: 'none',
-        color: '#8b949e',
+        color: 'var(--text-muted)',
         cursor: 'pointer',
         padding: 0,
       }}>

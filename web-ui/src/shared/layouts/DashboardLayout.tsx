@@ -18,11 +18,11 @@ export const DashboardLayout: React.FC = () => {
         <Sidebar />
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh', overflow: 'hidden' }}>
           <Header />
-          <main
+          <main className="page-content"
             style={{
               flex: 1,
               padding: isDashboard ? '8px' : '24px',
-              overflowY: isDashboard ? 'hidden' : 'auto',
+              overflowY: 'auto',
               display: 'flex',
               flexDirection: 'column',
               minHeight: 0,

@@ -1,6 +1,6 @@
 /**
  * Sidebar Component (TOC SCADA Navigation)
- * SCADA v2.1.0 Navigation Sidebar
+ * SCADA v2.0.0 Navigation Sidebar
  * Preserves React Router NavLink route paths ('/', '/devices', '/analytics', '/logs', '/settings')
  */
 
@@ -32,7 +32,7 @@ export const Sidebar: React.FC = () => {
     <aside
       style={{
         width: collapsed ? '52px' : '180px',
-        backgroundColor: '#161b22',
+        backgroundColor: 'var(--bg-secondary)',
         borderRight: '1px solid #30363d',
         display: 'flex',
         flexDirection: 'column',
@@ -61,7 +61,7 @@ export const Sidebar: React.FC = () => {
               width: '26px',
               height: '26px',
               borderRadius: '3px',
-              backgroundColor: '#0d1117',
+              backgroundColor: 'var(--bg-primary)',
               border: '1px solid #30363d',
               display: 'flex',
               alignItems: 'center',
@@ -74,11 +74,11 @@ export const Sidebar: React.FC = () => {
           </div>
           {!collapsed && (
             <div>
-              <h1 style={{ fontSize: '0.8rem', fontWeight: 800, letterSpacing: '0.04em', color: '#ffffff', lineHeight: 1.1 }}>
+              <h1 style={{ fontSize: '0.8rem', fontWeight: 800, letterSpacing: '0.04em', color: 'var(--text-main)', lineHeight: 1.1 }}>
                 TOC CONTROL
               </h1>
-              <span className="font-mono-num" style={{ fontSize: '8px', color: '#8b949e' }}>
-                SCADA v2.1.0
+              <span className="font-mono-num" style={{ fontSize: '8px', color: 'var(--text-muted)' }}>
+                SCADA v2.0.0
               </span>
             </div>
           )}
@@ -103,8 +103,8 @@ export const Sidebar: React.FC = () => {
                   textDecoration: 'none',
                   fontSize: '0.75rem',
                   fontWeight: isActive ? 700 : 500,
-                  color: isActive ? '#ffffff' : '#8b949e',
-                  backgroundColor: isActive ? '#21262d' : 'transparent',
+                  color: isActive ? 'var(--text-main)' : 'var(--text-muted)',
+                  backgroundColor: isActive ? 'var(--bg-surface)' : 'transparent',
                   borderLeft: isActive ? '3px solid #58a6ff' : '3px solid transparent',
                   transition: 'all 120ms ease',
                 })}
@@ -125,17 +125,17 @@ export const Sidebar: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: collapsed ? 'center' : 'space-between',
-          color: '#8b949e',
+          color: 'var(--text-muted)',
         }}
       >
         {!collapsed && <span className="font-mono-num" style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Collapse</span>}
         <button
           onClick={() => setCollapsed(!collapsed)}
           style={{
-            background: '#21262d',
+            background: 'var(--bg-surface)',
             border: '1px solid #30363d',
             borderRadius: '3px',
-            color: '#ffffff',
+            color: 'var(--text-main)',
             padding: '3px',
             cursor: 'pointer',
             display: 'flex',

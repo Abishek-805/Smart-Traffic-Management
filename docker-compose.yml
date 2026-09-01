@@ -5,7 +5,7 @@ services:
     image: redis:7-alpine
     container_name: smart-traffic-redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -24,6 +24,8 @@ services:
       - PORT=8000
       - REDIS_URL=redis://redis:6379
       - DEBUG=true
+      - CAMERA_PUBLIC_HOST=${CAMERA_PUBLIC_HOST:-localhost}
+      - CAMERA_WS_PORT=8001
     depends_on:
       redis:
         condition: service_healthy
@@ -37,6 +39,11 @@ services:
     ports:
       - "8001:8001"
     environment:
+      - OMP_WAIT_POLICY=PASSIVE
+      - KMP_BLOCKTIME=0
+      - YOLO_CPU_THREADS=4
+      - YOLO_INPUT_SIZE=640
+      - YOLO_MAX_DETECTIONS=100
       - PORT=8001
       - REDIS_URL=redis://redis:6379
     depends_on:
@@ -52,9 +59,10 @@ services:
     ports:
       - "5173:5173"
     environment:
-      - VITE_API_BASE=http://localhost:8000/api/v1
-      - VITE_WS_URL=ws://localhost:8001/ws/telemetry
-      - VITE_CAMERA_WS_URL=ws://localhost:8001/ws/camera
+      - VITE_API_BASE=/api/v1
+      - VITE_WS_URL=/ws/telemetry
+      - VITE_BACKEND_TARGET=http://app-backend:8000
+      - VITE_WS_TARGET=ws://websocket-server:8001
     depends_on:
       - app-backend
       - websocket-server

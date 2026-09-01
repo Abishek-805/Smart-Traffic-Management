@@ -41,6 +41,7 @@ class PipelineResult:
     hardware_command: Optional[HardwareCommand] = None
     health: Optional[PipelineHealth] = None
     remaining_green_sec: int = 0
+    signal_state: str = "ALL_RED"
     is_phase_change: bool = False
     latency_metrics: Dict[str, float] = field(default_factory=dict)
     # Phase 3.5 — Scheduler stability tracking

@@ -4,7 +4,10 @@ delegates to SessionManager and ConnectionManager, and generates response payloa
 """
 
 import asyncio
+import math
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any, Optional
 from fastapi import WebSocket
 
@@ -26,6 +29,7 @@ from server.connection_manager import ConnectionManager
 from ai.utils.logger import get_logger
 
 logger = get_logger("MessageHandler")
+_frame_worker_lock = threading.Lock()
 
 
 class MessageHandler:
@@ -41,6 +45,17 @@ class MessageHandler:
         self.session_manager = session_manager if session_manager else SessionManager()
         self.connection_manager = connection_manager if connection_manager else ConnectionManager()
         self._in_flight_directions = set()
+        # Perception is serialized already; one long-lived worker keeps native
+        # OpenCV/PyTorch workspaces on one thread instead of multiplying them
+        # across asyncio's large default pool.
+        self.frame_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="traffic-pipeline")
+
+    def ensure_frame_executor(self) -> None:
+        """Recreate the bounded worker when an app lifespan is started again."""
+        if getattr(self.frame_executor, "_shutdown", False):
+            self.frame_executor = ThreadPoolExecutor(
+                max_workers=1, thread_name_prefix="traffic-pipeline"
+            )
 
     async def process_message(self, raw_json: Dict[str, Any], websocket: WebSocket) -> Optional[Dict[str, Any]]:
         """
@@ -56,7 +71,7 @@ class MessageHandler:
         if not msg_type_str:
             return self._build_error("MISSING_MESSAGE_TYPE", "Field 'message_type' or 'type' is required.")
 
-        # Validate protocol version — reject mismatched clients with a clear error
+        # Validate protocol version â€” reject mismatched clients with a clear error
         if proto_ver != PROTOCOL_VERSION:
             logger.warning(f"Protocol version mismatch: client={proto_ver!r}, server={PROTOCOL_VERSION!r}")
             err = self._build_error(
@@ -76,6 +91,29 @@ class MessageHandler:
             err = self._build_error("UNKNOWN_MESSAGE_TYPE", f"Unknown message type '{msg_type_str}'.")
             err["id"] = correlation_id
             return err
+
+        if msg_type != MessageType.REGISTER_CAMERA:
+            payload = raw_json.get("payload", {})
+            if not isinstance(payload, dict):
+                return self._build_error("INVALID_PAYLOAD", "payload must be an object")
+            node_id = payload.get("node_id") or payload.get("cameraId")
+            token = payload.get("session_token") or raw_json.get("token")
+            if (not self.session_manager.validate_session(node_id, token)
+                    or self.connection_manager.get_connection(node_id) is not websocket):
+                return self._build_error("UNAUTHORIZED_SESSION", "Register this connection first")
+            session = self.session_manager.get_session(node_id)
+            direction = payload.get("direction") or payload.get("camera_direction")
+            if direction and direction.lower() != session.camera_direction:
+                return self._build_error("DIRECTION_MISMATCH", "Frame direction does not match registration")
+            payload["direction"] = session.camera_direction
+            if msg_type in (MessageType.START_STREAM, MessageType.STOP_STREAM):
+                from core.application_context import ApplicationContext
+                if msg_type == MessageType.START_STREAM and not ApplicationContext.get_instance().system_running:
+                    return self._build_error("SYSTEM_PAUSED", "Start the system from the dashboard first")
+                session.streaming = msg_type == MessageType.START_STREAM
+                return {"type": msg_type.value, "timestamp": time.time(), "payload": {}, "id": correlation_id}
+            if msg_type == MessageType.VIDEO_FRAME and not getattr(session, "streaming", True):
+                return self._build_error("STREAM_PAUSED", "Request START_STREAM first")
 
         # Route message based on type
         if msg_type == MessageType.REGISTER_CAMERA:
@@ -118,6 +156,28 @@ class MessageHandler:
         if not direction:
             direction = "north"
 
+        direction = str(direction).lower()
+        if direction not in ("north", "south", "east", "west"):
+            return self._build_error("INVALID_DIRECTION", "Choose north, south, east or west")
+        registration_token = str(raw_json.get("token") or "")
+        existing_node_session = self.session_manager.get_session(str(node_id))
+        is_reconnect = bool(
+            existing_node_session
+            and existing_node_session.camera_direction == direction
+            and existing_node_session.session_token == registration_token
+            and not existing_node_session.is_expired()
+        )
+        is_pairing_authorized = self.session_manager.validate_pairing_session(
+            direction, str(node_id), registration_token
+        )
+        if not is_pairing_authorized and not is_reconnect:
+            return self._build_error(
+                "UNAUTHORIZED_PAIRING",
+                "Pairing QR is invalid, expired, or belongs to another direction",
+            )
+        previous = self.session_manager.get_session_by_direction(direction)
+        if previous and previous.node_id != node_id:
+            return self._build_error("DIRECTION_OCCUPIED", "Disconnect the existing camera for this direction first")
         payload_raw["node_id"] = node_id
         payload_raw["camera_direction"] = direction
         raw_json["payload"] = payload_raw
@@ -128,8 +188,10 @@ class MessageHandler:
             return self._build_error("INVALID_REGISTRATION_PAYLOAD", f"Schema validation error: {e}")
 
         payload = msg.payload
-        session = self.session_manager.create_session(node_id, direction)
         await self.connection_manager.connect(node_id, websocket)
+        session = self.session_manager.create_session(node_id, direction)
+        if is_pairing_authorized:
+            self.session_manager.clear_pairing_session(direction)
 
         ack = RegistrationAckMessage(
             type=MessageType.REGISTRATION_ACK,
@@ -146,7 +208,7 @@ class MessageHandler:
         )
         d = ack.model_dump()
         d["type"] = "REGISTRATION_ACK"
-        logger.info(f"[PAIRING] REGISTER → ACK | node={node_id} | direction={direction} | token={session.session_token[:8]}...")
+        logger.info(f"[PAIRING] REGISTER â†’ ACK | node={node_id} | direction={direction} | token={session.session_token[:8]}...")
 
         # Schedule single authoritative START_STREAM signal to camera node so mobile app switches to STREAMING state
         async def _send_start_stream():
@@ -156,14 +218,17 @@ class MessageHandler:
             self.start_stream_counts[node_id] = self.start_stream_counts.get(node_id, 0) + 1
             count = self.start_stream_counts[node_id]
 
+            from core.application_context import ApplicationContext
+            if not ApplicationContext.get_instance().system_running or self.connection_manager.get_connection(node_id) is not websocket:
+                return
             start_msg = {
                 "type": "START_STREAM",
                 "message_type": "START_STREAM",
                 "timestamp": time.time(),
                 "payload": {
-                    "target_fps": 30,
-                    "resolution": "1280x720",
-                    "quality": 80,
+                    "target_fps": 2,
+                    "resolution": "640 max edge",
+                    "quality": 65,
                     "session_start_count": count,
                 },
             }
@@ -219,18 +284,21 @@ class MessageHandler:
         )
         d = ack.model_dump()
         d["type"] = "HEARTBEAT_ACK"
-        logger.debug(f"[PAIRING] HEARTBEAT → ACK | node={node_id}")
+        d["payload"]["client_timestamp"] = raw_json.get("timestamp")
+        logger.debug(f"[PAIRING] HEARTBEAT â†’ ACK | node={node_id}")
         return d
 
     async def _process_direction_loop(self, direction: str):
         """Worker task processing the latest queued frame for a specific lane direction."""
-        logger.info(f"[LATENCY-CONTROL] Starting frame processing loop for lane '{direction}'")
+        logger.debug(f"[LATENCY-CONTROL] Starting frame processing loop for lane '{direction}'")
         while True:
             if hasattr(self, "latest_frames") and self.latest_frames:
-                logger.info(f"[LATENCY-CONTROL] worker loop for '{direction}' sees keys: {list(self.latest_frames.keys())}")
+                logger.debug(f"[LATENCY-CONTROL] worker loop for '{direction}' sees keys: {list(self.latest_frames.keys())}")
             raw_json = self.latest_frames.pop(direction, None) if hasattr(self, "latest_frames") else None
             if raw_json is None:
-                await asyncio.sleep(0.01)  # 10ms poll interval
+                event = self.frame_events.setdefault(direction, asyncio.Event())
+                event.clear()
+                await event.wait()
                 continue
 
             try:
@@ -240,26 +308,52 @@ class MessageHandler:
                 if frame_b64:
                     from core.application_context import ApplicationContext
                     ctx = ApplicationContext.get_instance()
+                    if not ctx.system_running or time.time() * 1000 - raw_json["backend_receive_timestamp"] > 2500:
+                        ctx.increment_stage_counter("dropped")
+                        continue
                     ctx.last_backend_received_frame_id = frame_id
                     
                     # Read capture, upload, and receive times in milliseconds
                     cap_ts = payload_raw.get("capture_timestamp")
-                    if cap_ts is None:
-                        cap_ts = payload_raw.get("timestamp", time.time()) * 1000.0
+                    if not isinstance(cap_ts, (int, float)) or not math.isfinite(cap_ts):
+                        source_ts = payload_raw.get("timestamp", time.time())
+                        cap_ts = source_ts * 1000.0 if isinstance(source_ts, (int, float)) and math.isfinite(source_ts) else time.time() * 1000.0
                     upload_ts = payload_raw.get("upload_timestamp", cap_ts)
+                    if not isinstance(upload_ts, (int, float)) or not math.isfinite(upload_ts):
+                        upload_ts = cap_ts
                     rx_ts = raw_json.get("backend_receive_timestamp", time.time() * 1000.0)
 
-                    res = await asyncio.to_thread(_process_frame_worker, frame_b64, direction, cap_ts, upload_ts, rx_ts, frame_id)
-                    logger.info(f"[LATENCY-CONTROL] Background process worker finished for frame '{frame_id}'. res is None: {res is None}")
+                    res = await asyncio.get_running_loop().run_in_executor(
+                        self.frame_executor, _process_frame_worker,
+                        frame_b64, direction, cap_ts, upload_ts, rx_ts, frame_id)
+                    logger.debug(f"[LATENCY-CONTROL] Background process worker finished for frame '{frame_id}'. res is None: {res is None}")
                     if res:
+                        node_id = payload_raw.get("node_id")
+                        token = payload_raw.get("session_token") or raw_json.get("token")
+                        if not ctx.system_running or not self.session_manager.validate_session(node_id, token):
+                            ctx.increment_stage_counter("dropped")
+                            continue
                         dir_key, annotated_bytes, snapshot, telemetry = res
                         ctx.last_telemetry_frame_id = frame_id
-                        logger.info(f"[LATENCY-CONTROL] Updating snapshot in context for frame '{frame_id}'")
-                        await ctx.update_snapshot(snapshot)
+                        logger.debug(f"[LATENCY-CONTROL] Updating snapshot in context for frame '{frame_id}'")
                         ctx.frame_buffer[dir_key] = annotated_bytes
                         ctx.frame_buffer["active"] = annotated_bytes
+                        previous_seen = ctx.frame_updated_at.get(dir_key)
+                        telemetry["fps"] = round(1 / max(0.001, time.monotonic() - previous_seen), 1) if previous_seen else 0
                         ctx.live_telemetry[dir_key] = telemetry
                         ctx.increment_stage_counter("processed")
+                        ctx.last_frame_monotonic = time.monotonic()
+                        ctx.frame_updated_at[dir_key] = time.monotonic()
+                        await ctx.update_snapshot(snapshot)
+                        await self.connection_manager.send_to_node(node_id, {
+                            "type": "FRAME_ACK", "timestamp": time.time(), "payload": {
+                                "frame_id": frame_id, "direction": dir_key,
+                                "capture_timestamp": cap_ts,
+                                "server_processing_ms": telemetry["server_processing_ms"],
+                                "queue_wait_ms": telemetry["queue_wait_ms"],
+                                "inference_ms": telemetry["latency_metrics"].get("yolo_ms", 0),
+                                "vehicle_count": snapshot["payload"]["lanes"][dir_key]["vehicles"],
+                            }})
                     else:
                         ctx.frame_processing_errors += 1
             except Exception as e:
@@ -269,6 +363,9 @@ class MessageHandler:
         """Handle incoming VIDEO_FRAME payload by offloading to the corresponding direction queue."""
         payload_raw = raw_json.get("payload", {})
         if isinstance(payload_raw, dict):
+            frame_data = payload_raw.get("frame_data")
+            if not isinstance(frame_data, str) or not frame_data or len(frame_data) > 2_000_000:
+                return self._build_error("INVALID_FRAME", "JPEG base64 must be nonempty and below 2MB")
             direction = (
                 payload_raw.get("direction")
                 or payload_raw.get("camera_direction")
@@ -279,6 +376,7 @@ class MessageHandler:
             # Lazy initialize worker states
             if not hasattr(self, "latest_frames"):
                 self.latest_frames = {}
+                self.frame_events = {}
                 self.dropped_frames_count = 0
                 self.worker_tasks = {}
 
@@ -287,15 +385,18 @@ class MessageHandler:
 
             from core.application_context import ApplicationContext
             ctx = ApplicationContext.get_instance()
+            if not ctx.system_running:
+                return self._build_error("SYSTEM_PAUSED", "System is paused")
             ctx.increment_stage_counter("received")
 
             # Latest Frame Wins Policy: check if there's already an unprocessed frame in the slot
             if direction in self.latest_frames:
                 self.dropped_frames_count += 1
                 ctx.increment_stage_counter("dropped")
-                logger.info(f"[LATENCY-CONTROL] Dropping stale frame for '{direction}' (Total dropped: {self.dropped_frames_count})")
+                logger.debug(f"[LATENCY-CONTROL] Dropping stale frame for '{direction}' (Total dropped: {self.dropped_frames_count})")
 
             self.latest_frames[direction] = raw_json
+            self.frame_events.setdefault(direction, asyncio.Event()).set()
 
             # Lazy start loop task
             if direction not in self.worker_tasks:
@@ -325,9 +426,23 @@ class MessageHandler:
             logger.warning(f"Error parsing disconnect message: {e}")
         return None
 
+    async def shutdown(self):
+        tasks = list(getattr(self, "worker_tasks", {}).values())
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        self.worker_tasks = {}
+        self.latest_frames = {}
+        self.frame_executor.shutdown(wait=True, cancel_futures=True)
+
     def handle_connection_loss(self, node_id: str) -> None:
-        """Handle unexpected WebSocket disconnect without explicit DISCONNECT packet."""
-        self.session_manager.remove_session(node_id)
+        """Keep the authenticated session briefly so the same node can reconnect."""
+        session = self.session_manager.get_session(node_id)
+        if session:
+            logger.info(
+                "Socket lost for node '%s'; preserving session until heartbeat expiry.",
+                node_id,
+            )
 
     @staticmethod
     def _build_error(code: str, message: str, node_id: Optional[str] = None) -> dict:
@@ -343,6 +458,11 @@ class MessageHandler:
 
 
 def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upload_ts: float, rx_ts: float, frame_id: str = "NORTH-000000"):
+    with _frame_worker_lock:
+        return _process_frame_locked(frame_b64, direction, capture_ts, upload_ts, rx_ts, frame_id)
+
+
+def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upload_ts: float, rx_ts: float, frame_id: str):
     """
     Worker thread task executing CPU-bound base64/JPEG decoding, passing transport-agnostic np.ndarray
     frame into TrafficPipeline and ControlManager, and building immutable PipelineStateSnapshot.
@@ -354,31 +474,34 @@ def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upl
     from ai.pipeline.traffic_pipeline import TrafficPipeline
     from ai.controller.control_manager import ControlManager
 
+    if time.time() * 1000 - rx_ts > 2500:
+        return None
     decode_start = time.time() * 1000.0
     if "," in frame_b64:
         frame_b64 = frame_b64.split(",")[1]
-    frame_bytes = base64.b64decode(frame_b64)
+    frame_bytes = base64.b64decode(frame_b64, validate=True)
     nparr = np.frombuffer(frame_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     decode_ts = time.time() * 1000.0
 
     ctx = ApplicationContext.get_instance()
-    ctx.increment_stage_counter("decoded")
-    ctx.last_backend_decoded_frame_id = frame_id
 
     if img is None:
         ctx.increment_stage_counter("decode_failed")
         return None
 
+    ctx.increment_stage_counter("decoded")
+    ctx.last_backend_decoded_frame_id = frame_id
+
     # Ensure TrafficPipeline and ControlManager are instantiated in ApplicationContext
     if ctx.pipeline is None:
-        ctx.pipeline = TrafficPipeline(save_output=False)
+        ctx.pipeline = TrafficPipeline(save_output=False, headless=True)
     if ctx.control_manager is None:
-        ctx.control_manager = ControlManager(simulation_mode=True)
+        ctx.control_manager = ControlManager(simulation_mode=True, headless=True)
 
     # 1. AI Perception, ByteTrack, Lane Assignment, Analytics & Signal Scheduler via TrafficPipeline
     yolo_start = int(time.time() * 1000)
-    pipeline_result = ctx.pipeline.process_single_frame(img, lane_name=direction)
+    pipeline_result = ctx.pipeline.process_single_frame(img, lane_name=direction, timestamp=capture_ts / 1000)
     inference_time = int(time.time() * 1000)
     ctx.last_yolo_frame_id = frame_id
     ctx.last_tracked_frame_id = frame_id
@@ -389,7 +512,7 @@ def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upl
 
     # Extract annotated tile frame
     annotated_tile = pipeline_result.multi_annotated_frames.get(direction, img)
-    ret, enc = cv2.imencode(".jpg", annotated_tile)
+    ret, enc = cv2.imencode(".jpg", annotated_tile, [cv2.IMWRITE_JPEG_QUALITY, 80])
     annotated_bytes = enc.tobytes() if ret else frame_bytes
 
     # Build immutable PipelineStateSnapshot dict for main event loop atomic swap
@@ -405,30 +528,33 @@ def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upl
         if pipeline_result.intersection_state
         else 0
     )
-    total_vehicles = max(raw_detections_count, assigned_vehicles)
+    total_vehicles = assigned_vehicles
     rem_sec = pipeline_result.remaining_green_sec
 
     queue_len = 0.0
     pce_score = 0.0
     if pipeline_result.lane_stats:
-        queue_len = round(sum(s.total_queue_time_sec for s in pipeline_result.lane_stats.values()), 1)
+        queue_len = round(sum(s.stopped_count for s in pipeline_result.lane_stats.values()), 1)
         pce_score = round(sum(s.pce_score for s in pipeline_result.lane_stats.values()), 1)
 
+    # Display the same fairness-adjusted scores that selected the current phase.
+    scores = getattr(pipeline_result.priority_result, "scores", []) or []
+    priorities = {getattr(score.lane, "value", str(score.lane)).lower(): score.score for score in scores}
     lanes_payload = {}
     for d_name in ["north", "south", "east", "west"]:
         l_stat = pipeline_result.lane_stats.get(d_name) if pipeline_result.lane_stats else None
         if l_stat:
             v_cnt = int(getattr(l_stat, "live_count", 0))
-            q_val = float(getattr(l_stat, "total_queue_time_sec", 0.0))
             p_score = float(getattr(l_stat, "pce_score", 0.0))
             den = str(getattr(l_stat, "density", "LOW"))
-            prio = round(v_cnt * 0.5 + p_score * 0.5, 2)
+            prio = round(priorities.get(d_name, 0.0), 2)
             raw_cnt = int(getattr(l_stat, "raw_count", v_cnt))
             sm_cnt = float(getattr(l_stat, "smoothed_count", float(v_cnt)))
             lanes_payload[d_name] = {
                 "vehicles": v_cnt,
-                "queue": round(q_val, 1),
-                "wait": round(q_val, 1),
+                "historicalCount": int(getattr(l_stat, "historical_count", 0)),
+                "queue": int(getattr(l_stat, "stopped_count", 0)),
+                "wait": round(float(getattr(l_stat, "max_queue_time_sec", 0)), 1),
                 "pce": round(p_score, 1),
                 "density": den,
                 "priority": prio,
@@ -454,7 +580,8 @@ def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upl
         "payload": {
             "frameId": frame_id,
             "activePhase": active_phase,
-            "greenDuration": 25,
+            "signalState": pipeline_result.signal_state,
+            "greenDuration": pipeline_result.signal_decision.green_duration_sec if pipeline_result.signal_decision else 0,
             "timeRemaining": rem_sec,
             "totalVehicles": total_vehicles,
             "detectedVehicles": raw_detections_count,
@@ -477,6 +604,8 @@ def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upl
     }
 
     telemetry = {
+        "server_processing_ms": round(time.time() * 1000 - rx_ts, 2),
+        "queue_wait_ms": round(decode_start - rx_ts, 2),
         "frame_id": frame_id,
         "vehicle_count": total_vehicles,
         "detected_count": raw_detections_count,

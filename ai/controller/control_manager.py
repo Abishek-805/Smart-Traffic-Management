@@ -28,7 +28,9 @@ class ControlManager:
         simulation_mode: bool = True,
         csv_log_path: Optional[Path] = None,
         json_log_path: Optional[Path] = None,
+        headless: bool = False,
     ):
+        self.headless = headless
         self.decision_logger = DecisionLogger(
             csv_path=csv_log_path,
             json_path=json_log_path,
@@ -53,7 +55,7 @@ class ControlManager:
             np.ndarray: Rendered composite dashboard image canvas.
         """
         if not result.has_frame:
-            return self.dashboard.render_from_result(result)
+            return None if self.headless else self.dashboard.render_from_result(result)
 
         # 1. Handle new Phase Change decision event
         if result.is_phase_change and result.signal_decision and result.hardware_command:
@@ -67,6 +69,9 @@ class ControlManager:
 
             # Non-blocking transmission to ESP32 hardware/simulation interface
             self.esp32_interface.send_command(result.hardware_command)
+
+        if self.headless:
+            return None
 
         # 2. Query hardware status and decision history
         hw_status = self.esp32_interface.get_status()

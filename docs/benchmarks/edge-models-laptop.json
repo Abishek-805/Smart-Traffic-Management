@@ -1,0 +1,57 @@
+{
+  "scope": "Identical local traffic frames; runtime/resource comparison only. Not an accuracy or power-meter benchmark.",
+  "source": ".venv\\Lib\\site-packages\\ultralytics\\assets\\bus.jpg",
+  "vehicle_classes": [
+    2,
+    3,
+    5,
+    7
+  ],
+  "results": [
+    {
+      "model": "yolo11n.pt",
+      "frames": 20,
+      "imgsz": 640,
+      "threads": 4,
+      "p50_ms": 107.65,
+      "p95_ms": 143.1,
+      "mean_ms": 109.67,
+      "throughput_fps": 9.12,
+      "cpu_seconds_per_frame": 0.2797,
+      "rss_after_mb": 388.1,
+      "rss_delta_mb": 0.1,
+      "mean_vehicle_detections": 1.0,
+      "model_size_mb": 5.35
+    },
+    {
+      "model": "yolo26n.pt",
+      "frames": 20,
+      "imgsz": 640,
+      "threads": 4,
+      "p50_ms": 81.84,
+      "p95_ms": 107.15,
+      "mean_ms": 83.79,
+      "throughput_fps": 11.93,
+      "cpu_seconds_per_frame": 0.2164,
+      "rss_after_mb": 418.5,
+      "rss_delta_mb": 0.1,
+      "mean_vehicle_detections": 1.0,
+      "model_size_mb": 5.29
+    },
+    {
+      "model": "models\\yolo26n_ncnn_model",
+      "frames": 20,
+      "imgsz": 640,
+      "threads": 4,
+      "p50_ms": 98.31,
+      "p95_ms": 132.99,
+      "mean_ms": 101.22,
+      "throughput_fps": 9.88,
+      "cpu_seconds_per_frame": 0.243,
+      "rss_after_mb": 526.7,
+      "rss_delta_mb": 0.7,
+      "mean_vehicle_detections": 1.0,
+      "model_size_mb": 9.39
+    }
+  ]
+}

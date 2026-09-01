@@ -46,7 +46,7 @@ export const LogFilters: React.FC<LogFiltersProps> = ({ selectedCategory, onSele
                   border: '1px solid transparent',
                   backgroundColor:
                     selectedCategory === cat ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-                  color: selectedCategory === cat ? '#ffffff' : 'var(--text-muted)',
+                  color: selectedCategory === cat ? 'var(--text-main)' : 'var(--text-muted)',
                   fontSize: '0.8rem',
                   fontWeight: selectedCategory === cat ? 700 : 500,
                   cursor: 'pointer',

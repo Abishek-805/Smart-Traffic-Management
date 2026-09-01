@@ -30,6 +30,8 @@ export interface LaneViewModel {
   priority: number;
   fps: number;
   inferenceTimeMs: number;
+  serverProcessingMs: number;
+  queueWaitMs: number;
 }
 
 export interface PhaseViewModel {
@@ -69,12 +71,12 @@ export interface DashboardViewModel {
 }
 
 export const useDashboardViewModel = (): DashboardViewModel => {
-  const { telemetry, isConnected, streamStatus } = useTelemetry();
+  const { telemetry, isConnected, streamStatus, frameAgeMs, pipelineHealthy, lastUpdated } = useTelemetry();
   const { data: health } = useSystemHealth();
   const { data: mobileNodesData } = useMobileNodes();
   const mobileNodes = mobileNodesData?.nodes || [];
 
-  const activePhaseName = (telemetry?.activePhase || 'North').toLowerCase();
+  const activePhaseName = (telemetry?.activePhase || 'none').toLowerCase();
   const remainingTime = telemetry?.timeRemaining || 0;
   const greenDuration = telemetry?.greenDuration || 25;
   const progressPct = Math.min(100, Math.max(0, ((greenDuration - remainingTime) / greenDuration) * 100));
@@ -82,10 +84,11 @@ export const useDashboardViewModel = (): DashboardViewModel => {
   return useMemo(() => {
     // Build 4 Lane ViewModels (North, East, South, West)
     const lanesList: Record<DirectionType, LaneViewModel> = DIRECTIONS.reduce((acc, dir) => {
-      const isGreen = activePhaseName === dir;
+      const isGreen = pipelineHealthy && activePhaseName === dir && telemetry?.signalState !== 'YELLOW';
       const laneNode = mobileNodes.find((n) => n.assigned_lane.toLowerCase().includes(dir));
-      const isConfigured = laneNode?.status === 'CONNECTED' || laneNode?.status === 'PAIRED';
+      const isConfigured = laneNode?.status === 'CONNECTED';
 
+      const laneData = telemetry?.lanes?.[dir];
       // Determine SCADA 5-color status
       let statusColor = '#64748b'; // Grey (Offline)
       let statusLabel = 'OFFLINE';
@@ -96,7 +99,7 @@ export const useDashboardViewModel = (): DashboardViewModel => {
         statusLabel = 'DISCONNECTED';
         currentStreamStatus = 'OFFLINE';
       } else if (isConfigured) {
-        currentStreamStatus = streamStatus;
+        currentStreamStatus = streamStatus === 'DISCONNECTED' || streamStatus === 'STALE' ? streamStatus : laneData?.streamStatus ?? 'CONNECTING';
         if (isGreen) {
           statusColor = '#10b981'; // Green (Active)
           statusLabel = 'CURRENT GREEN';
@@ -106,7 +109,6 @@ export const useDashboardViewModel = (): DashboardViewModel => {
         }
       }
 
-      const laneData = telemetry?.lanes?.[dir];
       const vehicles = laneData?.vehicles ?? 0;
       const queueVal = laneData?.queue ?? 0;
       const pceVal = laneData?.pce ?? 0;
@@ -125,24 +127,26 @@ export const useDashboardViewModel = (): DashboardViewModel => {
         pceScore: pceVal.toFixed(1),
         priorityScore: prioVal.toFixed(1),
         waitTimeSeconds: Math.round(waitSec),
-        latencyMs: telemetry?.frameAgeMs || 0,
-        frameAgeMs: telemetry?.frameAgeMs || 0,
+        latencyMs: laneData?.serverProcessingMs ?? 0,
+        frameAgeMs: laneData?.frameAgeMs == null ? 0 : laneData.frameAgeMs + (lastUpdated ? Math.max(0, Date.now() - lastUpdated.getTime()) : 0),
         streamUrl: cameraApi.getPreviewUrl(dir),
         streamStatus: currentStreamStatus,
         isConfigured,
         density: typeof densityVal === 'number' ? densityVal : parseFloat(densityVal) || 0,
         priority: prioVal,
-        fps: !isConnected ? 0 : (telemetry?.frameAgeMs && telemetry.frameAgeMs > 0 ? Math.min(60, Math.round(1000 / telemetry.frameAgeMs)) : 30),
-        inferenceTimeMs: telemetry?.latencyMetrics?.yolo_ms ?? 0,
+        fps: currentStreamStatus === 'LIVE' ? laneData?.fps ?? 0 : 0,
+        inferenceTimeMs: laneData?.inferenceTimeMs ?? 0,
+        serverProcessingMs: laneData?.serverProcessingMs ?? 0,
+        queueWaitMs: laneData?.queueWaitMs ?? 0,
       };
 
       return acc;
     }, {} as Record<DirectionType, LaneViewModel>);
 
     // StatusBar ViewModel
-    const isAiHealthy = isConnected && Boolean(telemetry);
+    const isAiHealthy = pipelineHealthy;
     const isEspHealthy = health?.components?.esp32?.status === 'HEALTHY';
-    const currentFps = !isConnected ? 0 : (telemetry?.frameAgeMs && telemetry.frameAgeMs > 0 ? Math.min(60, Math.round(1000 / telemetry.frameAgeMs)) : 30);
+    const currentFps = Object.values(lanesList).reduce((sum, lane) => sum + lane.fps, 0);
     const connectedCamsCount = mobileNodes.filter((n) => n.status === 'CONNECTED').length;
 
     const statusBar: StatusBarViewModel = {
@@ -153,16 +157,16 @@ export const useDashboardViewModel = (): DashboardViewModel => {
       activeCameraCount: connectedCamsCount,
       totalCameraSlots: 4,
       fps: currentFps,
-      latencyMs: telemetry?.frameAgeMs || 0,
-      schedulerStatus: isConnected ? 'RUNNING' : 'DISCONNECTED',
+      latencyMs: telemetry?.latencyMetrics?.total_ms ?? 0,
+      schedulerStatus: !isConnected ? 'DISCONNECTED' : telemetry?.systemRunning ? pipelineHealthy ? 'RUNNING' : 'WAITING FOR FRAMES' : 'PAUSED',
     };
 
     // Phase ViewModel
     const activePhase: PhaseViewModel = {
-      activeDirection: telemetry?.activePhase || 'North',
+      activeDirection: pipelineHealthy ? telemetry?.activePhase || 'None' : 'None',
       remainingSeconds: remainingTime,
       progressPercentage: progressPct,
-      phaseReason: 'Dynamic Queue Priority Scheduler',
+      phaseReason: telemetry?.signalState === 'YELLOW' ? 'Yellow clearance' : telemetry?.phaseReason || 'Waiting for a connected camera',
     };
 
     // MetricStrip ViewModel
@@ -172,8 +176,8 @@ export const useDashboardViewModel = (): DashboardViewModel => {
       inferenceTimeMs: telemetry?.latencyMetrics?.yolo_ms ?? 0,
       processingQueueLength: telemetry?.stageCounters?.dropped ?? 0,
       pipelineLatencyMs: telemetry?.latencyMetrics?.total_ms || telemetry?.frameAgeMs || 0,
-      frameAgeMs: telemetry?.frameAgeMs || 0,
-      connectionHealth: isConnected ? 'HEALTHY' : 'DISCONNECTED',
+      frameAgeMs,
+      connectionHealth: !isConnected ? 'DISCONNECTED' : pipelineHealthy ? 'HEALTHY' : 'DEGRADED',
     };
 
     return {
@@ -182,5 +186,5 @@ export const useDashboardViewModel = (): DashboardViewModel => {
       statusBar,
       metrics,
     };
-  }, [telemetry, isConnected, streamStatus, health, mobileNodes, activePhaseName, remainingTime, greenDuration, progressPct]);
+  }, [telemetry, isConnected, streamStatus, frameAgeMs, pipelineHealthy, lastUpdated, health, mobileNodes, activePhaseName, remainingTime, greenDuration, progressPct]);
 };

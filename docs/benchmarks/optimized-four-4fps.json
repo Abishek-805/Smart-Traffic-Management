@@ -1,0 +1,164 @@
+{
+  "config": {
+    "fps_per_camera": 4.0,
+    "edge": 640,
+    "seconds": 20,
+    "warmup": 5
+  },
+  "scope": "Four localhost WebSocket clients replaying local clips; ACK and preview arrival, not physical phone latency or accuracy.",
+  "directions": {
+    "north": {
+      "ack_ms": {
+        "p50": 80.35,
+        "p95": 135.56,
+        "p99": 151.9
+      },
+      "server_ms": {
+        "p50": 80.01,
+        "p95": 135.05,
+        "p99": 151.11
+      },
+      "queue_ms": {
+        "p50": 45.51,
+        "p95": 104.04,
+        "p99": 119.09
+      },
+      "inference_ms": {
+        "p50": 30.9,
+        "p95": 34.81,
+        "p99": 38.95
+      },
+      "preview_ms": {
+        "p50": 133.53,
+        "p95": 204.73,
+        "p99": 223.23
+      },
+      "sent": 81,
+      "acked": 81,
+      "ack_fps": 4.05,
+      "upload_kbps": 502.5,
+      "count_range": [
+        0,
+        0
+      ]
+    },
+    "east": {
+      "ack_ms": {
+        "p50": 74.26,
+        "p95": 138.38,
+        "p99": 147.35
+      },
+      "server_ms": {
+        "p50": 73.19,
+        "p95": 138.22,
+        "p99": 146.54
+      },
+      "queue_ms": {
+        "p50": 38.96,
+        "p95": 103.36,
+        "p99": 110.17
+      },
+      "inference_ms": {
+        "p50": 31.69,
+        "p95": 38.27,
+        "p99": 45.95
+      },
+      "preview_ms": {
+        "p50": 132.68,
+        "p95": 204.18,
+        "p99": 223.8
+      },
+      "sent": 81,
+      "acked": 81,
+      "ack_fps": 4.05,
+      "upload_kbps": 502.7,
+      "count_range": [
+        0,
+        0
+      ]
+    },
+    "south": {
+      "ack_ms": {
+        "p50": 87.6,
+        "p95": 142.19,
+        "p99": 152.97
+      },
+      "server_ms": {
+        "p50": 87.38,
+        "p95": 142.13,
+        "p99": 152.48
+      },
+      "queue_ms": {
+        "p50": 51.14,
+        "p95": 102.89,
+        "p99": 109.82
+      },
+      "inference_ms": {
+        "p50": 31.54,
+        "p95": 36.79,
+        "p99": 42.48
+      },
+      "preview_ms": {
+        "p50": 132.49,
+        "p95": 217.43,
+        "p99": 238.15
+      },
+      "sent": 81,
+      "acked": 81,
+      "ack_fps": 4.05,
+      "upload_kbps": 503.9,
+      "count_range": [
+        0,
+        0
+      ]
+    },
+    "west": {
+      "ack_ms": {
+        "p50": 96.52,
+        "p95": 134.71,
+        "p99": 145.29
+      },
+      "server_ms": {
+        "p50": 94.12,
+        "p95": 134.43,
+        "p99": 143.95
+      },
+      "queue_ms": {
+        "p50": 62.12,
+        "p95": 100.82,
+        "p99": 111.41
+      },
+      "inference_ms": {
+        "p50": 31.28,
+        "p95": 35.85,
+        "p99": 37.98
+      },
+      "preview_ms": {
+        "p50": 130.66,
+        "p95": 204.2,
+        "p99": 217.01
+      },
+      "sent": 81,
+      "acked": 81,
+      "ack_fps": 4.05,
+      "upload_kbps": 501.7,
+      "count_range": [
+        0,
+        0
+      ]
+    }
+  },
+  "resources": {
+    "cpu_percent_one_core_100": {
+      "p50": 106.25,
+      "p95": 143.86,
+      "p99": 148.9
+    },
+    "rss_mb": {
+      "p50": 591.18,
+      "p95": 631.29,
+      "p99": 638.67
+    },
+    "rss_growth_mb": 153.35
+  }
+}

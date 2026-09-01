@@ -7,7 +7,7 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -18,7 +18,9 @@ COPY shared /app/shared
 COPY core /app/core
 COPY ai /app/ai
 COPY server /app/server
-COPY yolo11n.pt /app/yolo11n.pt
+COPY config /app/config
+COPY dashboard /app/dashboard
+COPY yolo26n.pt /app/yolo26n.pt
 COPY websocket-server/app /app/app
 
 EXPOSE 8001

@@ -6,6 +6,7 @@
 import React from 'react';
 import { DIRECTIONS, DIRECTION_LABELS, DirectionType } from '../../../constants/directions';
 import { cameraApi } from '../../../services/api/camera';
+import { useDashboardViewModel } from '../../../features/dashboard/useDashboardViewModel';
 import { LiveCameraPreview } from './LiveCameraPreview';
 
 interface CameraGridProps {
@@ -19,8 +20,9 @@ export const CameraGrid: React.FC<CameraGridProps> = React.memo(({
   selectedDirection,
   onSelectDirection,
 }) => {
+  const vm = useDashboardViewModel();
   return (
-    <div
+    <div className="camera-grid"
       style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(2, 1fr)',
@@ -56,6 +58,7 @@ export const CameraGrid: React.FC<CameraGridProps> = React.memo(({
             onClick={() => onSelectDirection(dir)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
                 onSelectDirection(dir);
               }
             }}
@@ -70,7 +73,7 @@ export const CameraGrid: React.FC<CameraGridProps> = React.memo(({
                     backgroundColor: isSelected ? '#58a6ff' : isConfigured ? '#10b981' : '#64748b',
                   }}
                 />
-                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)' }}>
                   {DIRECTION_LABELS[dir]}
                 </span>
               </div>
@@ -78,21 +81,25 @@ export const CameraGrid: React.FC<CameraGridProps> = React.memo(({
                 style={{
                   fontSize: '0.7rem',
                   fontWeight: 800,
-                  color: isConfigured ? '#10b981' : '#8b949e',
+                  color: isConfigured ? '#10b981' : 'var(--text-muted)',
                   backgroundColor: isConfigured ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 255, 255, 0.05)',
                   padding: '2px 8px',
                   borderRadius: '4px',
                   border: isConfigured ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border-color)',
                 }}
               >
-                {isConfigured ? 'LIVE STREAM' : 'UNASSIGNED'}
+                {vm.lanes[dir].streamStatus}
               </span>
             </div>
 
             <div style={{ flex: 1, minHeight: '200px', display: 'flex', flexDirection: 'column' }}>
               <LiveCameraPreview
                 streamUrl={cameraApi.getPreviewUrl(dir)}
-                streamStatus={isConfigured ? 'LIVE' : 'OFFLINE'}
+                streamStatus={vm.lanes[dir].streamStatus}
+                fps={vm.lanes[dir].fps}
+                latencyMs={vm.lanes[dir].latencyMs}
+                frameAgeMs={vm.lanes[dir].frameAgeMs}
+                vehicleCount={vm.lanes[dir].vehicleCount}
                 directionLabel={dir}
               />
             </div>

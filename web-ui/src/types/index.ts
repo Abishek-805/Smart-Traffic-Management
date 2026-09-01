@@ -31,6 +31,9 @@ export interface ComponentHealth {
   running?: boolean;
   fps?: number;
   active?: number;
+  model?: string;
+  runtime?: string;
+  input_size?: number;
 }
 
 export interface SystemHealthData {
@@ -58,6 +61,13 @@ export type TelemetryEventType =
   | 'LogEntry';
 
 export interface LaneTelemetryItem {
+  frameAgeMs?: number | null;
+  streamStatus?: 'CONNECTING' | 'LIVE' | 'STALE' | 'OFFLINE' | 'DISCONNECTED';
+  fps?: number;
+  inferenceTimeMs?: number;
+  serverProcessingMs?: number;
+  queueWaitMs?: number;
+  frameId?: string | null;
   vehicles: number;
   queue: number;
   wait: number;
@@ -67,6 +77,9 @@ export interface LaneTelemetryItem {
 }
 
 export interface TelemetryPayload {
+  systemRunning?: boolean;
+  signalState?: 'GREEN' | 'YELLOW' | 'ALL_RED';
+  phaseReason?: string;
   activePhase: string;
   greenDuration: number;
   timeRemaining: number;
@@ -187,7 +200,7 @@ export interface AnalyticsSummaryData {
   total_vehicles_today: number;
   avg_wait_time_sec: number;
   peak_pce_score: number;
-  efficiency_score: number;
+  efficiency_score: number | null;
   hourly_flow: HourlyFlowPoint[];
   queue_trends: QueueTrendPoint[];
   vehicle_split: VehicleSplitItem[];

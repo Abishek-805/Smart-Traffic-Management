@@ -3,8 +3,10 @@ Unit tests for Production Web Control Center (Service Layer, ApplicationContext,
 """
 
 import unittest
+import time
 from fastapi.testclient import TestClient
 from web.app import app
+from server.websocket_server import message_handler
 
 
 class TestWebApplication(unittest.TestCase):
@@ -60,10 +62,15 @@ class TestWebApplication(unittest.TestCase):
 
     def test_06_camera_node_websocket_integration(self):
         """Verify /ws/camera endpoint functions on single unified FastAPI app."""
+        pairing = {"session": "CAM-WEB-01", "token": "web-pair"}
+        message_handler.session_manager.register_pairing_session(
+            "north", pairing["session"], pairing["token"], time.time() + 60
+        )
         with self.client.websocket_connect("/ws/camera") as ws:
             ws.send_json({
                 "type": "REGISTER_CAMERA",
-                "payload": {"node_id": "CAM-WEB-01", "camera_direction": "north"}
+                "token": pairing["token"],
+                "payload": {"node_id": pairing["session"], "camera_direction": "north"}
             })
             ack = ws.receive_json()
             self.assertEqual(ack.get("type"), "REGISTRATION_ACK")
@@ -71,4 +78,3 @@ class TestWebApplication(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -1,6 +1,7 @@
 /* SCADA Enterprise Design Tokens & Global CSS System — v2.1.0 Industrial Specification */
 
 :root {
+  --color-primary: #3b82f6;
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
 
@@ -132,13 +133,53 @@ html, body, #root {
   height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: #0d1117;
+  background: var(--bg-primary);
 }
 ::-webkit-scrollbar-thumb {
-  background: #30363d;
+  background: var(--border-color);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #58a6ff;
 }
 
+
+.phase-bar { display: flex; justify-content: space-between; gap: 16px; padding: 16px 20px; flex-wrap: wrap; }
+.phase-bar > div { display: flex; flex-direction: column; gap: 4px; }
+.phase-bar strong { font-size: 18px; }
+.phase-label { color: var(--text-muted); font-size: 12px; }
+.dashboard-workspace { display: grid; grid-template-columns: minmax(260px, 300px) minmax(0, 1fr); gap: 12px; min-height: 0; align-items: start; }
+.pairing-sidebar { display: flex; flex-direction: column; gap: 10px; position: sticky; top: 0; min-width: 0; }
+.pairing-sidebar-heading { display: flex; align-items: flex-start; gap: 9px; padding: 12px; border: 1px solid var(--border-highlight); border-radius: 4px; background: rgba(88, 166, 255, 0.08); color: var(--text-main); }
+.pairing-sidebar-heading > div { display: flex; flex-direction: column; gap: 3px; }
+.pairing-sidebar-heading span { color: var(--text-muted); font-size: 11px; line-height: 1.35; }
+.pairing-card select { width: 100%; border: 1px solid var(--border-color); border-radius: 4px; }
+.pairing-card p { line-height: 1.4; }
+.pairing-button, .pairing-card button { min-height: 38px; border-radius: 4px; border: 1px solid var(--border-highlight); background: rgba(88, 166, 255, 0.14); color: var(--text-main); font-weight: 800; cursor: pointer; }
+.pairing-card button:disabled { cursor: wait; opacity: .65; }
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 2px solid var(--border-highlight) !important; outline-offset: 2px; }
+@media (max-width: 1100px) { .dashboard-workspace { grid-template-columns: minmax(0, 1fr); } .pairing-sidebar { position: static; } }
+@media (max-width: 800px) { .camera-grid { grid-template-columns: minmax(0,1fr) !important; } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+html.light { --bg-primary: #f1f5f9; --bg-secondary: #fff; --bg-surface: #e2e8f0; --bg-main: #f1f5f9; --bg-card: #fff; --bg-card-hover: #e2e8f0; --bg-sidebar: #fff; --bg-header: #fff; --text-primary: #0f172a; --text-secondary: #334155; --text-main: #0f172a; --text-muted: #475569; --text-subtle: #64748b; --border-color: #cbd5e1; }
+
+
+* { box-sizing: border-box; }
+.operator-header > div { flex-wrap: wrap; max-width: 100%; }
+.operator-header > div > div { flex-shrink: 0; }
+.page-toolbar { gap: 16px; flex-wrap: wrap; }
+.page-toolbar > div { min-width: 0; }
+.page-toolbar > div:first-child { flex: 1 1 240px; }
+.page-toolbar > div:last-child { flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .page-content { padding: 12px !important; }
+  .operator-header { padding: 8px !important; gap: 6px !important; }
+  .operator-header > div { gap: 6px !important; }
+  .operator-header button { min-height: 30px; }
+  .page-toolbar { padding: 14px !important; }
+}
+
+@media (max-width: 600px) {
+  .lane-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .dashboard-camera-grid { grid-auto-rows: minmax(600px, 1fr) !important; }
+}

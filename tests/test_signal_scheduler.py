@@ -19,6 +19,7 @@ from ai.signal.signal_types import (
 )
 from ai.signal.signal_decision import SignalDecision
 from ai.signal.signal_scheduler import SignalScheduler
+from ai.analytics.analytics_exporter import LaneStatistics
 
 
 def create_sample_priority_result(north_score: float = 40.0) -> PriorityResult:
@@ -66,6 +67,46 @@ def test_scheduler_winner_selection():
     assert decision.green_duration_sec <= 60
 
     print("✔ Scheduler winner selection and phase_id test passed!")
+
+
+def _lane_stats(counts, emergency=None):
+    emergency = emergency or set()
+    return {name: LaneStatistics(lane_name=name, live_count=count, raw_count=count,
+        has_priority_vehicle=name in emergency) for name, count in counts.items()}
+
+
+def test_scheduler_excludes_stale_approaches():
+    scheduler = SignalScheduler()
+    result = create_sample_priority_result(north_score=100)
+    stats = _lane_stats({'north': 8, 'south': 3, 'east': 2, 'west': 1})
+    selected, starvation = scheduler.select_eligible(result, stats, {'south', 'east'},
+        {'North': 0, 'South': 0, 'East': 0, 'West': 0})
+    assert selected.highest_priority.lane == LaneName.SOUTH
+    assert not starvation
+
+
+def test_scheduler_bounds_starvation_after_three_completed_phases():
+    scheduler = SignalScheduler()
+    result = create_sample_priority_result(north_score=100)
+    stats = _lane_stats({'north': 8, 'south': 1, 'east': 0, 'west': 0})
+    selected, starvation = scheduler.select_eligible(result, stats, {'north', 'south'},
+        {'North': 0, 'South': 3, 'East': 0, 'West': 0})
+    assert selected.highest_priority.lane == LaneName.SOUTH
+    assert starvation
+
+
+def test_emergency_preempts_starvation_only_when_fresh():
+    scheduler = SignalScheduler()
+    result = create_sample_priority_result(north_score=100)
+    stats = _lane_stats({'north': 8, 'south': 1}, emergency={'north'})
+    selected, starvation = scheduler.select_eligible(result, stats, {'north', 'south'},
+        {'North': 0, 'South': 4})
+    assert selected.highest_priority.lane == LaneName.NORTH
+    assert not starvation
+    selected, starvation = scheduler.select_eligible(result, stats, {'south'},
+        {'North': 0, 'South': 4})
+    assert selected.highest_priority.lane == LaneName.SOUTH
+    assert starvation
 
 
 if __name__ == "__main__":

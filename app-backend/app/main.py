@@ -1,6 +1,6 @@
 import asyncio
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from contextlib import asynccontextmanager, suppress
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -16,11 +16,17 @@ redis_service = AppBackendRedisService(redis_url=REDIS_URL)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Starting {APP_NAME} v{VERSION} on port {PORT}...")
+    from core.application_context import ApplicationContext
+    ctx = ApplicationContext.get_instance()
+    ctx.remote_runtime = True
+    ctx.command_handler = redis_service.publish_command
     await redis_service.connect()
     listener_task = asyncio.create_task(redis_service.start_listener())
     yield
     logger.info(f"Shutting down {APP_NAME}...")
     listener_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await listener_task
     await redis_service.close()
 
 app = FastAPI(
@@ -43,6 +49,8 @@ app.include_router(api_v1_router)
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def legacy_api_redirect(path: str, request: Request):
+    if path == "v1" or path.startswith("v1/"):
+        raise HTTPException(status_code=404, detail="API route not found")
     canonical_url = f"/api/v1/{path}"
     if request.url.query:
         canonical_url += f"?{request.url.query}"

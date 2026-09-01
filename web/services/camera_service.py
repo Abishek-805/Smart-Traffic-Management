@@ -1,77 +1,44 @@
-"""
-CameraService manages multi-camera stream configurations, telemetry stats, and MJPEG preview streams.
-"""
-
+"""Camera configuration and fresh annotated MJPEG previews."""
 import asyncio
-import cv2
-import numpy as np
-from typing import Dict, Any, AsyncGenerator
+import time
+from fastapi import HTTPException
 from core.application_context import ApplicationContext
-from ai.utils.logger import get_logger
 
-logger = get_logger("CameraService")
-
+DIRECTIONS = ("north", "south", "east", "west")
 
 class CameraService:
-    """
-    Service layer for camera stream management and live MJPEG feed generation.
-    """
-
-    def __init__(self, ctx: ApplicationContext = None):
+    def __init__(self, ctx=None):
         self.ctx = ctx or ApplicationContext.get_instance()
 
-    def get_camera_configs(self) -> Dict[str, Any]:
-        """Return camera mode and individual stream configurations."""
-        from web.services.node_service import get_local_ip
-        host_ip = get_local_ip()
-        sessions = self.ctx.session_manager.sessions
-        active_dirs = {sess.camera_direction.lower() for sess in sessions.values()}
-
+    def get_camera_configs(self):
+        from web.services.node_service import NodeService
+        nodes = NodeService(self.ctx).get_connected_nodes()["nodes"]
+        payload = (self.ctx.latest_snapshot or {}).get("payload", {})
         streams = {}
-        for d in ["north", "south", "east", "west"]:
-            if d in active_dirs:
-                streams[d] = {"source": f"ws://{host_ip}:8000/ws/camera", "status": "CONNECTED", "fps": 30.0, "latency_ms": 24}
-            else:
-                streams[d] = {"source": f"unpaired_{d}", "status": "OFFLINE", "fps": 0.0, "latency_ms": 0}
+        for direction in DIRECTIONS:
+            node = next((n for n in nodes if n.get("assigned_lane", "").lower().startswith(direction)), {})
+            lane = payload.get("lanes", {}).get(direction, {})
+            streams[direction] = {
+                "source": f"/api/v1/cameras/{direction}/feed",
+                "status": node.get("status", "OFFLINE"),
+                "fps": lane.get("fps", 0), "latency_ms": lane.get("inferenceTimeMs"),
+            }
+        return {"mode": "mobile", "streams": streams}
 
-        return {
-            "mode": "mobile",
-            "streams": streams,
-        }
-
-    async def generate_mjpeg_stream(self, direction: str) -> AsyncGenerator[bytes, None]:
-        """
-        Generate an MJPEG boundary stream for live camera feed preview on dashboard.
-        """
-        dir_clean = direction.lower()
+    async def generate_mjpeg_stream(self, direction):
+        direction = direction.lower()
+        if direction not in DIRECTIONS:
+            raise HTTPException(422, "Invalid camera direction")
+        previous = None
         while self.ctx.system_running:
-            # Check if live frame buffer has recent frames for this approach direction
-            live_bytes = self.ctx.frame_buffer.get(dir_clean)
-
-            if live_bytes:
-                yield (
-                    b"--frame\r\n"
-                    b"Content-Type: image/jpeg\r\n\r\n" + live_bytes + b"\r\n"
-                )
-                await asyncio.sleep(0.05)  # ~20 FPS
-                continue
-
-            # Create synthetic dark control room stream frame with direction label
-            img = np.zeros((360, 640, 3), dtype=np.uint8)
-            cv2.rectangle(img, (10, 10), (630, 350), (42, 55, 26), 2)
-            cv2.putText(img, f"STREAM: {dir_clean.upper()}", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 229, 0), 2)
-            cv2.putText(img, "YOLO11 + ByteTrack AI Tracking Active", (30, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (186, 160, 140), 1)
-            cv2.putText(img, "Live Operations Control Feed", (30, 320), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 230, 118), 1)
-
-            ret, encoded = cv2.imencode(".jpg", img)
-            if not ret:
-                await asyncio.sleep(0.1)
-                continue
-
-            frame_bytes = encoded.tobytes()
-            yield (
-                b"--frame\r\n"
-                b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
-            )
+            seen = self.ctx.frame_updated_at.get(direction)
+            live = self.ctx.frame_buffer.get(direction)
+            if not live or seen is None or time.monotonic() - seen > 3:
+                return  # End stale feeds rather than showing an old frame as live.
+            if live is not previous:
+                frame_id = self.ctx.live_telemetry.get(direction, {}).get("frame_id", "")
+                header = f"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: {len(live)}\r\nX-Frame-Id: {frame_id}\r\nCache-Control: no-store\r\n\r\n"
+                yield header.encode() + live + b"\r\n"
+                previous = live
             await asyncio.sleep(0.1)
 

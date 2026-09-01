@@ -1,7 +1,10 @@
 # Smart Traffic Management System - Core Runtime Dependencies
 
 # Computer Vision & AI Inference Engine
-ultralytics>=8.3.0
+ultralytics==8.4.136
+scipy>=1.13
+lap>=0.5.12
+python-dotenv>=1.0
 opencv-python>=4.8.0
 numpy>=1.24.0
 Pillow>=10.0.0
@@ -20,4 +23,3 @@ qrcode>=7.4.2
 
 # Cache & Telemetry Streaming (Pub/Sub)
 redis>=5.0.0
-

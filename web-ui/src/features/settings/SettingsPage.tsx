@@ -4,7 +4,8 @@
  * Delegates accordion panels to ConfigAccordions sub-component.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
+import { apiFetch } from '../../services/api/client';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useVersionInfo } from '../../shared/hooks/useSystemQueries';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -12,12 +13,23 @@ import { ConfigAccordions } from './ConfigAccordions';
 import { Save, RotateCcw, Info } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
-  const { resetSettings } = useSettings();
+  const { settings, resetSettings } = useSettings();
   const { data: versionInfo } = useVersionInfo();
   const { addToast } = useNotifications();
 
-  const handleSave = () =>
-    addToast('success', 'Local Settings Saved', 'These settings are stored locally in this browser. They do not modify the running backend unless the backend explicitly supports applying them.');
+  const [saving, setSaving] = useState(false);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const result = await apiFetch<{ message: string }>('/system/config', {
+        method: 'POST', body: JSON.stringify({ confidenceThreshold: settings.confidenceThreshold,
+          minGreenTime: settings.minGreenTime, maxGreenTime: settings.maxGreenTime }),
+      });
+      addToast('success', 'Runtime settings applied', result.message);
+    } catch (e) {
+      addToast('error', 'Settings not applied', e instanceof Error ? e.message : 'Backend unavailable');
+    } finally { setSaving(false); }
+  };
 
   const handleReset = () => {
     if (confirm('Are you sure you want to reset all configurations to their default values?')) {
@@ -29,7 +41,7 @@ export const SettingsPage: React.FC = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '900px' }}>
       {/* Header */}
-      <div className="scada-card" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="scada-card page-toolbar" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>System Configuration &amp; Settings</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
@@ -46,8 +58,9 @@ export const SettingsPage: React.FC = () => {
           </button>
           <button
             onClick={handleSave}
+            disabled={saving}
             aria-label="Save settings"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: 'var(--color-primary)', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '8px 16px', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: 'var(--color-primary)', color: 'var(--text-main)', border: 'none', borderRadius: '6px', padding: '8px 16px', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
           >
             <Save size={14} aria-hidden="true" /> Save Changes
           </button>
@@ -71,7 +84,7 @@ export const SettingsPage: React.FC = () => {
       >
         <Info size={16} style={{ flexShrink: 0 }} />
         <span>
-          <strong>System Settings Scope:</strong> These settings are stored locally in this browser. They do not modify the running backend unless the backend explicitly supports applying them.
+          <strong>System Settings Scope:</strong> Save applies confidence and green timing to the running AI service. Display preferences stay in this browser. Serial hardware is not activated here. Runtime settings reset on server restart.
         </span>
       </div>
 
@@ -84,7 +97,7 @@ export const SettingsPage: React.FC = () => {
           <Info size={18} color="var(--color-primary)" aria-hidden="true" />
           <h3 style={{ fontSize: '1rem', fontWeight: 800 }}>System Build Info</h3>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', fontSize: '0.8rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: '12px', fontSize: '0.8rem' }}>
           <div>
             <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>VERSION</span>
             <strong style={{ color: 'var(--color-primary)' }}>{versionInfo?.version || '1.0.0'}</strong>

@@ -22,7 +22,7 @@ export const StatusOverlay: React.FC<StatusOverlayProps> = ({ status, title, mes
   let icon = <Camera size={24} color="#64748b" />;
   let defaultTitle = 'Camera Offline';
   let defaultMsg = 'No active stream feed';
-  let accentColor = '#64748b';
+  let accentColor = '#aab6c6';
 
   if (status === 'CONNECTING') {
     icon = <RefreshCw size={24} color="#3b82f6" className="spin" />;
@@ -48,7 +48,7 @@ export const StatusOverlay: React.FC<StatusOverlayProps> = ({ status, title, mes
     icon = <WifiOff size={24} color="#64748b" />;
     defaultTitle = 'OFFLINE';
     defaultMsg = 'No camera connected';
-    accentColor = '#64748b';
+    accentColor = '#aab6c6';
   }
 
   return (
@@ -74,7 +74,7 @@ export const StatusOverlay: React.FC<StatusOverlayProps> = ({ status, title, mes
       <span style={{ fontSize: '0.82rem', fontWeight: 800, color: accentColor, marginBottom: '2px' }}>
         {title || defaultTitle}
       </span>
-      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+      <span style={{ fontSize: '0.72rem', color: '#aab6c6' }}>
         {message || defaultMsg}
       </span>
     </div>

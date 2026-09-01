@@ -20,9 +20,9 @@ interface LaneCardProps {
   isSelected?: boolean;
 }
 
-const MetricCard: React.FC<{ label: string; value: React.ReactNode; color?: string }> = ({ label, value, color = '#ffffff' }) => (
+const MetricCard: React.FC<{ label: string; value: React.ReactNode; color?: string }> = ({ label, value, color = 'var(--text-main)' }) => (
   <div style={{
-    backgroundColor: 'rgba(13, 17, 23, 0.95)',
+    backgroundColor: 'var(--bg-primary)',
     border: '1px solid #30363d',
     borderRadius: '4px',
     padding: '8px 10px',
@@ -33,14 +33,14 @@ const MetricCard: React.FC<{ label: string; value: React.ReactNode; color?: stri
     minWidth: 0,
     flex: 1,
   }}>
-    <span style={{ fontSize: '10px', color: '#8b949e', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>{label}</span>
-    <strong style={{ fontSize: '26px', color: color, fontWeight: 900, lineHeight: '1' }} className="font-mono-num">{value}</strong>
+    <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>{label}</span>
+    <strong style={{ fontSize: '28px', color: color, fontWeight: 900, lineHeight: '1' }} className="font-mono-num">{value}</strong>
   </div>
 );
 
 export const LaneCard: React.FC<LaneCardProps> = ({
   lane,
-  remainingSeconds = 18,
+  remainingSeconds = 0,
   isEmergencyMode = false,
   onSelect,
   isSelected = false,
@@ -91,7 +91,7 @@ export const LaneCard: React.FC<LaneCardProps> = ({
         height: '100%',
         width: '100%',
         padding: '8px',
-        backgroundColor: '#161b22',
+        backgroundColor: 'var(--bg-secondary)',
         position: 'relative',
         overflow: 'hidden',
         boxSizing: 'border-box',
@@ -102,6 +102,7 @@ export const LaneCard: React.FC<LaneCardProps> = ({
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
           onSelect?.();
         }
       }}
@@ -119,12 +120,12 @@ export const LaneCard: React.FC<LaneCardProps> = ({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ffffff', letterSpacing: '0.02em', margin: 0 }}>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '0.02em', margin: 0 }}>
             {lane.label} Camera
           </h3>
           <span
             style={{
-              fontSize: '10px',
+              fontSize: '12px',
               fontWeight: 800,
               color: status.color,
               backgroundColor: 'rgba(0,0,0,0.2)',
@@ -144,9 +145,9 @@ export const LaneCard: React.FC<LaneCardProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '4px',
-            backgroundColor: lane.isGreen ? 'rgba(16, 185, 129, 0.2)' : '#0d1117',
+            backgroundColor: lane.isGreen ? 'rgba(16, 185, 129, 0.2)' : 'var(--bg-primary)',
             color: lane.isGreen ? '#10b981' : '#58a6ff',
-            border: `1px solid ${lane.isGreen ? '#10b981' : '#30363d'}`,
+            border: `1px solid ${lane.isGreen ? '#10b981' : 'var(--border-color)'}`,
             padding: '2px 8px',
             borderRadius: '3px',
             fontSize: '13px',
@@ -178,7 +179,7 @@ export const LaneCard: React.FC<LaneCardProps> = ({
               left: '50%',
               transform: 'translate(-50%, -50%)',
               backgroundColor: 'rgba(239, 68, 68, 0.95)',
-              color: '#ffffff',
+              color: 'var(--text-main)',
               padding: '6px 14px',
               borderRadius: '4px',
               fontWeight: 900,
@@ -196,8 +197,8 @@ export const LaneCard: React.FC<LaneCardProps> = ({
         )}
       </div>
 
-      {/* Bottom Metrics Bar (Refactored to 2x4 card grid for high visibility) */}
-      <div
+      {/* Current-frame measurements; missing inputs are explicitly unavailable. */}
+      <div className="lane-metrics"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(4, 1fr)',
@@ -205,14 +206,16 @@ export const LaneCard: React.FC<LaneCardProps> = ({
           gap: '6px',
         }}
       >
-        <MetricCard label="Vehicles" value={lane.vehicleCount} color="#ffffff" />
-        <MetricCard label="Queue" value={lane.queueLengthMeters} color="#f59e0b" />
-        <MetricCard label="Density" value={`${lane.density.toFixed(1)}/m`} color="#10b981" />
-        <MetricCard label="Wait" value={`${lane.waitTimeSeconds}s`} color="#58a6ff" />
-        <MetricCard label="Priority" value={lane.priorityScore} color="#ef4444" />
-        <MetricCard label="FPS" value={lane.isConfigured ? lane.fps.toFixed(0) : '0'} color="#bc8cff" />
-        <MetricCard label="Latency" value={`${lane.latencyMs}ms`} color="#10b981" />
-        <MetricCard label="Inference" value={`${lane.inferenceTimeMs}ms`} color="#bc8cff" />
+        <MetricCard label="Vehicles" value={lane.streamStatus === 'LIVE' ? lane.vehicleCount : '—'} color="var(--text-main)" />
+        <MetricCard label="Queue (veh)" value={lane.streamStatus === 'LIVE' ? lane.queueLengthMeters.replace(' veh', '') : '—'} color="#f59e0b" />
+        <MetricCard label="PCE" value={lane.streamStatus === 'LIVE' ? lane.pceScore : '—'} color="#10b981" />
+        <MetricCard label="Max wait" value={lane.streamStatus === 'LIVE' ? lane.waitTimeSeconds + 's' : '—'} color="#58a6ff" />
+        <MetricCard label="Priority" value={lane.streamStatus === 'LIVE' ? lane.priorityScore : '—'} color="#ef4444" />
+        <MetricCard label="FPS" value={lane.streamStatus === 'LIVE' ? lane.fps.toFixed(1) : '—'} color="#bc8cff" />
+        <MetricCard label="Frame age" value={lane.streamStatus === 'LIVE' ? (lane.frameAgeMs / 1000).toFixed(1) + 's' : '—'} color="#10b981" />
+        <MetricCard label="Inference" value={lane.streamStatus === 'LIVE' ? Math.round(lane.inferenceTimeMs) + 'ms' : '—'} color="#bc8cff" />
+        <MetricCard label="Server total" value={lane.streamStatus === 'LIVE' ? Math.round(lane.serverProcessingMs) + 'ms' : '—'} color="#58a6ff" />
+        <MetricCard label="Server queue" value={lane.streamStatus === 'LIVE' ? Math.round(lane.queueWaitMs) + 'ms' : '—'} color="#f59e0b" />
       </div>
     </div>
   );

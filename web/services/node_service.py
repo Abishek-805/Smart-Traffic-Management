@@ -13,6 +13,8 @@ logger = get_logger("NodeService")
 
 
 import socket
+import os
+import uuid
 
 def get_local_ip() -> str:
     """Dynamically get the host machine's active LAN IP address."""
@@ -23,7 +25,7 @@ def get_local_ip() -> str:
         s.close()
         return local_ip
     except Exception:
-        return "192.168.1.3"
+        return "127.0.0.1"
 
 
 class NodeService:
@@ -36,83 +38,49 @@ class NodeService:
 
     def get_connected_nodes(self) -> Dict[str, Any]:
         """Return connected mobile node sessions with calculated Signal Quality."""
-        sessions = self.ctx.session_manager.sessions
-        all_directions = ["north", "south", "east", "west"]
-        connected_by_dir = {sess.camera_direction.lower(): (nid, sess) for nid, sess in sessions.items()}
-        node_list = []
-
-        for direction in all_directions:
-            if direction in connected_by_dir:
-                nid, sess = connected_by_dir[direction]
-                latency = 24  # ms
-                sig_quality = "Excellent" if latency < 40 else ("Good" if latency < 100 else "Weak")
-                node_list.append({
-                    "node_id": nid,
-                    "assigned_lane": f"{direction.capitalize()} Approach - Lane 1",
-                    "device_name": f"Mobile Node ({direction.capitalize()})",
-                    "signal_quality": sig_quality,
-                    "battery_pct": 84,
-                    "latency_ms": latency,
-                    "resolution": "1280x720 @ 30 FPS",
-                    "status": "CONNECTED",
-                    "last_heartbeat": "Just now",
-                })
-            else:
-                pairing_sess = self.ctx.session_manager.get_pairing_session(direction)
-                if pairing_sess:
-                    expires_at = pairing_sess["expires_at"]
-                    time_remaining = max(0, int(expires_at - time.time()))
-                    node_list.append({
-                        "node_id": pairing_sess["session_id"],
-                        "assigned_lane": f"{direction.capitalize()} Approach - Pairing",
-                        "device_name": "Pairing Session Active",
-                        "signal_quality": "N/A",
-                        "battery_pct": 0,
-                        "latency_ms": 0,
-                        "resolution": "Offline",
-                        "status": "PAIRED",
-                        "last_heartbeat": f"{time_remaining}s remaining",
-                        "expires_at": int(expires_at * 1000),
-                    })
-                else:
-                    node_list.append({
-                        "node_id": f"SLOT-{direction.upper()}",
-                        "assigned_lane": f"{direction.capitalize()} Approach - Unpaired",
-                        "device_name": "No Device Paired",
-                        "signal_quality": "N/A",
-                        "battery_pct": 0,
-                        "latency_ms": 0,
-                        "resolution": "Offline",
-                        "status": "OFFLINE",
-                        "last_heartbeat": "Unregistered",
-                    })
-
-        return {
-            "connected_count": len([n for n in node_list if n["status"] == "CONNECTED"]),
-            "nodes": node_list,
-        }
+        from server.runtime import runtime_snapshot
+        payload = ((self.ctx.latest_snapshot or {}).get("payload", {}) if self.ctx.remote_runtime
+                   else runtime_snapshot(self.ctx)["payload"])
+        nodes = list(self.ctx.remote_nodes if self.ctx.remote_runtime else payload.get("nodes", []))
+        for direction in ("north", "east", "south", "west"):
+            if any(n.get("assigned_lane", "").lower().startswith(direction) for n in nodes):
+                continue
+            pairing = self.ctx.session_manager.get_pairing_session(direction)
+            nodes.append({"node_id": pairing["session_id"] if pairing else "SLOT-" + direction.upper(),
+                          "assigned_lane": direction.capitalize() + " Approach",
+                          "device_name": "Awaiting camera" if pairing else "No device connected",
+                          "status": "PAIRED" if pairing else "OFFLINE", "fps": 0,
+                          "battery_pct": None, "signal_dbm": None, "latency_ms": None,
+                          "last_heartbeat": "Awaiting registration",
+                          "expires_at": int(pairing["expires_at"] * 1000) if pairing else None})
+        return {"connected_count": sum(n["status"] == "CONNECTED" for n in nodes), "nodes": nodes}
 
     def generate_qr_payload_and_image(self, direction: str = "north") -> Dict[str, Any]:
         """
         Generate pairing QR payload JSON and base64 PNG QR image data URI for a specific camera approach direction.
         """
         dir_clean = (direction or "north").lower()
-        host_ip = get_local_ip()
+        if dir_clean not in ("north", "south", "east", "west"):
+            raise ValueError("Invalid direction")
+        host_ip = os.getenv("CAMERA_PUBLIC_HOST") or get_local_ip()
+        # Combined local runtime is the default. Docker explicitly supplies 8001.
+        port = int(os.getenv("CAMERA_WS_PORT", "8000"))
+        secure = os.getenv("CAMERA_WS_SECURE", "false").lower() == "true"
         expires_at = time.time() + 300
-        session_id = f"CAM-{dir_clean.upper()}-PAIR"
-        token_val = f"auth_token_{dir_clean}_9df7c6ab"
+        session_id = f"CAM-{dir_clean.upper()}-{uuid.uuid4().hex[:8]}"
+        token_val = uuid.uuid4().hex
 
-        self.ctx.session_manager.register_pairing_session(dir_clean, session_id, expires_at)
+        self.ctx.session_manager.register_pairing_session(dir_clean, session_id, token_val, expires_at)
 
         qr_payload = {
             "version": "1.0",
             "server": host_ip,
-            "port": 8001,
+            "port": port,
             "session": session_id,
             "token": token_val,
             "expires": int(expires_at * 1000),
-            "protocol": "websocket",
-            "secure": False,
+            "protocol": "wss" if secure else "ws",
+            "secure": secure,
             "defaultLane": f"{dir_clean.capitalize()} Intersection - Lane 1",
             "camera_direction": dir_clean,
         }
@@ -125,8 +93,8 @@ class NodeService:
             buf = io.BytesIO()
             img.save(buf, format="PNG")
             base64_qr = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
-        except Exception:
-            base64_qr = f"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><rect width='100%' height='100%' fill='white'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='black' font-size='14'>QR ({dir_clean.upper()}): {host_ip}:8001</text></svg>"
+        except Exception as exc:
+            raise RuntimeError("QR generation failed; install qrcode and Pillow") from exc
 
         return {
             "payload": qr_payload,

@@ -46,7 +46,7 @@ export const BackendConnected: React.FC<{ children: React.ReactNode }> = ({ chil
               alignItems: 'center',
               gap: '8px',
               backgroundColor: 'var(--color-primary)',
-              color: '#ffffff',
+              color: 'var(--text-main)',
               border: 'none',
               borderRadius: '8px',
               padding: '10px 20px',

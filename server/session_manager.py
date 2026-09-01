@@ -68,7 +68,7 @@ class SessionManager:
             heartbeat_timeout_sec=self.timeout_sec,
         )
         self.sessions[node_id] = session
-        logger.info(f"Created session for node '{node_id}' ({dir_clean.upper()}). Token: {session_token}")
+        logger.info(f"Created session for node '{node_id}' ({dir_clean.upper()}).")
         return session
 
     def get_session_by_direction(self, camera_direction: str) -> Optional[NodeSession]:
@@ -85,7 +85,7 @@ class SessionManager:
         session = self.sessions.get(node_id)
         if not session:
             return False
-        return session.session_token == session_token
+        return not session.is_expired() and session.session_token == session_token
 
     def update_heartbeat(self, node_id: str, session_token: str) -> bool:
         """Update last_heartbeat timestamp for valid session."""
@@ -117,11 +117,12 @@ class SessionManager:
             self.remove_session(nid)
         return expired
 
-    def register_pairing_session(self, direction: str, session_id: str, expires_at: float):
+    def register_pairing_session(self, direction: str, session_id: str, token: str, expires_at: float):
         """Register a pairing session for a camera direction."""
         dir_clean = (direction or "north").lower()
         self.pairing_sessions[dir_clean] = {
             "session_id": session_id,
+            "token": token,
             "expires_at": expires_at,
         }
         logger.info(f"Registered pairing session for {dir_clean.upper()}. ID: {session_id}, Expires at: {expires_at}")
@@ -144,9 +145,9 @@ class SessionManager:
         self.pairing_sessions.pop(dir_clean, None)
         logger.info(f"Cleared pairing session for {dir_clean.upper()}.")
 
-    def validate_pairing_session(self, direction: str, token: str) -> bool:
-        """Validate if a token matches the active pairing session for a camera direction."""
+    def validate_pairing_session(self, direction: str, session_id: str, token: str) -> bool:
+        """Validate a non-expired pairing session, direction, and secret token."""
         sess = self.get_pairing_session(direction)
         if not sess:
             return False
-        return sess["session_id"] == token
+        return sess["session_id"] == session_id and sess["token"] == token

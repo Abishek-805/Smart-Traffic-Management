@@ -4,7 +4,7 @@ Categories: INFO, WARNING, ERROR, AI, NODE, ESP32, SYSTEM.
 """
 
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 import uuid
 
 
@@ -18,63 +18,7 @@ class LogService:
 
     def _generate_initial_logs(self) -> List[Dict[str, Any]]:
         """Pre-populate sample structured log entries."""
-        now = datetime.utcnow()
-        return [
-            {
-                "id": str(uuid.uuid4()),
-                "timestamp": (now - timedelta(seconds=10)).isoformat() + "Z",
-                "level": "INFO",
-                "category": "SYSTEM",
-                "component": "ControlCenterApp",
-                "message": "FastAPI Web Application initialized successfully.",
-                "metadata": {"port": 8000, "protocol": "HTTP/1.1"},
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "timestamp": (now - timedelta(seconds=8)).isoformat() + "Z",
-                "level": "INFO",
-                "category": "AI",
-                "component": "YOLO11Detector",
-                "message": "Model weights loaded successfully (yolo11n.pt). Inference device set to CPU.",
-                "metadata": {"model": "yolo11n.pt", "framework": "PyTorch"},
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "timestamp": (now - timedelta(seconds=6)).isoformat() + "Z",
-                "level": "INFO",
-                "category": "ESP32",
-                "component": "ESP32Interface",
-                "message": "Connected to ESP32 Signal Controller hardware on COM3 @ 115200 baud.",
-                "metadata": {"port": "COM3", "baud": 115200},
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "timestamp": (now - timedelta(seconds=4)).isoformat() + "Z",
-                "level": "INFO",
-                "category": "NODE",
-                "component": "ConnectionManager",
-                "message": "Mobile Camera Node paired: CAM-LANE1-9F8A (North Intersection).",
-                "metadata": {"node_id": "CAM-LANE1-9F8A", "lane": "North"},
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "timestamp": (now - timedelta(seconds=2)).isoformat() + "Z",
-                "level": "WARNING",
-                "category": "AI",
-                "component": "FairnessManager",
-                "message": "South direction queue length exceeded threshold (14.2m). Triggering priority shift.",
-                "metadata": {"lane": "South", "queueLength": 14.2},
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "timestamp": now.isoformat() + "Z",
-                "level": "INFO",
-                "category": "SYSTEM",
-                "component": "SignalScheduler",
-                "message": "Green phase allocated: North approach (25s duration).",
-                "metadata": {"activePhase": "North", "duration": 25},
-            },
-        ]
+        return []
 
     def add_log(
         self,
@@ -87,7 +31,7 @@ class LogService:
         """Record a structured log entry."""
         entry = {
             "id": str(uuid.uuid4()),
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": level.upper(),
             "category": category.upper(),
             "component": component,

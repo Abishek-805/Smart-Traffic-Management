@@ -1,298 +1,149 @@
 # Smart Traffic Management System
 
-An enterprise-grade, real-time AI traffic management system powered by **YOLO11**, **ByteTrack**, **FastAPI**, **Redis**, and **React SCADA UI**.
+A local traffic-monitoring prototype: four Android camera nodes send JPEG samples to
+YOLO26n and independent ByteTrack trackers. FastAPI serves the dashboard, directional
+camera previews, measured telemetry and a simulated adaptive signal controller.
 
----
+**Use only on a trusted LAN.** Camera registration uses an expiring one-time QR
+secret and the server issues a session token for later frames/reconnects. REST
+operator controls still have no login and local WebSockets use cleartext by default.
+Do not expose these ports to the internet or connect this prototype directly to
+public-road signals.
 
-## 1. Overview
+See the [implementation plan](docs/IMPLEMENTATION_PLAN.md),
+[optimization measurements](docs/OPTIMIZATION_REPORT.md) and
+[validation report](docs/VALIDATION_REPORT.md) for scope and remaining checks.
+The [Raspberry Pi deployment guide](docs/RASPBERRY_PI_DEPLOYMENT.md) records the
+edge model choice, NCNN setup, and required accuracy gate.
 
-The **Smart Traffic Management System** is a distributed, real-time computer vision and signal control system designed to optimize urban traffic intersection flow. Mobile edge devices (smartphones running the `traffic-camera-app`) act as wireless traffic sensors, streaming high-frame-rate video feeds to a centralized perception server. The backend runs YOLO11 vehicle detection and ByteTrack object tracking to compute live Passenger Car Equivalent (PCE) queue metrics, dynamic green phase timing, and emergency vehicle priority overrides.
+## Start on Windows
 
----
+Prerequisites: Python 3.12, Node.js 22.12+ with npm, and internet for first installation.
+Use the Python environment in this repository rather than a system Python 3.14 install.
 
-## 2. Architecture
-
-```
-                                  +---------------------------------------+
-                                  |     Mobile Camera App (Android)       |
-                                  |   (Independent App Repository)       |
-                                  +---------------------------------------+
-                                                      |
-                                                      | WebSocket (/ws/camera)
-                                                      v
-                                  +---------------------------------------+
-                                  | WebSocket Server & Perception Engine  |
-                                  |        (FastAPI - Port 8001)          |
-                                  |       - YOLO11 Vehicle Detector       |
-                                  |       - ByteTrack Multi-Object Tracker|
-                                  |       - PCE Queue Density Engine      |
-                                  +---------------------------------------+
-                                                      |
-                                                      | Redis Pub/Sub Event Bus
-                                                      v
-                                  +---------------------------------------+
-                                  |          App REST Backend             |
-                                  |        (FastAPI - Port 8000)          |
-                                  |       - System & Node Management      |
-                                  |       - Analytics & Log Storage       |
-                                  |       - QR Code Pairing Generator     |
-                                  +---------------------------------------+
-                                                      |
-                                                      | HTTP REST & WebSocket (/ws/telemetry)
-                                                      v
-                                  +---------------------------------------+
-                                  |        React + Vite SCADA UI          |
-                                  |          (Port 5173 / Web)            |
-                                  +---------------------------------------+
-```
-
----
-
-## 3. Requirements
-
-- **Operating System**: Windows 10/11, Linux (Ubuntu 20.04+), or macOS (12+)
-- **Python**: Version `3.10` or higher (tested with Python 3.12/3.14)
-- **Node.js**: Version `18.x` or higher
-- **npm**: Version `9.x` or higher
-- **Docker Desktop** *(Optional)*: If running system via containers
-- **Redis Server** *(Optional)*: Required when running without Docker (`redis-server`)
-
----
-
-## 4. Clone Repository
-
-```bash
-git clone https://github.com/Abishek-805/Smart-Traffic-Management.git
-cd Smart-Traffic-Management
-```
-
----
-
-## 5. Python Virtual Environment
-
-### Windows (PowerShell / Command Prompt)
+From PowerShell in this repository:
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\activate
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+.\start.ps1 -Lan
 ```
 
-### Linux / macOS (Bash / Zsh)
+This creates `.venv`, installs Python dependencies, runs `npm ci` and builds the web
+UI, then starts the combined service at **http://localhost:8000**. No Redis, Docker
+or demo videos are required. The first install includes PyTorch and can take time.
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
+If Python is not registered with the Windows Python launcher:
 
----
-
-## 6. Development Dependencies
-
-For running unit tests, end-to-end simulation suites, and test runners:
-
-```bash
-pip install -r requirements-dev.txt
-```
-
----
-
-## 7. Environment Configuration
-
-Copy `.env.example` to create your local `.env` configuration file:
-
-### Windows (PowerShell)
 ```powershell
-Copy-Item .env.example .env
+.\start.ps1 -Lan -PythonPath 'C:\path\to\Python312\python.exe'
 ```
 
-### Linux / macOS
-```bash
-cp .env.example .env
+Subsequent starts can use `.\start.ps1 -Lan -SkipInstall`. Omit `-Lan` for
+computer-only access. If PowerShell blocks a downloaded script, review it and use
+`powershell -ExecutionPolicy Bypass -File .\start.ps1 -Lan` for this invocation;
+there is no need to change the machine's execution policy.
+
+Python-only launch after installation and web build:
+
+```powershell
+.\.venv\Scripts\python.exe run.py --host 0.0.0.0 --port 8000
 ```
 
-### Key Environment Variables
+## Connect the Android apps
 
-| Variable | Default Value | Description |
-| :--- | :--- | :--- |
-| `PORT` | `8000` | Port for REST App Backend |
-| `WEBSOCKET_SERVER_PORT` | `8001` | Port for WebSocket & AI Server |
-| `REDIS_URL` | `redis://localhost:6379` | Redis connection URL for Pub/Sub event bus |
-| `HOST` | `0.0.0.0` | Bind host for server processes |
-| `DEBUG` | `true` | Enable detailed debug logs |
-| `VITE_API_BASE` | `http://localhost:8000/api/v1` | SCADA UI target REST API URL |
-| `VITE_WS_URL` | `ws://localhost:8001/ws/telemetry` | SCADA UI target telemetry WebSocket |
-| `VITE_CAMERA_WS_URL` | `ws://localhost:8001/ws/camera` | Mobile camera streaming WebSocket |
+The app source is the sibling `traffic-camera-app` repository. It needs a native
+Android build; **Expo Go cannot run the VisionCamera/Nitro streaming implementation**.
 
----
+1. Put laptop and phones on the same trusted Wi-Fi network.
+2. Start with `-Lan`. Allow the Python process through Windows Firewall on your
+   private network if Windows asks. Do not disable the firewall.
+3. Open **Live Cameras → Pair Camera Node**, select North/East/South/West and generate
+   that direction's QR. Scan a different direction on each phone.
+4. Verify that both a connection and **fresh frames** appear. A registered node alone
+   does not prove that its camera is capturing.
+5. Use Start/Stop to control all nodes, or Disconnect Slot to disconnect a direction.
 
-## 8. Web UI Installation
+The combined service uses port **8000 for both REST and camera WebSocket**.
+Phone `localhost` means the phone itself. When automatic address selection chooses
+the wrong adapter, put `CAMERA_PUBLIC_HOST=YOUR_LAPTOP_LAN_IP` in a root `.env` file.
+Generate new QR codes after changing the address or port.
 
-```bash
-cd web-ui
-npm ci
-cd ..
+## Architecture and data meanings
+
+```text
+Android JPEG samples -> /ws/camera -> latest frame per direction
+  -> shared configurable YOLO detector -> independent per-camera ByteTrack
+  -> vehicle state / PCE / waiting estimates -> simulated scheduler
+  -> /ws/telemetry + /api/v1/cameras/{direction}/feed -> React dashboard
 ```
 
----
+- Mobile profiles target 2 (low power) or 4 (balanced) JPEG samples/second per
+  phone, with a 640-pixel default longest edge and preserved aspect ratio. One
+  processed frame is allowed in flight. This is not a 30 FPS video transport.
+- Each camera covers **one approach**. All detected supported vehicles in its frame
+  belong to that approach. Aim/crop cameras accordingly; arbitrary quadrant ROIs
+  are no longer drawn on approach feeds.
+- Live vehicles are current tracked objects. Session counts are confirmed track
+  observations, not daily totals, unique citywide vehicles or crossing-line counts.
+- Queue is stopped vehicles; wait is estimated maximum stopped time; PCE is a
+  weighted vehicle count. Camera movement and occlusion can affect these estimates.
+- Displayed priority is the scheduler's score for the current decision, including
+  fairness, rather than a separate invented dashboard formula.
+- Each direction becomes stale independently after 3 seconds without a processed
+  frame. Missing input shows unavailable/offline; it does not silently play demo video.
+- Signal timing advances independently of incoming frames. The dashboard shows
+  all-red when stopped or when all camera input is unavailable.
+- Battery, signal strength and device temperature remain unavailable unless measured.
+  Historical charts and efficiency improvement are not fabricated.
+- Settings Save applies confidence and green-time limits to the runtime. Timing
+  limits take effect at the next phase. Runtime settings reset on server restart;
+  theme and notification preferences stay in the browser.
 
-## 9. Run with Docker
+The supplied COCO model supports cars, motorcycles, buses and trucks. Emergency
+recognition and reinforcement learning are **not implemented**. ESP32 is kept in
+simulation in the combined and split web runtimes.
 
-To build and launch the complete stack (Redis, REST Backend, WebSocket AI Server, and Web UI SCADA Frontend) in Docker:
+## Optional split deployment
 
-```bash
+Docker Compose defines Redis, REST on 8000, camera/telemetry WebSocket on 8001,
+and Vite on 5173. Stop the combined server before using the same REST port.
+
+```powershell
+$env:CAMERA_PUBLIC_HOST = 'YOUR_LAPTOP_LAN_IP'
 docker compose up --build
 ```
 
-### Docker Services & Port Mappings
+Open http://localhost:5173. This topology uses retained Redis snapshots and JPEGs
+with expiration, plus acknowledged runtime commands; it does not create a second
+perception pipeline in the REST process. Redis connection recovery is automatic.
+Docker was not available on the repair machine; the shared Redis contract was
+tested with fakeredis, not a running Docker deployment.
 
-- **Redis Server**: `localhost:6379`
-- **App Backend (REST API)**: `http://localhost:8000` (Docs: `http://localhost:8000/docs`)
-- **WebSocket / AI Server**: `ws://localhost:8001` (Docs: `http://localhost:8001/docs`)
-- **Web UI SCADA Dashboard**: `http://localhost:5173`
+For UI development against the combined server:
 
-To stop all services:
-```bash
-docker compose down
-```
-
----
-
-## 10. Run Without Docker
-
-If running locally on your host machine, start each service in a separate terminal window:
-
-### Terminal 1: Redis Server
-*(Skip if Redis service is already running on port 6379)*
-```bash
-redis-server
-```
-
-### Terminal 2: App Backend (Port 8000)
-```bash
-cd app-backend
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### Terminal 3: WebSocket + AI Perception Server (Port 8001)
-```bash
-cd websocket-server
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
-```
-
-
-### Terminal 4: Web UI SCADA Frontend
-```bash
+```powershell
 cd web-ui
 npm run dev
 ```
 
----
+The development server defaults to the combined backend and WebSocket runtime on
+8000. Set `VITE_WS_TARGET=ws://localhost:8001` only for the split deployment.
+Browser API and WebSocket URLs are relative so the dashboard also works from another computer.
 
-## 11. API Endpoints
+## Validate
 
-The App Backend provides OpenAPI/Swagger documentation at `http://localhost:8000/docs`.
-
-### Core REST Endpoints (`/api/v1`)
-
-- `GET /api/v1/system/health`: System health metrics (CPU, RAM, latency, status)
-- `GET /api/v1/system/status`: Intersection operational status & signal phase info
-- `POST /api/v1/system/start`: Start AI perception engine processing loop
-- `POST /api/v1/system/stop`: Pause AI perception engine processing loop
-- `GET /api/v1/cameras`: Query active camera configuration and feeds
-- `GET /api/v1/mobile-nodes`: List connected edge camera nodes and metrics
-- `GET /api/v1/analytics`: Query vehicle flow totals, PCE queue trends, and phase efficiency
-- `GET /api/v1/logs`: System logs with category, level, and keyword filtering
-- `GET /api/v1/qr/generate?direction=north`: Generate QR code pairing payload and Base64 image for mobile pairing
-
----
-
-## 12. WebSocket Endpoints
-
-The WebSocket Server operates on **Port 8001**:
-
-### 1. Camera Video Streaming Endpoint
-- **URL**: `ws://<SERVER_IP>:8001/ws/camera`
-- **Protocol Flow**:
-  1. **REGISTER_CAMERA** (Mobile → Server): Mobile client connects and sends JSON registration payload containing `node_id`, `camera_direction` (`north`, `south`, `east`, `west`), `resolution`, `fps`, and device details.
-  2. **REGISTRATION_ACK** (Server → Mobile): Server acknowledges registration with status `CONNECTED` and returns `session_token`.
-  3. **START_STREAM** (Server → Mobile): Server sends `START_STREAM` signal instructing mobile device to start capturing and sending frames.
-  4. **VIDEO_FRAME** (Mobile → Server): Mobile client streams structured JSON `VIDEO_FRAME` messages containing `frame_id`, approach `direction`, Base64-encoded JPEG image string in `payload.frame_data`, `capture_timestamp`, and `upload_timestamp`.
-
-### 2. SCADA Telemetry Stream Endpoint
-- **URL**: `ws://<SERVER_IP>:8001/ws/telemetry`
-- **Description**: Streams live JSON `SystemStatusUpdated` telemetry snapshots (PCE queue metrics, signal phase states, bounding boxes, system health) to connected SCADA dashboards at 30 FPS.
-
-
----
-
-## 13. Mobile Camera Connection
-
-The mobile Android application (`traffic-camera-app`) is an **independent separate repository** and mobile client. It connects to this backend via WebSockets.
-
-### Connecting a Mobile Device:
-
-1. Connect your Android device to the same Wi-Fi / Local Area Network as your server laptop.
-2. Determine your laptop's local IP address (`ipconfig` on Windows or `ifconfig` / `ip a` on Linux/macOS). Example: `192.168.1.100`.
-3. Open the `traffic-camera-app` on the phone.
-4. Scan the QR code generated by the Web UI (`http://localhost:5173/settings` or via `http://localhost:8000/api/v1/qr/generate?direction=NORTH`) or manually input the WebSocket URL:
-   ```
-   ws://192.168.1.100:8001/ws/camera
-   ```
-5. Assign a distinct approach direction to each phone:
-   - Phone 1: `NORTH`
-   - Phone 2: `SOUTH`
-   - Phone 3: `EAST`
-   - Phone 4: `WEST`
-
----
-
-## 14. Multi-Camera Architecture
-
-- **Independent WebSocket Sockets**: Each mobile node opens a dedicated WebSocket connection on `/ws/camera`.
-- **Directional Isolation**: Frame processors run in isolated queues indexed by approach direction (`NORTH`, `SOUTH`, `EAST`, `WEST`).
-- **ByteTrack Multi-Object Tracking**: Vehicle trajectories and track IDs are calculated per approach feed independently, ensuring no track ID collision occurs across approaches.
-- **Aggregated PCE Queue Computation**: The Signal Scheduler combines vehicle counts, vehicle classes (cars, buses, emergency vehicles), and approach wait times to calculate dynamic green phase allocations.
-
----
-
-## 15. Testing & Build Verification
-
-### Backend Pytest Suite
-Run all unit and integration tests from the repository root:
-
-```bash
-python -m pytest
-```
-
-*Expected output: All 41 tests pass.*
-
-### Frontend Production Build
-Verify that the React SCADA frontend compiles cleanly:
-
-```bash
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q --timeout=60
+.\.venv\Scripts\python.exe scripts/smoke_runtime.py
+.\.venv\Scripts\python.exe scripts/benchmark_runtime.py --pid SERVER_PID --videos videos --seconds 60 --fps 4 --output docs/benchmarks/local-four.json
+# When a labelled project dataset is available:
+.\.venv\Scripts\python.exe scripts/evaluate_detector.py --data path/to/traffic.yaml
 cd web-ui
 npm run build
+npm audit
 ```
 
----
-
-## 16. Troubleshooting
-
-| Issue | Root Cause | Solution |
-| :--- | :--- | :--- |
-| **Port 8000 or 8001 in use** | Another process is bound to port 8000 or 8001 | Stop conflicting processes (`taskkill /F /IM python.exe` on Windows or `fuser -k 8000/tcp` on Linux). |
-| **Redis connection refused** | Redis server is not running locally | Ensure Redis container is up (`docker compose up redis -d`) or start `redis-server` locally. |
-| **Python `ModuleNotFoundError`** | Package not installed or virtual environment unactivated | Activate virtual environment (`source .venv/bin/activate` or `.\.venv\Scripts\activate`) and run `pip install -r requirements.txt`. |
-| **Phone cannot connect to WebSocket** | Windows Firewall blocking port 8001 or incorrect IP | Allow Python / Port 8001 in Windows Defender Firewall rules and verify phone and laptop are on the same Wi-Fi subnet. |
-| **YOLO model missing** | `yolo11n.pt` not found in root or `models/` | Ultralytics automatically downloads `yolo11n.pt` on initial launch when connected to the internet. |
-| **`npm.ps1` execution error on Windows** | PowerShell Execution Policy restricts script execution | Run `cmd /c npm ci` or set execution policy via `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`. |
-
----
-
-## License
-
-Distributed under the MIT License. See `LICENSE` for details.
+Run the smoke test with the combined service already listening on 8000. It creates
+four temporary synthetic camera clients, checks independent staleness and exercises
+Stop/Start; run it when no real phones are connected. It does not measure detector
+accuracy. Physical phone capture/endurance and annotated traffic accuracy tests
+remain required; see the validation report.

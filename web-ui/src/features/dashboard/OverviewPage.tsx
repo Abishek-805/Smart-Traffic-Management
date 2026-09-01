@@ -9,7 +9,6 @@ export const OverviewPage: React.FC = () => {
 
   const handleSelectLane = (direction: string) => {
     setSelectedDirection(direction as DirectionType);
-    console.log(`Lane selected: ${direction}`);
   };
 
   return (

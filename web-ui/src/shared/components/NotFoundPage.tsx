@@ -24,7 +24,7 @@ export const NotFoundPage: React.FC = () => {
           width: '100%',
           padding: '32px',
           textAlign: 'center',
-          backgroundColor: '#161b22',
+          backgroundColor: 'var(--bg-secondary)',
           border: '1px solid #30363d',
           borderRadius: '8px',
           boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
@@ -44,7 +44,7 @@ export const NotFoundPage: React.FC = () => {
         >
           <AlertTriangle size={28} color="#f59e0b" />
         </div>
-        <h2 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '8px', color: '#ffffff' }}>
+        <h2 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '8px', color: 'var(--text-main)' }}>
           404 — Page Not Found
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '24px', lineHeight: 1.5 }}>
@@ -57,7 +57,7 @@ export const NotFoundPage: React.FC = () => {
             alignItems: 'center',
             gap: '8px',
             backgroundColor: 'var(--color-primary)',
-            color: '#ffffff',
+            color: 'var(--text-main)',
             border: 'none',
             borderRadius: '6px',
             padding: '10px 20px',

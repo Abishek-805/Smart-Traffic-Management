@@ -8,7 +8,7 @@ import { UserSettings } from '../types';
 
 const defaultSettings: UserSettings = {
   theme: 'dark',
-  confidenceThreshold: 0.5,
+  confidenceThreshold: 0.35,
   minGreenTime: 10,
   maxGreenTime: 60,
   comPort: 'COM3',

@@ -99,7 +99,7 @@ class CountStabilizer:
         self.metrics = StabilityMetrics()
 
         # Report log entries (written on flush)
-        self._report_entries: List[Dict[str, Any]] = []
+        self._report_entries = deque(maxlen=256)
 
         logger.info(
             f"CountStabilizer initialized (EMA alpha={self.alpha}, "
@@ -284,7 +284,7 @@ class CountStabilizer:
                 "|-----------|------|-----------|----------------|------------|----------|",
             ]
 
-            for entry in self._report_entries[-100:]:  # Keep last 100 entries
+            for entry in list(self._report_entries)[-100:]:  # Keep last 100 entries
                 ts_str = time.strftime('%H:%M:%S', time.localtime(entry["timestamp"]))
                 for lane_name, lane_data in entry["lanes"].items():
                     lines.append(

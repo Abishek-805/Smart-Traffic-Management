@@ -21,12 +21,13 @@ export const Header: React.FC = () => {
 
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
 
-  const activePhase = telemetry?.activePhase || 'North';
+  const activePhase = telemetry?.activePhase || 'None';
   const remainingSeconds = telemetry?.timeRemaining !== undefined ? telemetry.timeRemaining : 0;
   const operatingMode = telemetry?.operatingMode || health?.operating_mode || 'AUTOMATIC';
 
-  const isAiHealthy = health?.components?.ai?.status === 'HEALTHY' || (isConnected && Boolean(telemetry));
-  const aiFps = health?.components?.ai?.fps || (telemetry?.frameAgeMs && telemetry.frameAgeMs > 0 ? Math.min(60, Math.round(1000 / telemetry.frameAgeMs)) : 0);
+  const isAiHealthy = isConnected && telemetry?.pipelineHealthy === true;
+  const aiFps = health?.components?.ai?.fps ?? 0;
+  const detectorLabel = health?.components?.ai?.model || 'DETECTOR';
 
   const esp32Comp = health?.components?.esp32;
   const isEsp32Connected = Boolean(esp32Comp?.connected);
@@ -81,12 +82,14 @@ export const Header: React.FC = () => {
 
   return (
     <>
-      <header
+      <header className="operator-header"
         style={{
-          height: '42px',
-          maxHeight: '42px',
-          backgroundColor: '#161b22',
-          borderBottom: '1px solid #30363d',
+          minHeight: '42px',
+          flexShrink: 0,
+          flexWrap: 'wrap',
+          gap: '8px',
+          backgroundColor: 'var(--bg-secondary)',
+          borderBottom: '1px solid var(--border-color)',
           padding: '0 12px',
           display: 'flex',
           alignItems: 'center',
@@ -98,25 +101,25 @@ export const Header: React.FC = () => {
       >
         {/* Left Section: Current Phase | Countdown | Operating Mode */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#0d1117', padding: '3px 8px', borderRadius: '3px', border: '1px solid #30363d' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'var(--bg-primary)', padding: '3px 8px', borderRadius: '3px', border: '1px solid #30363d' }}>
             <Shield size={13} color="#10b981" />
-            <span style={{ fontWeight: 800, color: '#ffffff', letterSpacing: '0.04em' }}>SCADA TCC</span>
+            <span style={{ fontWeight: 800, color: 'var(--text-main)', letterSpacing: '0.04em' }}>SCADA TCC</span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', padding: '3px 8px', borderRadius: '3px' }}>
-            <span style={{ color: '#10b981', fontWeight: 800 }}>GREEN:</span>
-            <span style={{ color: '#ffffff', fontWeight: 800, textTransform: 'uppercase' }}>{activePhase}</span>
+            <span style={{ color: '#10b981', fontWeight: 800 }}>{telemetry?.signalState || 'PHASE'}:</span>
+            <span style={{ color: 'var(--text-main)', fontWeight: 800, textTransform: 'uppercase' }}>{activePhase}</span>
           </div>
 
-          <div className="font-mono-num" style={{ backgroundColor: '#21262d', color: '#58a6ff', border: '1px solid #30363d', padding: '3px 8px', borderRadius: '3px', fontWeight: 800, fontSize: '11px' }}>
+          <div className="font-mono-num" style={{ backgroundColor: 'var(--bg-surface)', color: '#58a6ff', border: '1px solid #30363d', padding: '3px 8px', borderRadius: '3px', fontWeight: 800, fontSize: '11px' }}>
             ⏱ {remainingSeconds}s
           </div>
 
           <span
             style={{
-              backgroundColor: operatingMode === 'EMERGENCY_OVERRIDE' ? 'rgba(239,68,68,0.2)' : '#21262d',
-              color: operatingMode === 'EMERGENCY_OVERRIDE' ? '#ef4444' : '#c9d1d9',
-              border: `1px solid ${operatingMode === 'EMERGENCY_OVERRIDE' ? '#ef4444' : '#30363d'}`,
+              backgroundColor: operatingMode === 'EMERGENCY_OVERRIDE' ? 'rgba(239,68,68,0.2)' : 'var(--bg-surface)',
+              color: operatingMode === 'EMERGENCY_OVERRIDE' ? '#ef4444' : 'var(--text-secondary)',
+              border: `1px solid ${operatingMode === 'EMERGENCY_OVERRIDE' ? '#ef4444' : 'var(--border-color)'}`,
               padding: '3px 6px',
               borderRadius: '3px',
               fontWeight: 800,
@@ -128,26 +131,26 @@ export const Header: React.FC = () => {
         </div>
 
         {/* Center Section: WebSocket | YOLO | ESP32 | System Health */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#0d1117', padding: '3px 10px', borderRadius: '3px', border: '1px solid #30363d' }} className="font-mono-num">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'var(--bg-primary)', padding: '3px 10px', borderRadius: '3px', border: '1px solid #30363d' }} className="font-mono-num">
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Radio size={11} color={isConnected ? '#10b981' : '#ef4444'} />
-            <span style={{ color: '#8b949e' }}>WS:</span>
+            <span style={{ color: 'var(--text-muted)' }}>WS:</span>
             <span style={{ color: isConnected ? '#10b981' : '#ef4444', fontWeight: 800 }}>{isConnected ? 'ONLINE' : 'OFFLINE'}</span>
           </div>
 
-          <span style={{ color: '#30363d' }}>|</span>
+          <span style={{ color: 'var(--border-color)' }}>|</span>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Cpu size={11} color="#bc8cff" />
-            <span style={{ color: '#8b949e' }}>YOLO11:</span>
-            <span style={{ color: isAiHealthy ? '#10b981' : '#f59e0b', fontWeight: 800 }}>{isAiHealthy ? `${aiFps > 0 ? aiFps.toFixed(0) : 'ACTIVE'} FPS` : 'FAULT'}</span>
+            <span style={{ color: 'var(--text-muted)' }}>{detectorLabel}:</span>
+            <span style={{ color: isAiHealthy ? '#10b981' : '#f59e0b', fontWeight: 800 }}>{isAiHealthy ? `${aiFps > 0 ? aiFps.toFixed(0) : 'ACTIVE'} FPS` : 'WAITING FOR FRAMES'}</span>
           </div>
 
-          <span style={{ color: '#30363d' }}>|</span>
+          <span style={{ color: 'var(--border-color)' }}>|</span>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Video size={11} color="#58a6ff" />
-            <span style={{ color: '#8b949e' }}>ESP32:</span>
+            <span style={{ color: 'var(--text-muted)' }}>ESP32:</span>
             <span style={{ color: esp32StatusColor, fontWeight: 800 }}>{esp32StatusLabel}</span>
           </div>
         </div>
@@ -158,7 +161,7 @@ export const Header: React.FC = () => {
             onClick={handleStart}
             disabled={startMutation.isPending || stopMutation.isPending || restartMutation.isPending}
             style={{
-              backgroundColor: '#161b22',
+              backgroundColor: 'var(--bg-secondary)',
               color: '#10b981',
               border: '1px solid #30363d',
               borderRadius: '3px',
@@ -188,7 +191,7 @@ export const Header: React.FC = () => {
             onClick={handleStop}
             disabled={startMutation.isPending || stopMutation.isPending || restartMutation.isPending}
             style={{
-              backgroundColor: '#161b22',
+              backgroundColor: 'var(--bg-secondary)',
               color: '#ef4444',
               border: '1px solid #30363d',
               borderRadius: '3px',
@@ -218,7 +221,7 @@ export const Header: React.FC = () => {
             onClick={handleRestart}
             disabled={startMutation.isPending || stopMutation.isPending || restartMutation.isPending}
             style={{
-              backgroundColor: '#161b22',
+              backgroundColor: 'var(--bg-secondary)',
               color: '#58a6ff',
               border: '1px solid #30363d',
               borderRadius: '3px',
@@ -262,14 +265,14 @@ export const Header: React.FC = () => {
             }}
             title="Emergency control is unavailable on the backend. Feature is simulation-only."
           >
-            <AlertTriangle size={11} /> EMERGENCY (SIM ONLY)
+            <AlertTriangle size={11} /> EMERGENCY UNAVAILABLE
           </button>
 
           <button
             onClick={() => setIsDiagnosticsOpen(true)}
             style={{
-              backgroundColor: '#21262d',
-              color: '#c9d1d9',
+              backgroundColor: 'var(--bg-surface)',
+              color: 'var(--text-secondary)',
               border: '1px solid #30363d',
               borderRadius: '3px',
               padding: '3px 8px',

@@ -27,9 +27,10 @@ export async function apiFetch<T>(
   };
 
   try {
-    const res = await fetch(url, { ...options, headers });
+    const res = await fetch(url, { ...options, headers, signal: options.signal ?? AbortSignal.timeout(10000) });
     if (!res.ok) {
-      throw new ApiError(`HTTP Error ${res.status}: ${res.statusText}`, `HTTP_${res.status}`);
+      const body = await res.json().catch(() => ({}));
+      throw new ApiError(body.detail || `HTTP ${res.status}: ${res.statusText}`, `HTTP_${res.status}`);
     }
 
     const payload: ApiResponse<T> = await res.json();

@@ -6,6 +6,7 @@ Traffic Analytics, and Adaptive Signal Decision Engine layers using structured d
 from pathlib import Path
 from typing import Optional, Union, Dict, Any, List
 import time
+import math
 import cv2
 import numpy as np
 
@@ -44,12 +45,11 @@ logger = get_logger("TrafficPipeline")
 class TrafficPipeline:
     """
     Production multi-camera execution pipeline connecting 4-Camera Ingestion,
-    Perception (single YOLO11+ByteTrack forward pass per frame), Traffic Analytics
+    Perception (single configured YOLO+ByteTrack forward pass per frame), Traffic Analytics
     (Lane, Vehicle State, PCE, Queue), and Adaptive Signal Decision Engine.
 
-    Phase 3 architecture: VehicleDetector.detect_and_track() performs exactly one
-    YOLO inference per frame, returning detections with track_ids. ByteTracker.update()
-    is a tracking-only pass-through — it never invokes the model.
+    One shared detector performs one inference per frame. Independent ByteTrack
+    instances associate detections within each camera without invoking the model.
     """
 
     def __init__(
@@ -58,11 +58,13 @@ class TrafficPipeline:
         video_source: Optional[Union[str, Path, int]] = None,
         save_output: bool = True,
         output_path: Optional[Path] = None,
+        headless: bool = False,
     ):
         logger.info("Initializing Smart Traffic Management System Pipeline...")
 
         # Thread Safety Re-entrant Lock & Per-Lane Locks
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        self.headless = headless
         self._lane_locks: Dict[str, threading.Lock] = {
             "north": threading.Lock(),
             "south": threading.Lock(),
@@ -76,7 +78,7 @@ class TrafficPipeline:
         elif video_source is not None:
             self.camera_manager = CameraManager(config=video_source)
         else:
-            self.camera_manager = CameraManager(config=STREAM_CONFIG)
+            self.camera_manager = CameraManager(config={})
 
         # 2. Perception & Analytics Layer (Shared Vision Model, Per-Lane Trackers & State Managers)
         self.model_manager = ModelManager()
@@ -161,14 +163,9 @@ class TrafficPipeline:
         Per-lane processing locks ensure independent camera streams execute perception
         and analytics concurrently without global worker serialization.
         """
-        if frames_data and len(frames_data) == 1:
-            lane_key = next(iter(frames_data.keys())).lower()
-            lock = self._lane_locks.get(lane_key, self._lock)
-            with lock:
-                return self._process_step_unlocked(frames_data=frames_data)
-        else:
-            with self._lock:
-                return self._process_step_unlocked(frames_data=frames_data)
+        # Perception and scheduler share mutable state. YOLO already serializes inference.
+        with self._lock:
+            return self._process_step_unlocked(frames_data=frames_data)
 
     def _process_step_unlocked(
         self, frames_data: Optional[Dict[str, Dict[str, Any]]] = None
@@ -177,7 +174,7 @@ class TrafficPipeline:
         if frames_data is None:
             frames_data = self.camera_manager.read_all()
 
-        if not frames_data:
+        if not frames_data and not self.active_decision:
             return PipelineResult(has_frame=False)
 
         lane_results: Dict[str, LaneProcessingResult] = {}
@@ -221,24 +218,22 @@ class TrafficPipeline:
                 resolution = payload.get("resolution", (1280, 720))
                 self._init_lane_components(lane_name, resolution)
 
-            # Step 1+2: Unified Perception — single YOLO forward pass (detect + ByteTrack in one call)
-            # detect_and_track() calls model.track() exactly once, returning detections with track_ids.
-            # ByteTracker.update() below is a tracking-only pass-through — no second inference.
-            tracked_detections, inference_ms = self.detector.detect_and_track(
+            # One detection pass; each camera associates tracks independently.
+            tracked_detections, inference_ms = self.detector.detect(
                 frame, frame_number=frame_num, timestamp=timestamp
             )
             max_inference_ms = max(max_inference_ms, inference_ms)
 
-            # Step 2: ByteTracker validation pass (tracking-only, no model inference)
+            # Association consumes detections without another inference pass.
             tracked_detections = self.trackers[lane_name].update(
                 tracked_detections, frame=frame, frame_number=frame_num, timestamp=timestamp
             )
 
-            # Step 3: Analytics (Geometric Lane Assignment — resolution-aware via normalized polygons)
+            # Step 3: Bind observations to the registered approach.
             w_f, h_f = frame.shape[1], frame.shape[0]
-            lane_detections = self.lane_managers[lane_name].assign_lanes(
-                tracked_detections, frame_width=w_f, frame_height=h_f
-            )
+            # Each camera watches a single approach, not a bird's-eye intersection.
+            from dataclasses import replace
+            lane_detections = [replace(d, lane=lane_name.capitalize()) for d in tracked_detections]
 
             # Step 4: Analytics (Vehicle Motion Tracking for this camera direction)
             enriched_detections = self.state_managers[lane_name].update(
@@ -273,7 +268,7 @@ class TrafficPipeline:
             annotated_tile = self.visualizer.draw(
                 frame=frame,
                 detections=enriched_detections,
-                lane_manager=self.lane_managers[lane_name],
+                lane_manager=None,  # One camera covers one approach; no arbitrary quadrant ROIs.
                 lane_stats=stats_map,
                 source_fps=fps,
             )
@@ -297,6 +292,8 @@ class TrafficPipeline:
         ctx = ApplicationContext.get_instance()
         now_mono = time.monotonic()
 
+        lane_stats_map = self.count_stabilizer.stabilize(lane_stats_map, timestamp=time.time()) if lane_stats_map else {}
+
         # Update persistent history with fresh lane stats
         for l_name, l_stat in lane_stats_map.items():
             ctx.lane_stats_history[l_name] = l_stat
@@ -312,7 +309,7 @@ class TrafficPipeline:
             elif l_name in ctx.lane_stats_history:
                 hist_stat = ctx.lane_stats_history[l_name]
                 last_seen = ctx.lane_last_seen.get(l_name, 0.0)
-                if now_mono - last_seen > 15.0:
+                if now_mono - last_seen > 3.0:
                     # 15s Stale Decay: clear vehicle queue metrics for offline camera feed
                     decayed_stat = LaneStatistics(
                         lane_name=hist_stat.lane_name,
@@ -335,7 +332,6 @@ class TrafficPipeline:
         # Apply EMA smoothing to lane counts before scheduler evaluation.
         # This prevents scheduler flicker from one-frame detection noise,
         # temporary occlusions, or track ID switches.
-        lane_stats_map = self.count_stabilizer.stabilize(lane_stats_map, timestamp=time.time())
 
         total_intersection_vehicles = sum(s.live_count for s in lane_stats_map.values())
         intersection_state = IntersectionState(
@@ -343,7 +339,7 @@ class TrafficPipeline:
             timestamp=time.time(),
             total_vehicles=total_intersection_vehicles,
             active_phase_id=self.phase_counter,
-            green_lane=str(self.active_decision.green_lane) if self.active_decision else None,
+            green_lane=self.active_decision.green_lane.value if self.active_decision else None,
         )
 
         # Step 6: Signal Decision Engine Execution
@@ -354,12 +350,12 @@ class TrafficPipeline:
 
         is_phase_expired = (
             self.active_decision is None
-            or elapsed_sec >= (self.active_decision.green_duration_sec + self.active_decision.yellow_duration_sec)
+            or elapsed_sec >= (self.active_decision.green_duration_sec + self.active_decision.yellow_duration_sec + 1)
         )
 
         is_phase_change = False
 
-        if is_phase_expired or has_emergency:
+        if is_phase_expired or (has_emergency and self.active_decision and self.active_decision.reason.value != "EMERGENCY"):
             old_phase = self.active_decision.green_lane if self.active_decision else "None"
             is_phase_change = True
             self.phase_counter += 1
@@ -375,10 +371,19 @@ class TrafficPipeline:
                 fairness_priority_result, lane_stats_map
             )
 
-            # Signal Scheduler
-            self.active_decision = self.signal_scheduler.schedule(
-                final_priority_result, phase_id=self.phase_counter
-            )
+            fresh_lanes = {name for name in lane_stats_map if now_mono - ctx.lane_last_seen.get(name, 0) < 3}
+            final_priority_result, starvation = self.signal_scheduler.select_eligible(
+                final_priority_result, lane_stats_map, fresh_lanes, self.fairness_manager.cycles_since_served)
+            if final_priority_result is None:
+                self.active_decision = None
+                self.active_hardware_cmd = None
+                return PipelineResult(has_frame=bool(frames_data), lane_stats=lane_stats_map,
+                    intersection_state=intersection_state, signal_state="ALL_RED")
+            self.active_decision = self.signal_scheduler.schedule(final_priority_result, phase_id=self.phase_counter)
+            if starvation:
+                from ai.signal.signal_types import DecisionReason
+                self.active_decision.reason = DecisionReason.STARVATION
+                self.active_decision.reason_details = "Bounded waiting: serving a fresh approach after three waiting phases"
             self.last_priority_result = final_priority_result
             self.phase_start_time = current_mono_time
 
@@ -404,10 +409,10 @@ class TrafficPipeline:
         remaining_green_sec = 0
         if self.active_decision:
             green_duration = self.active_decision.green_duration_sec
-            remaining_green_sec = max(0, int(round(green_duration - (current_mono_time - self.phase_start_time))))
+            remaining_green_sec = max(0, int(math.ceil(green_duration - (current_mono_time - self.phase_start_time))))
 
         intersection_state.active_phase_id = self.phase_counter
-        intersection_state.green_lane = str(self.active_decision.green_lane) if self.active_decision else None
+        intersection_state.green_lane = self.active_decision.green_lane.value if self.active_decision else None
         intersection_state.remaining_green_sec = remaining_green_sec
 
         # Pipeline Health Diagnostics
@@ -423,10 +428,11 @@ class TrafficPipeline:
             remaining_time_sec=remaining_green_sec,
         )
 
-        self.stats.record_frame(max_inference_ms)
+        if frames_data:
+            self.stats.record_frame(max_inference_ms)
 
         # Render MultiCameraDashboard composite canvas
-        composite_dashboard = self.dashboard.render(
+        composite_dashboard = None if self.headless else self.dashboard.render(
             stream_data=frames_data,
             intersection_state=lane_stats_map,
             signal_decision=self.active_decision,
@@ -462,6 +468,9 @@ class TrafficPipeline:
             hardware_command=self.active_hardware_cmd,
             health=health,
             remaining_green_sec=remaining_green_sec,
+            signal_state=("GREEN" if current_mono_time - self.phase_start_time < self.active_decision.green_duration_sec
+                else "YELLOW" if current_mono_time - self.phase_start_time < self.active_decision.green_duration_sec + self.active_decision.yellow_duration_sec
+                else "ALL_RED") if self.active_decision else "ALL_RED",
             is_phase_change=is_phase_change,
             latency_metrics=latency_metrics,
             stability_metrics=self.count_stabilizer.metrics.to_dict(),

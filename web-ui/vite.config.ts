@@ -5,22 +5,14 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const backendTarget = env.VITE_BACKEND_TARGET || 'http://localhost:8000';
-  const wsTarget = backendTarget.replace(/^http/, 'ws');
+  // Local development uses the combined runtime unless split deployment is
+  // explicitly selected with VITE_WS_TARGET=ws://localhost:8001.
+  const wsTarget = env.VITE_WS_TARGET || backendTarget.replace(/^http/, 'ws');
 
   return {
     plugins: [react()],
-    build: {
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-            'vendor-recharts': ['recharts'],
-            'vendor-icons': ['lucide-react'],
-          },
-        },
-      },
-    },
     server: {
+      host: '0.0.0.0',
       port: 5173,
       proxy: {
         '/api': {

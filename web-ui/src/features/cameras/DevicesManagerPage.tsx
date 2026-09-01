@@ -4,7 +4,8 @@
  * Delegates rendering to VideoWall + InspectorPanel sub-components.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { apiFetch } from '../../services/api/client';
 import { VideoWall } from '../devices/VideoWall';
 import { InspectorPanel } from '../devices/InspectorPanel';
 import { InlineQRPairing } from '../devices/InlineQRPairing';
@@ -17,26 +18,18 @@ export const DevicesManagerPage: React.FC = () => {
   const { refetch: refetchNodes } = useMobileNodes();
   const { addToast } = useNotifications();
 
-  const [connectedCams, setConnectedCams] = useState<string[]>([]);
+  const connectedCams = Object.entries(configData?.streams ?? {}).filter(([, c]) => c.status === 'CONNECTED').map(([d]) => d);
   const [selectedDirection, setSelectedDirection] = useState<string>('north');
   const [showQRPairing, setShowQRPairing] = useState<boolean>(false);
 
-  useEffect(() => {
-    const cams = localStorage.getItem('scc_connected_cameras');
-    if (cams) {
-      setConnectedCams(JSON.parse(cams));
-    } else {
-      const defaultCams = ['north', 'south', 'east', 'west'];
-      setConnectedCams(defaultCams);
-      localStorage.setItem('scc_connected_cameras', JSON.stringify(defaultCams));
+  const handleDisconnect = async () => {
+    try {
+      await apiFetch('/cameras/' + selectedDirection, { method: 'DELETE' });
+      await Promise.all([refetchCameras(), refetchNodes()]);
+      addToast('success', 'Camera disconnected', selectedDirection.toUpperCase());
+    } catch (error) {
+      addToast('error', 'Disconnect failed', error instanceof Error ? error.message : 'Runtime unavailable');
     }
-  }, []);
-
-  const handleDisconnect = () => {
-    const next = connectedCams.filter((c) => c !== selectedDirection.toLowerCase());
-    setConnectedCams(next);
-    localStorage.setItem('scc_connected_cameras', JSON.stringify(next));
-    addToast('warning', 'Camera Disconnected', `${selectedDirection.toUpperCase()} camera slot is now offline.`);
   };
 
   const selectedInfo = configData?.streams?.[selectedDirection];
@@ -48,7 +41,7 @@ export const DevicesManagerPage: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '48px' }}>
       {/* Header */}
       <div
-        className="scada-card"
+        className="scada-card page-toolbar"
         style={{
           padding: '18px 24px',
           display: 'flex',
@@ -59,7 +52,7 @@ export const DevicesManagerPage: React.FC = () => {
       >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', margin: 0 }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>
               Intersection Camera Video Wall
             </h2>
             <span
@@ -77,7 +70,7 @@ export const DevicesManagerPage: React.FC = () => {
               }}
             >
               <Activity size={10} />
-              {activeCount}/4 STREAMS ACTIVE
+              {activeCount}/4 CAMERAS CONNECTED
             </span>
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: 0 }}>

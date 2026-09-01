@@ -9,6 +9,7 @@
  */
 
 import React, { useState } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useObservability } from '../../shared/hooks/useObservability';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -79,6 +80,7 @@ const AccordionHeader: React.FC<AccordionHeaderProps> = ({ icon, title, isOpen, 
 
 export const ConfigAccordions: React.FC = () => {
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
   const { settings, updateSettings } = useSettings();
   const { addToast } = useNotifications();
   const { data: cameraConfigs } = useCameraConfigs();
@@ -88,21 +90,13 @@ export const ConfigAccordions: React.FC = () => {
   const toggle = (s: string) => setOpenSection(openSection === s ? null : s);
 
   const handleResetFirstLaunch = () => {
-    if (confirm('Are you sure you want to reset the first launch state? This will clear paired cameras and direct you to the initial setup.')) {
+    if (confirm('Are you sure you want to reset the first launch state? This resets browser setup preferences only; connected cameras remain connected.')) {
       localStorage.removeItem('scc_connected_cameras');
       localStorage.removeItem('scc_setup_complete');
-      addToast('warning', 'First Launch Reset', 'System states cleared. Redirecting to setup initialization.');
+      addToast('warning', 'First Launch Reset', 'Browser setup preferences cleared.');
       navigate('/');
       window.location.reload();
     }
-  };
-
-  const handleLoadDemoData = () => {
-    localStorage.setItem('scc_connected_cameras', JSON.stringify(['north', 'south', 'east', 'west']));
-    localStorage.setItem('scc_setup_complete', 'true');
-    addToast('success', 'Demo Data Loaded', 'Configured 4 default camera slots.');
-    navigate('/');
-    window.location.reload();
   };
 
   const handleClearLocalStorage = () => {
@@ -135,13 +129,13 @@ export const ConfigAccordions: React.FC = () => {
           title="AI & Perception Parameters"
           isOpen={openSection === 'ai'}
           onToggle={() => toggle('ai')}
-          badge={<StatusBadge status="ACTIVE" color="#10b981" bg="rgba(16,185,129,0.12)" />}
+          badge={<StatusBadge status="APPLY WITH SAVE" color="#58a6ff" bg="rgba(88,166,255,0.12)" />}
         />
         {openSection === 'ai' && (
           <div style={{ padding: '20px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <label style={{ fontSize: '0.82rem', fontWeight: 700 }}>YOLO11 Detection Confidence Threshold</label>
+                <label style={{ fontSize: '0.82rem', fontWeight: 700 }}>Detection Confidence Threshold</label>
                 <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--color-primary)' }}>
                   {(settings.confidenceThreshold * 100).toFixed(0)}%
                 </span>
@@ -150,7 +144,7 @@ export const ConfigAccordions: React.FC = () => {
                 type="range" min={0.1} max={0.9} step={0.05}
                 value={settings.confidenceThreshold}
                 onChange={(e) => updateSettings({ confidenceThreshold: parseFloat(e.target.value) })}
-                aria-label="YOLO11 confidence threshold"
+                aria-label="Detector confidence threshold"
                 style={{ width: '100%' }}
               />
             </div>
@@ -234,6 +228,9 @@ export const ConfigAccordions: React.FC = () => {
         />
         {openSection === 'app' && (
           <div style={{ padding: '20px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <button type="button" onClick={toggleTheme} style={inputStyle}>
+              Switch to {theme === 'dark' ? 'light' : 'dark'} theme
+            </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <input
                 type="checkbox" id="notifications-enabled"
@@ -242,7 +239,7 @@ export const ConfigAccordions: React.FC = () => {
                 style={{ width: '16px', height: '16px', cursor: 'pointer' }}
               />
               <label htmlFor="notifications-enabled" style={{ fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
-                Enable Audio Alerts on Phase Preemptions
+                Show informational notifications (errors always shown)
               </label>
             </div>
           </div>
@@ -270,7 +267,7 @@ export const ConfigAccordions: React.FC = () => {
                     color={obs.isPerformingWell ? '#10b981' : '#f59e0b'}
                   />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', fontSize: '0.78rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: '10px', fontSize: '0.78rem' }}>
                   <div>FPS Target: <strong>{obs.fps} FPS</strong></div>
                   <div>Render Duration: <strong>{obs.renderDurationMs} ms (&lt;16ms target)</strong></div>
                   <div>WS Latency: <strong>{obs.wsLatencyMs} ms</strong></div>
@@ -283,9 +280,7 @@ export const ConfigAccordions: React.FC = () => {
                 <button onClick={handleResetFirstLaunch} aria-label="Reset first launch state" style={devBtnStyle('245, 158, 11')}>
                   Reset First Launch
                 </button>
-                <button onClick={handleLoadDemoData} aria-label="Load demo data" style={devBtnStyle('16, 185, 129')}>
-                  Load Demo Data
-                </button>
+
                 <button onClick={handleClearLocalStorage} aria-label="Clear local cache" style={devBtnStyle('239, 68, 68')}>
                   Clear Local Cache
                 </button>

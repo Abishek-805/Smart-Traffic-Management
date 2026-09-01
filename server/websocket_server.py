@@ -1,75 +1,29 @@
-"""
-FastAPI application hosting the WebSocket endpoint (/ws/camera) for camera node communication.
-"""
-
-from typing import Optional
+"""Single camera socket endpoint used by both deployment modes."""
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from server.message_handler import MessageHandler
-from ai.utils.logger import get_logger
-
-logger = get_logger("WebSocketServer")
-
-# FastAPI App Instance
-app = FastAPI(
-    title="Smart Traffic Management Communication Server",
-    description="Communication server handling WebSocket node registration, sessions, and heartbeats.",
-    version="1.0.0",
-)
-
-# Global MessageHandler instance (managers are patched at startup via web/app.py lifespan)
 message_handler = MessageHandler()
 
-
-@app.websocket("/ws/camera")
 async def camera_websocket_endpoint(websocket: WebSocket):
-    """
-    WebSocket endpoint for camera nodes:
-    Accepts connections, receives JSON packets, and routes them to MessageHandler.
-    """
     await websocket.accept()
-    logger.info(f"Incoming WebSocket connection accepted from client '{websocket.client}'.")
-    registered_node_id: Optional[str] = None
-
+    node_id = None
     try:
         while True:
-            try:
-                raw_data = await websocket.receive_json()
-                response = await message_handler.process_message(raw_data, websocket)
+            data = await websocket.receive_json()
+            response = await message_handler.process_message(data, websocket)
+            if response:
+                if response.get("type") == "REGISTRATION_ACK":
+                    node_id = response["payload"]["node_id"]
+                await message_handler.connection_manager.send_json(response, websocket)
+    except (WebSocketDisconnect, RuntimeError, ValueError):
+        pass
+    finally:
+        # An older socket must never remove a newly registered replacement.
+        if node_id and message_handler.connection_manager.get_connection(node_id) is websocket:
+            message_handler.handle_connection_loss(node_id)
+            await message_handler.connection_manager.disconnect(node_id)
 
-                # Record registered node ID for disconnect handling
-                if (
-                    response
-                    and response.get("message_type") == "REGISTRATION_ACK"
-                    and "payload" in response
-                ):
-                    registered_node_id = response["payload"].get("node_id")
+app = FastAPI(title="Traffic camera protocol server")
+app.add_api_websocket_route("/ws/camera", camera_websocket_endpoint)
 
-                # Transmit response packet if applicable
-                if response:
-                    await websocket.send_json(response)
-
-
-            except WebSocketDisconnect:
-                raise
-            except Exception as frame_err:
-                from core.application_context import ApplicationContext
-                ApplicationContext.get_instance().frame_processing_errors += 1
-                logger.warning(f"Recoverable frame processing error for node '{registered_node_id}': {frame_err}")
-                continue
-
-    except WebSocketDisconnect:
-        logger.info(f"WebSocket connection closed for client '{websocket.client}'.")
-        if registered_node_id:
-            logger.info(f"Cleaning up disconnected node '{registered_node_id}'.")
-            message_handler.handle_connection_loss(registered_node_id)
-            await message_handler.connection_manager.disconnect(registered_node_id)
-    except Exception as e:
-        logger.error(f"Unexpected error in WebSocket loop: {e}", exc_info=True)
-        if registered_node_id:
-            message_handler.handle_connection_loss(registered_node_id)
-            await message_handler.connection_manager.disconnect(registered_node_id)
-
-
-def get_app() -> FastAPI:
-    """Return FastAPI application instance."""
+def get_app():
     return app

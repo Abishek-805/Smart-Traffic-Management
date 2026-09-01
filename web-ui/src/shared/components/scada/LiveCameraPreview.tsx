@@ -5,7 +5,7 @@
  * FPS, Latency, Frame Age, AI Status, Recording indicator, Maximize button.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusOverlay, StreamStatusType } from './StatusOverlay';
 
 interface LiveCameraPreviewProps {
@@ -25,13 +25,22 @@ export const LiveCameraPreview: React.FC<LiveCameraPreviewProps> = React.memo(({
   streamStatus,
   directionLabel,
   height = '100%',
-  fps = 30.0,
-  latencyMs = 18,
-  frameAgeMs = 12,
-  vehicleCount = 4,
+  fps = 0,
+  latencyMs = 0,
+  frameAgeMs = 0,
+  vehicleCount = 0,
   onClick,
 }) => {
   const [imgError, setImgError] = useState(false);
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    setImgError(false);
+  }, [streamUrl, streamStatus]);
+  useEffect(() => {
+    if (!imgError || streamStatus !== 'LIVE') return;
+    const timer = setTimeout(() => { setImgError(false); setRetry(v => v + 1); }, 2000);
+    return () => clearTimeout(timer);
+  }, [imgError, streamStatus]);
   const effectiveStatus: StreamStatusType = imgError ? 'OFFLINE' : streamStatus;
 
   return (
@@ -50,13 +59,13 @@ export const LiveCameraPreview: React.FC<LiveCameraPreviewProps> = React.memo(({
       }}
     >
       {/* Live Stream Image Feed */}
-      {effectiveStatus !== 'OFFLINE' && effectiveStatus !== 'DISCONNECTED' && !imgError && (
+      {effectiveStatus === 'LIVE' && !imgError && (
         <img
-          src={streamUrl}
+          src={streamUrl + (streamUrl.includes('?') ? '&' : '?') + 'attempt=' + retry}
           alt={`${directionLabel || 'Camera'} feed`}
           onError={() => setImgError(true)}
           onLoad={() => setImgError(false)}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
         />
       )}
 
@@ -109,7 +118,7 @@ export const LiveCameraPreview: React.FC<LiveCameraPreviewProps> = React.memo(({
             }}
           >
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#3FB950' }} className="pulse-active" />
-            REC
+            {effectiveStatus === 'LIVE' ? 'LIVE' : 'NO FEED'}
           </span>
         </div>
       )}
@@ -137,7 +146,7 @@ export const LiveCameraPreview: React.FC<LiveCameraPreviewProps> = React.memo(({
             backdropFilter: 'blur(4px)',
           }}
         >
-          {fps.toFixed(0)} FPS
+          {effectiveStatus === 'LIVE' ? fps.toFixed(1) : '—'} FPS
         </span>
       </div>
 
@@ -160,13 +169,13 @@ export const LiveCameraPreview: React.FC<LiveCameraPreviewProps> = React.memo(({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ color: '#58a6ff', fontWeight: 700 }}>YOLO11</span>
+          <span style={{ color: '#58a6ff', fontWeight: 700 }}>DETECTOR</span>
           <span className="font-mono-num" style={{ color: '#ffffff', fontWeight: 800 }}>
-            {vehicleCount} veh
+            {effectiveStatus === 'LIVE' ? vehicleCount : '—'} veh
           </span>
         </div>
         <div className="font-mono-num" style={{ color: '#8b949e' }}>
-          {latencyMs}ms | {(frameAgeMs / 1000).toFixed(1)}s age
+          {effectiveStatus === 'LIVE' ? latencyMs + 'ms | ' + (frameAgeMs / 1000).toFixed(1) + 's age' : 'Awaiting fresh frame'}
         </div>
       </div>
     </div>

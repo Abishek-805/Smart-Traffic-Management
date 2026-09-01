@@ -17,6 +17,7 @@ env/
 
 # Project Generated Files & Large Media
 models/*.pt
+models/*_ncnn_model/
 videos/*.mp4
 outputs/*.mp4
 logs/
@@ -26,7 +27,6 @@ logs/
 # Node & Frontend Build
 node_modules/
 web-ui/node_modules/
-web-ui/dist/
 
 # Pytest & Coverage
 .pytest_cache/

@@ -1,0 +1,41 @@
+{
+  "scope": "Same pretrained bus image, not a model accuracy evaluation. CPU threading only, FP32 at 640.",
+  "results": [
+    {
+      "threads": 8,
+      "p50_ms": 52.81,
+      "p95_ms": 54.7,
+      "cpu_seconds_per_frame": 0.1385,
+      "same_reference_boxes": true,
+      "detections": 1,
+      "rss_mb": 357.6
+    },
+    {
+      "threads": 4,
+      "p50_ms": 39.08,
+      "p95_ms": 50.61,
+      "cpu_seconds_per_frame": 0.0885,
+      "same_reference_boxes": true,
+      "detections": 1,
+      "rss_mb": 363.3
+    },
+    {
+      "threads": 2,
+      "p50_ms": 56.45,
+      "p95_ms": 68.49,
+      "cpu_seconds_per_frame": 0.0792,
+      "same_reference_boxes": true,
+      "detections": 1,
+      "rss_mb": 367.3
+    },
+    {
+      "threads": 1,
+      "p50_ms": 90.13,
+      "p95_ms": 101.88,
+      "cpu_seconds_per_frame": 0.0813,
+      "same_reference_boxes": true,
+      "detections": 1,
+      "rss_mb": 372.5
+    }
+  ]
+}

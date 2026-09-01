@@ -8,6 +8,7 @@ import base64
 import cv2
 import numpy as np
 import asyncio
+import time
 
 from web.app import app
 from core.application_context import ApplicationContext
@@ -20,13 +21,18 @@ class TestE2EPipelineWebSocket(unittest.IsolatedAsyncioTestCase):
     async def test_e2e_camera_to_traffic_pipeline_flow(self):
         """Verify that incoming camera frames trigger TrafficPipeline, update ControlManager, and generate a valid snapshot."""
         handler = MessageHandler()
+        ApplicationContext._instance = None
         ctx = ApplicationContext.get_instance()
+        handler.session_manager.register_pairing_session(
+            "north", "TEST-CAM-NORTH", "test-pair", time.time() + 60
+        )
 
         # 1. Register Camera Node
         reg_packet = {
             "protocol_version": "1.0",
             "message_type": "REGISTER_CAMERA",
             "id": "req-001",
+            "token": "test-pair",
             "payload": {
                 "node_id": "TEST-CAM-NORTH",
                 "camera_direction": "north",
@@ -56,6 +62,7 @@ class TestE2EPipelineWebSocket(unittest.IsolatedAsyncioTestCase):
                 "node_id": "TEST-CAM-NORTH",
                 "direction": "north",
                 "frame_data": frame_b64,
+                "session_token": reg_response["payload"]["session_token"],
             },
         }
 
@@ -79,6 +86,7 @@ class TestE2EPipelineWebSocket(unittest.IsolatedAsyncioTestCase):
         # Verify frame buffer contains annotated JPEG bytes
         self.assertIn("north", ctx.frame_buffer)
         self.assertIsInstance(ctx.frame_buffer["north"], bytes)
+        await handler.shutdown()
 
 
 if __name__ == "__main__":

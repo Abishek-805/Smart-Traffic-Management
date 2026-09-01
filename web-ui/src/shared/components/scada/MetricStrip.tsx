@@ -34,7 +34,7 @@ export const MetricStrip: React.FC<MetricStripProps> = ({ metrics }) => {
         <MetricChip icon="🚗" value={`${metrics.totalVehicles} Vehicles`} label="Total Intersecting Vehicles" highlight />
         <MetricChip icon="⚡" value={`${metrics.avgFps.toFixed(1)} FPS`} label="System Perception Rate" />
         <MetricChip icon="⏱" value={`${metrics.inferenceTimeMs}ms Inference`} label="YOLO Model Inference Time" />
-        <MetricChip icon="⏳" value={`${metrics.processingQueueLength} Queue`} label="Async Processing Queue Depth" />
+        <MetricChip icon="⏳" value={`${metrics.processingQueueLength} dropped`} label="Frames dropped this session" />
         <MetricChip icon="📡" value={`${metrics.pipelineLatencyMs}ms Latency`} label="Pipeline Latency" />
         <MetricChip icon="🎞" value={`${metrics.frameAgeMs}ms Age`} label="Last Frame Latency" />
         <MetricChip

@@ -2,6 +2,7 @@
 ConnectionManager handles active WebSocket connections for camera nodes.
 """
 
+import asyncio
 from typing import Dict, Optional
 from fastapi import WebSocket
 from ai.utils.logger import get_logger
@@ -38,12 +39,16 @@ class ConnectionManager:
         """Disconnect and unregister node WebSocket."""
         ws = self.active_connections.pop(node_id, None)
         if ws:
+            try:
+                await asyncio.wait_for(ws.close(code=1000), timeout=2)
+            except Exception:
+                pass
             logger.info(f"WebSocket unregistered for node '{node_id}'. Active connections: {len(self.active_connections)}")
 
     async def send_json(self, data: dict, websocket: WebSocket) -> bool:
         """Send JSON payload directly to a WebSocket instance."""
         try:
-            await websocket.send_json(data)
+            await asyncio.wait_for(websocket.send_json(data), timeout=2)
             return True
         except Exception as e:
             logger.error(f"Error sending JSON payload over WebSocket: {e}")
@@ -61,7 +66,7 @@ class ConnectionManager:
         """Broadcast JSON payload to all active node WebSockets."""
         for node_id, ws in list(self.active_connections.items()):
             try:
-                await ws.send_json(data)
+                await asyncio.wait_for(ws.send_json(data), timeout=2)
             except Exception as e:
                 logger.error(f"Error broadcasting to node '{node_id}': {e}")
 

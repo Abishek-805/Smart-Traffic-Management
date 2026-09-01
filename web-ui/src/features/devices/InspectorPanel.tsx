@@ -35,7 +35,7 @@ const DetailCell: React.FC<{
     style={{
       padding: '14px',
       borderRadius: '8px',
-      backgroundColor: 'rgba(22, 27, 34, 0.8)',
+      backgroundColor: 'var(--bg-primary)',
       border: '1px solid var(--border-color)',
       fontSize: '0.82rem',
       display: 'flex',
@@ -113,10 +113,10 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = React.memo(({
               border: isConfigured ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border-color)',
             }}
           >
-            <Video size={20} color={isConfigured ? '#10b981' : '#8b949e'} aria-hidden="true" />
+            <Video size={20} color={isConfigured ? '#10b981' : 'var(--text-muted)'} aria-hidden="true" />
           </div>
           <div>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: '#ffffff' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
               Selected Inspector: {label}
             </h3>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -147,7 +147,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = React.memo(({
       </div>
 
       {/* Details Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: '14px' }}>
         <DetailCell
           label="DEVICE NAME & MODEL"
           value={isConfigured ? (isWS ? 'Mobile Node (WebSocket Gateway)' : 'IP Camera Feed') : 'Unavailable'}

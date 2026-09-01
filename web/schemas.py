@@ -53,6 +53,7 @@ class SystemHealthData(BaseModel):
     memory_total_gb: Optional[float] = 8.0
     frame_processing_errors: Optional[int] = 0
     inference_latency_ms: Optional[float] = 0.0
+    stage_counters: Dict[str, int] = Field(default_factory=dict)
     components: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -77,9 +78,9 @@ class NodeHealthSummary(BaseModel):
     connected_nodes: int = 0
     offline_nodes: int = 0
     average_fps: float = 0.0
-    average_latency_ms: float = 0.0
-    average_battery_pct: float = 0.0
-    average_signal_dbm: float = 0.0
+    average_latency_ms: Optional[float] = None
+    average_battery_pct: Optional[float] = None
+    average_signal_dbm: Optional[float] = None
 
 
 class MobileNodeItem(BaseModel):
@@ -87,9 +88,9 @@ class MobileNodeItem(BaseModel):
     name: str
     status: str  # CONNECTED, DISCONNECTED, PAIRING
     fps: float
-    latency_ms: float
-    battery_pct: float
-    signal_dbm: float
+    latency_ms: Optional[float] = None
+    battery_pct: Optional[float] = None
+    signal_dbm: Optional[float] = None
     last_seen: str
     assigned_lane: str
     expires_at: Optional[int] = None

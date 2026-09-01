@@ -138,7 +138,7 @@ export const SpatialIntersectionSchematic: React.FC<SpatialIntersectionSchematic
 
         {/* Center Countdown Ring Text Overlay */}
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
-          <div className="font-mono-num" style={{ fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>
+          <div className="font-mono-num" style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-main)' }}>
             {remainingTime}s
           </div>
           <div className="font-mono-num" style={{ fontSize: '9px', fontWeight: 700, color: '#3FB950' }}>

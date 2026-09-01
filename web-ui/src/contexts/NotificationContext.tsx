@@ -5,6 +5,8 @@
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
+import { useSettings } from './SettingsContext';
+
 export type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
 export interface ToastItem {
@@ -27,6 +29,7 @@ const NotificationContext = createContext<NotificationContextType>({
 });
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { settings } = useSettings();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const removeToast = useCallback((id: string) => {
@@ -34,12 +37,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   const addToast = useCallback((type: NotificationType, title: string, message: string) => {
+    if (type !== 'error' && !settings.enableNotifications) return;
     const id = Math.random().toString(36).substring(2, 9);
     setToasts((prev) => [...prev, { id, type, title, message }]);
     setTimeout(() => {
       removeToast(id);
     }, 4000);
-  }, [removeToast]);
+  }, [removeToast, settings.enableNotifications]);
 
   return (
     <NotificationContext.Provider value={{ toasts, addToast, removeToast }}>

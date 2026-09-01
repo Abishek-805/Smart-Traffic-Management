@@ -79,12 +79,6 @@ class VehicleStateManager:
             current_frame_track_ids.add(tid)
             lane_name = det.lane or "Unknown"
 
-            # Register in historical count set
-            if lane_name in self.historical_tracks_count:
-                self.historical_tracks_count[lane_name].add(tid)
-            else:
-                self.historical_tracks_count[lane_name] = {tid}
-
             cx, cy = det.centroid
 
             if tid not in self.active_states:
@@ -146,6 +140,9 @@ class VehicleStateManager:
                 state.last_seen_timestamp = timestamp
                 state.last_seen_frame = frame_number
                 state.is_alive = True
+
+            if state.is_confirmed:
+                self.historical_tracks_count.setdefault(lane_name, set()).add(tid)
 
             # Enrich Detection object with computed state parameters
             det.motion_px_sec = state.motion_px_sec

@@ -52,7 +52,7 @@ export const GroupedStatusBar: React.FC<GroupedStatusBarProps> = ({
           <Activity size={14} color="#10b981" />
           <span>AI</span>
         </div>
-        <HealthIndicator label="YOLO11" isHealthy={statusBar.aiHealthy} tooltip="YOLO11 Object Detector Model" />
+        <HealthIndicator label="DETECTOR" isHealthy={statusBar.aiHealthy} tooltip="Configured object detector" />
         <HealthIndicator label="ByteTrack" isHealthy={statusBar.aiHealthy} tooltip="ByteTrack Multi-Object Tracker" />
       </div>
 

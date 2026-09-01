@@ -18,12 +18,12 @@ export const DashboardGrid: React.FC<DashboardGridProps> = ({ vm, onSelectLane, 
   const isEmergency = vm.statusBar.operatingMode === 'EMERGENCY_OVERRIDE';
 
   return (
-    <div
+    <div className="camera-grid dashboard-camera-grid"
       style={{
         flex: 1,
         display: 'grid',
         gridTemplateColumns: 'repeat(2, 1fr)',
-        gridTemplateRows: 'repeat(2, 1fr)',
+        gridAutoRows: 'minmax(440px, 1fr)',
         gap: '10px',
         height: '100%',
         width: '100%',

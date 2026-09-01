@@ -76,6 +76,25 @@ class SignalScheduler:
 
         return decision
 
+    def select_eligible(self, result, lane_stats, fresh_lanes, waiting_cycles, max_wait_cycles=3):
+        """Do not serve stale/empty approaches while fresh demand exists.
+        After a bounded number of completed phases, serve the oldest waiting
+        demand even if its weighted score is smaller than a busy approach.
+        """
+        key = lambda score: getattr(score.lane, "value", str(score.lane)).lower()
+        demand = [s for s in result.scores if key(s) in fresh_lanes and lane_stats.get(key(s)) and lane_stats[key(s)].raw_count > 0]
+        eligible = demand or [s for s in result.scores if key(s) in fresh_lanes]
+        if not eligible:
+            return None, False
+        emergency = [s for s in demand if lane_stats[key(s)].has_priority_vehicle]
+        if emergency:
+            result.highest_priority = max(emergency, key=lambda s: s.score)
+            return result, False
+        overdue = [s for s in demand if waiting_cycles.get(getattr(s.lane, "value", str(s.lane)), 0) >= max_wait_cycles]
+        winner = max(overdue, key=lambda s: (waiting_cycles.get(getattr(s.lane, "value", str(s.lane)), 0), s.score)) if overdue else max(eligible, key=lambda s: s.score)
+        result.highest_priority = winner
+        return result, bool(overdue)
+
     def _select_green_lane(self, priority_result: PriorityResult) -> PriorityScore:
         """
         Select winner lane with highest priority score in O(1) time.

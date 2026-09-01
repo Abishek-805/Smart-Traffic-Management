@@ -21,6 +21,7 @@ from server import (
     ConnectionManager,
     MessageHandler,
 )
+from server.websocket_server import message_handler as app_message_handler
 
 
 class TestCommunicationServer(unittest.TestCase):
@@ -74,10 +75,12 @@ class TestCommunicationServer(unittest.TestCase):
 
     def test_04_message_handler_registration_and_heartbeat(self):
         """Test MessageHandler processing REGISTER_CAMERA and HEARTBEAT packets."""
+        self.session_mgr.register_pairing_session("west", "CAM-WEST-01", "west-pair", time.time() + 60)
         reg_pkt = {
             "message_type": "REGISTER_CAMERA",
             "protocol_version": PROTOCOL_VERSION,
             "timestamp": time.time(),
+            "token": "west-pair",
             "payload": {
                 "node_id": "CAM-WEST-01",
                 "camera_direction": "west",
@@ -144,6 +147,10 @@ class TestCommunicationServer(unittest.TestCase):
 
     def test_06_fastapi_websocket_endpoint_flow(self):
         """Test FastAPI TestClient WebSocket connection to /ws/camera endpoint."""
+        pairing = {"session": "CAM-TEST-101", "token": "test-pair"}
+        app_message_handler.session_manager.register_pairing_session(
+            "north", pairing["session"], pairing["token"], time.time() + 60
+        )
         with self.client.websocket_connect("/ws/camera") as websocket:
             # 1. Send REGISTER_CAMERA
             websocket.send_json(
@@ -151,8 +158,9 @@ class TestCommunicationServer(unittest.TestCase):
                     "message_type": "REGISTER_CAMERA",
                     "protocol_version": PROTOCOL_VERSION,
                     "timestamp": time.time(),
+                    "token": pairing["token"],
                     "payload": {
-                        "node_id": "CAM-TEST-101",
+                        "node_id": pairing["session"],
                         "camera_direction": "north",
                         "resolution": "1280x720",
                         "fps": 30.0,
@@ -162,7 +170,7 @@ class TestCommunicationServer(unittest.TestCase):
 
             ack_data = websocket.receive_json()
             self.assertEqual(ack_data["message_type"], "REGISTRATION_ACK")
-            self.assertEqual(ack_data["payload"]["node_id"], "CAM-TEST-101")
+            self.assertEqual(ack_data["payload"]["node_id"], pairing["session"])
             token = ack_data["payload"]["session_token"]
             self.assertTrue(token)
 
@@ -177,7 +185,7 @@ class TestCommunicationServer(unittest.TestCase):
                     "protocol_version": PROTOCOL_VERSION,
                     "timestamp": time.time(),
                     "payload": {
-                        "node_id": "CAM-TEST-101",
+                        "node_id": pairing["session"],
                         "session_token": token,
                         "uptime_sec": 12.5,
                     },
@@ -195,7 +203,7 @@ class TestCommunicationServer(unittest.TestCase):
                     "protocol_version": PROTOCOL_VERSION,
                     "timestamp": time.time(),
                     "payload": {
-                        "node_id": "CAM-TEST-101",
+                        "node_id": pairing["session"],
                         "session_token": token,
                         "reason": "Test finished",
                     },

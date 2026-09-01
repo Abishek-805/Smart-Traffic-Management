@@ -51,7 +51,7 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Video size={14} color="#58a6ff" />
-            <span style={{ fontSize: '11px', fontWeight: 800, color: '#ffffff', letterSpacing: '0.04em' }}>LIVE CAMERAS</span>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '0.04em' }}>LIVE CAMERAS</span>
           </div>
           <span className="font-mono-num" style={{ fontSize: '10px', color: '#10b981', fontWeight: 700 }}>
             {vm.statusBar.activeCameraCount}/4 ONLINE
@@ -80,8 +80,8 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  backgroundColor: isSelected ? '#161b22' : '#0d1117',
-                  border: `1px solid ${isSelected ? '#58a6ff' : lane.isGreen ? '#10b981' : '#30363d'}`,
+                  backgroundColor: isSelected ? 'var(--bg-secondary)' : 'var(--bg-primary)',
+                  border: `1px solid ${isSelected ? '#58a6ff' : lane.isGreen ? '#10b981' : 'var(--border-color)'}`,
                   borderRadius: '3px',
                   padding: '4px 8px',
                   fontSize: '11px',
@@ -92,14 +92,14 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: lane.isGreen ? '#10b981' : isOnline ? '#58a6ff' : '#484f58' }} />
-                  <span style={{ fontWeight: 700, color: isSelected ? '#ffffff' : '#c9d1d9' }}>{DIRECTION_LABELS[dir]}</span>
+                  <span style={{ fontWeight: 700, color: isSelected ? 'var(--text-main)' : '#c9d1d9' }}>{DIRECTION_LABELS[dir]}</span>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} className="font-mono-num">
                   <span style={{ fontSize: '10px', color: isOnline ? '#10b981' : '#484f58', fontWeight: 700 }}>
                     {isOnline ? 'ONLINE' : 'OFFLINE'}
                   </span>
-                  <span style={{ fontSize: '9px', color: '#bc8cff', backgroundColor: '#161b22', padding: '1px 4px', borderRadius: '2px', border: '1px solid #30363d' }}>
+                  <span style={{ fontSize: '9px', color: '#bc8cff', backgroundColor: 'var(--bg-secondary)', padding: '1px 4px', borderRadius: '2px', border: '1px solid #30363d' }}>
                     {vm.statusBar.fps > 0 ? `${vm.statusBar.fps.toFixed(0)} FPS` : '0 FPS'}
                   </span>
                 </div>
@@ -113,16 +113,16 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
       <div className="scada-card" style={{ padding: '10px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
           <Cpu size={14} color="#bc8cff" />
-          <span style={{ fontSize: '11px', fontWeight: 800, color: '#ffffff', letterSpacing: '0.04em' }}>AI PIPELINE STATUS</span>
+          <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '0.04em' }}>AI PIPELINE STATUS</span>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '10px' }} className="font-mono-num">
-          <div style={{ display: 'flex', justifyContent: 'space-between', backgroundColor: '#0d1117', padding: '4px 6px', borderRadius: '3px', border: '1px solid #30363d' }}>
-            <span style={{ color: '#bc8cff', fontWeight: 700 }}>YOLO11</span>
-            <span style={{ color: '#10b981' }}>{vm.statusBar.aiHealthy ? `Loaded (GPU) | ${vm.metrics.inferenceTimeMs}ms` : 'Inactive'}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', backgroundColor: 'var(--bg-primary)', padding: '4px 6px', borderRadius: '3px', border: '1px solid #30363d' }}>
+            <span style={{ color: '#bc8cff', fontWeight: 700 }}>DETECTOR</span>
+            <span style={{ color: '#10b981' }}>{vm.statusBar.aiHealthy ? `Loaded | ${vm.metrics.inferenceTimeMs}ms` : 'Inactive'}</span>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', backgroundColor: '#0d1117', padding: '4px 6px', borderRadius: '3px', border: '1px solid #30363d' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', backgroundColor: 'var(--bg-primary)', padding: '4px 6px', borderRadius: '3px', border: '1px solid #30363d' }}>
             <span style={{ color: '#58a6ff', fontWeight: 700 }}>ByteTrack</span>
             <span style={{ color: '#10b981' }}>Running | {vm.metrics.totalVehicles} Objects</span>
           </div>
@@ -140,7 +140,7 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Server size={14} color="#58a6ff" />
-            <span style={{ fontSize: '11px', fontWeight: 800, color: '#ffffff', letterSpacing: '0.04em' }}>CONNECTED NODES</span>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '0.04em' }}>CONNECTED NODES</span>
           </div>
           <span className="font-mono-num" style={{ fontSize: '10px', color: '#10b981' }}>
             {mobileNodes.filter(n => n.status === 'CONNECTED').length} ACTIVE
@@ -152,7 +152,7 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
             {mobileNodes.map((node) => {
               const isConnected = node.status === 'CONNECTED';
               return (
-                <div key={node.node_id} style={{ backgroundColor: '#0d1117', padding: '6px 8px', borderRadius: '3px', border: `1px solid ${isConnected ? '#30363d' : '#22272e'}`, fontSize: '10px' }}>
+                <div key={node.node_id} style={{ backgroundColor: 'var(--bg-primary)', padding: '6px 8px', borderRadius: '3px', border: `1px solid ${isConnected ? 'var(--border-color)' : '#22272e'}`, fontSize: '10px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontWeight: 700, color: '#c9d1d9' }}>
                     <span>{node.assigned_lane?.split(' ')[0] || 'Unassigned'} Slot</span>
                     <span style={{ color: isConnected ? '#10b981' : '#f59e0b' }}>
@@ -160,14 +160,14 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
                     </span>
                   </div>
                   {isConnected ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px', color: '#8b949e', marginTop: '2px' }} className="font-mono-num">
-                      <div>Device: <span style={{ color: '#ffffff', fontWeight: 600 }}>{node.name.split(' (')[0]}</span></div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px', color: 'var(--text-muted)', marginTop: '2px' }} className="font-mono-num">
+                      <div>Device: <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{node.name.split(' (')[0]}</span></div>
                       <div>Battery: <span style={{ color: '#10b981' }}>{node.battery_pct}%</span></div>
                       <div>FPS: <span style={{ color: '#bc8cff' }}>{node.fps.toFixed(0)}</span></div>
                       <div>Signal: <span style={{ color: '#10b981' }}>{node.signal_dbm} dBm</span></div>
                     </div>
                   ) : (
-                    <div style={{ color: '#8b949e', fontSize: '9px', fontStyle: 'italic', marginTop: '2px' }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '9px', fontStyle: 'italic', marginTop: '2px' }}>
                       Scan QR Code to pair device
                     </div>
                   )}
@@ -176,7 +176,7 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
             })}
           </div>
         ) : (
-          <div style={{ backgroundColor: '#0d1117', padding: '8px', borderRadius: '3px', border: '1px solid #30363d', fontSize: '10px', color: '#8b949e', textAlign: 'center' }}>
+          <div style={{ backgroundColor: 'var(--bg-primary)', padding: '8px', borderRadius: '3px', border: '1px solid #30363d', fontSize: '10px', color: 'var(--text-muted)', textAlign: 'center' }}>
             No mobile camera slots configured
           </div>
         )}
@@ -200,9 +200,9 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Layers size={14} color="#f59e0b" />
-            <span style={{ fontSize: '11px', fontWeight: 800, color: '#ffffff', letterSpacing: '0.04em' }}>DIGITAL TWIN</span>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '0.04em' }}>DIGITAL TWIN</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#8b949e', fontSize: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)', fontSize: '10px' }}>
             <span>{isDigitalTwinExpanded ? 'Hide' : 'Expand'}</span>
             {isDigitalTwinExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </div>

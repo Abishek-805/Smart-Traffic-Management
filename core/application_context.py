@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any
 from ai.utils.logger import get_logger
 from server.session_manager import SessionManager
 from server.connection_manager import ConnectionManager
+from config.model import MODEL_DISPLAY_NAME, MODEL_RUNTIME, INPUT_SIZE
 
 logger = get_logger("ApplicationContext")
 
@@ -24,6 +25,11 @@ class ApplicationContext:
         self.system_running: bool = True
         self.session_manager: SessionManager = SessionManager()
         self.connection_manager: ConnectionManager = ConnectionManager()
+        self.remote_runtime = False
+        self.remote_nodes = []
+        self.remote_received_at = 0.0
+        self.command_handler = None
+        self.frame_updated_at = {}
         self.frame_buffer: dict = {}  # direction -> latest annotated JPEG bytes
         self.live_telemetry: dict = {}  # direction -> live detection metrics
         self.latest_snapshot: Optional[Dict[str, Any]] = None  # Atomic immutable snapshot for telemetry broadcast
@@ -94,7 +100,18 @@ class ApplicationContext:
 
     def get_health_dict(self) -> Dict[str, Any]:
         """Return structured diagnostic health state."""
+        if self.remote_runtime:
+            payload = (self.latest_snapshot or {}).get("payload", {})
+            fresh = time.monotonic() - self.remote_received_at < 3
+            return {"status": "RUNNING" if fresh and payload.get("systemRunning") else "STOPPED",
+                    "mode": "AUTOMATIC", "uptime": self.uptime_sec(),
+                    "components": payload.get("healthComponents", {}) if fresh else {},
+                    "stage_counters": payload.get("stageCounters", {}),
+                    "frame_processing_errors": payload.get("processingErrors", 0),
+                    "inference_latency_ms": payload.get("latencyMetrics", {}).get("yolo_ms", 0)}
         node_count = len(self.session_manager.sessions)
+        active = sum(time.monotonic() - t < 3 for t in self.frame_updated_at.values())
+        healthy = self.system_running and self.pipeline is not None and active > 0
         cpu_pct = 0.0
         mem_used = 0.0
         mem_total = 8.0
@@ -123,10 +140,13 @@ class ApplicationContext:
             "stage_counters": self.get_stage_counters(),
             "components": {
                 "ai": {
-                    "status": "HEALTHY" if self.system_running else "DEGRADED",
-                    "message": f"YOLO11 + ByteTrack Active | {inf_ms}ms",
+                    "status": "HEALTHY" if healthy else "DEGRADED",
+                    "message": f"{MODEL_DISPLAY_NAME} {MODEL_RUNTIME} + ByteTrack | {active} fresh feeds | {inf_ms}ms",
                     "running": self.system_running,
-                    "fps": 30.0,
+                    "fps": sum(v.get("fps", 0) for v in self.live_telemetry.values()) if healthy else 0,
+                    "model": MODEL_DISPLAY_NAME,
+                    "runtime": MODEL_RUNTIME,
+                    "input_size": INPUT_SIZE,
                 },
                 "mobile": {
                     "status": "HEALTHY" if node_count > 0 else "DEGRADED",
@@ -134,13 +154,13 @@ class ApplicationContext:
                     "connected": node_count,
                 },
                 "cameras": {
-                    "status": "HEALTHY",
-                    "message": "Multi-camera pipeline operational",
-                    "active": 4,
+                    "status": "HEALTHY" if active else "DEGRADED",
+                    "message": f"{active} fresh camera feeds",
+                    "active": active,
                 },
                 "esp32": {
-                    "status": "HEALTHY",
-                    "message": "Simulation Mode (Active)",
+                    "status": "DEGRADED",
+                    "message": "Simulation only; no physical controller connected",
                     "connected": False,
                     "simulation": True,
                 },

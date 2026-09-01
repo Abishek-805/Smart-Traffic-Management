@@ -97,7 +97,9 @@ export const DiagnosticsDrawer: React.FC<DiagnosticsDrawerProps> = ({ isOpen, on
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>Core Model</span>
-              <strong style={{ color: 'var(--color-primary)' }}>YOLO11n (COCO v8 weights)</strong>
+              <strong style={{ color: 'var(--color-primary)' }}>
+                {health?.components?.ai?.model || 'Detector'} ({health?.components?.ai?.runtime || 'runtime'})
+              </strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>Tracking Engine</span>
@@ -259,7 +261,7 @@ export const DiagnosticsDrawer: React.FC<DiagnosticsDrawerProps> = ({ isOpen, on
             justifyContent: 'center',
             gap: '8px',
             backgroundColor: 'var(--color-primary)',
-            color: '#ffffff',
+            color: 'var(--text-main)',
             border: 'none',
             borderRadius: '8px',
             padding: '12px',

@@ -13,6 +13,7 @@ COPY shared /app/shared
 COPY core /app/core
 COPY ai /app/ai
 COPY server /app/server
+COPY config /app/config
 COPY web /app/web
 COPY app-backend/app /app/app
 
