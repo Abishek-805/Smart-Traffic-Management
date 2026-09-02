@@ -1,24 +1,27 @@
 """
 Traffic, vehicle class mappings, lane ROI configurations, and congestion scoring parameters.
-COCO Class Index Mapping:
-2: car
-3: motorcycle
-5: bus
-7: truck
+Runtime class selection is model-name based. This supports both COCO pretrained
+weights and the 14-class UVH-26 Indian traffic taxonomy.
 """
 
 from typing import Dict, Any
 
-VEHICLE_CLASSES = {
-    2: "car",
-    3: "motorcycle",
-    5: "bus",
-    7: "truck",
+TARGET_CLASS_NAMES = {
+    "bicycle", "car", "motorcycle", "bus", "truck",
+    "hatchback", "sedan", "suv", "muv", "three-wheeler", "two-wheeler",
+    "lcv", "mini-bus", "tempo-traveller", "van", "other",
 }
 
-# Target class sets for fast lookups
-TARGET_CLASS_IDS = set(VEHICLE_CLASSES.keys())
-TARGET_CLASS_NAMES = set(VEHICLE_CLASSES.values())
+
+def normalize_vehicle_class(value: str) -> str:
+    """Normalize COCO/UVH label spelling without collapsing useful subclasses."""
+    normalized = str(value).strip().lower().replace("_", "-").replace(" ", "-")
+    return {
+        "2-wheeler": "two-wheeler",
+        "3-wheeler": "three-wheeler",
+        "minibus": "mini-bus",
+        "tempo-traveler": "tempo-traveller",
+    }.get(normalized, normalized)
 
 # PCE (Passenger Car Equivalent) space occupancy weights
 PCE_WEIGHTS = {
@@ -26,6 +29,18 @@ PCE_WEIGHTS = {
     "bus": 1.5,
     "truck": 2.0,
     "motorcycle": 0.5,
+    "bicycle": 0.5,
+    "two-wheeler": 0.5,
+    "three-wheeler": 0.8,
+    "hatchback": 1.0,
+    "sedan": 1.0,
+    "suv": 1.2,
+    "muv": 1.2,
+    "van": 1.2,
+    "lcv": 1.5,
+    "tempo-traveller": 1.5,
+    "mini-bus": 2.0,
+    "other": 1.0,
 }
 
 # Motion and queue detection parameters

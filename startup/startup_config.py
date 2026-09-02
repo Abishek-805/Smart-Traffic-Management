@@ -6,7 +6,6 @@ Encapsulates versioning, camera acquisition, ESP32 hardware interface, runtime o
 from dataclasses import dataclass, field
 from typing import Dict, Any, Union, Optional
 from pathlib import Path
-from config.paths import VIDEOS_DIR
 
 
 @dataclass
@@ -15,13 +14,8 @@ class CameraConfig:
     Configuration container for 4-camera video sources.
     Modes: 'mobile', 'usb', 'rtsp', 'webcam', 'demo'
     """
-    mode: str = "demo"
-    sources: Dict[str, Union[str, int]] = field(default_factory=lambda: {
-        "north": str(VIDEOS_DIR / "north.mp4"),
-        "south": str(VIDEOS_DIR / "south.mp4"),
-        "east": str(VIDEOS_DIR / "east.mp4"),
-        "west": str(VIDEOS_DIR / "west.mp4"),
-    })
+    mode: str = "mobile"
+    sources: Dict[str, Union[str, int]] = field(default_factory=dict)
 
     def to_stream_config(self) -> Dict[str, Union[str, int]]:
         """Return stream sources dictionary for CameraManager."""
@@ -36,7 +30,7 @@ class CameraConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "CameraConfig":
         return cls(
-            mode=data.get("mode", "demo"),
+            mode=data.get("mode", "mobile"),
             sources=data.get("sources", {}),
         )
 

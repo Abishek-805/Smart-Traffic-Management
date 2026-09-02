@@ -7,11 +7,13 @@ already improves on YOLOv8n: Ultralytics reports 39.5 COCO box mAP, 2.6 million
 parameters and 6.5 GFLOPs for YOLO11n, versus 37.3 mAP, 3.2 million parameters and
 8.7 GFLOPs for YOLOv8n.
 
-The selected laptop model and Raspberry Pi candidate is **YOLO26n**. Use PyTorch
-for current laptop validation and export it to NCNN for Raspberry Pi CPU testing.
-Ultralytics' Raspberry Pi 5 benchmark reports YOLO26n
-at 128.42 ms per image with ONNX versus about 147 ms for YOLO11n, with slightly
-higher COCO mAP. NCNN is the runtime Ultralytics recommends for ARM edge devices.
+The laptop test profile uses **YOLO26s** for better small-vehicle recall. The
+Raspberry Pi candidate remains **YOLO26n fine-tuned on UVH-26** because four-stream
+CPU freshness matters more than the generic small-model accuracy gain. Export the
+fine-tuned nano model to NCNN for Raspberry Pi CPU testing.
+Ultralytics' current Raspberry Pi 5 benchmark reports the YOLO26n NCNN export at
+about 67 ms inference per 640-pixel image, faster than its ONNX and OpenVINO results.
+NCNN is the runtime Ultralytics recommends for ARM edge devices.
 It must still pass the project's labelled traffic validation before any public-road
 deployment; current generic COCO weights have not been validated on local traffic.
 
@@ -30,17 +32,21 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-python scripts/export_edge_model.py --model yolo26n.pt --format ncnn --imgsz 640
+python scripts/export_edge_model.py --model outputs/training/yolo26n-uvh26/weights/best.pt --format ncnn --imgsz 640
 cp .env.example .env
 ```
 
 Set these values in `.env`:
 
 ```dotenv
-YOLO_MODEL_NAME=models/yolo26n_ncnn_model
+YOLO_MODEL_NAME=models/best_ncnn_model
 YOLO_INPUT_SIZE=640
 YOLO_CPU_THREADS=4
-YOLO_MAX_DETECTIONS=100
+YOLO_MAX_DETECTIONS=300
+YOLO_CONFIDENCE_THRESHOLD=0.08
+TRACK_HIGH_THRESHOLD=0.15
+TRACK_LOW_THRESHOLD=0.08
+NEW_TRACK_THRESHOLD=0.15
 YOLO_DEVICE=cpu
 ```
 
@@ -57,16 +63,15 @@ precision or recall. Evaluate both candidates on labelled camera images from the
 actual mounting height, road geometry, lighting, rain, and local vehicle mix:
 
 ```bash
-python scripts/evaluate_detector.py --data datasets/traffic.yaml --model yolo11n.pt --output docs/benchmarks/yolo11n-accuracy.json
-python scripts/evaluate_detector.py --data datasets/traffic.yaml --model yolo26n.pt --output docs/benchmarks/yolo26n-accuracy.json
-python scripts/benchmark_edge_models.py --models yolo11n.pt yolo26n.pt --source videos/traffic.mp4
+python scripts/evaluate_detector.py --data datasets/uvh26/traffic.yaml --model outputs/training/yolo26n-uvh26/weights/best.pt --output docs/benchmarks/yolo26n-uvh26-accuracy.json
+python scripts/benchmark_runtime.py --pid SERVER_PID --images datasets/uvh26/images/val --seconds 60 --fps 2 --output docs/benchmarks/pi-four-real.json
 ```
 
-Keep the candidate only if per-class recall for motorcycle, car, bus, and truck,
+Keep the candidate only if per-class recall across all 14 UVH-26 vehicle classes,
 queue count error, and p95 inference latency all meet the junction's acceptance
 limits. Fine-tune the nano model on local data when auto-rickshaws, occlusion, or
 distant motorcycles are missed; generic COCO weights do not define an auto-rickshaw
-class.
+class. Full preparation and validation steps are in `docs/MODEL_TRAINING.md`.
 
 ## Hardware acceleration
 

@@ -85,8 +85,8 @@ async def handle_command(command, payload=None):
     if command == "CONFIGURE":
         confidence = float(payload["confidenceThreshold"])
         minimum, maximum = int(payload["minGreenTime"]), int(payload["maxGreenTime"])
-        if not .1 <= confidence <= .95 or not 5 <= minimum <= maximum <= 120:
-            raise ValueError("Confidence must be 0.1–0.95 and green durations 5 ≤ min ≤ max ≤ 120 seconds")
+        if not .05 <= confidence <= .95 or not 5 <= minimum <= maximum <= 120:
+            raise ValueError("Confidence must be 0.05–0.95 and green durations 5 ≤ min ≤ max ≤ 120 seconds")
         if not ctx.pipeline:
             raise RuntimeError("AI runtime is not ready")
         def configure():

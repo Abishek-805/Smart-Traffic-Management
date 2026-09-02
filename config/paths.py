@@ -19,7 +19,6 @@ for directory in [MODELS_DIR, VIDEOS_DIR, OUTPUTS_DIR, LOGS_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
 
 # File paths
-DEFAULT_VIDEO_PATH = VIDEOS_DIR / "traffic.mp4"
 DEFAULT_OUTPUT_PATH = OUTPUTS_DIR / "detection.mp4"
 
 # Log files

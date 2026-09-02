@@ -5,8 +5,9 @@ Integration unit tests for Sprint 5 Multi-Camera TrafficPipeline AI integration.
 import unittest
 from pathlib import Path
 import numpy as np
+import cv2
 
-from ai.camera import CameraManager, STREAM_CONFIG
+from ai.camera import CameraManager
 from ai.pipeline.traffic_pipeline import TrafficPipeline
 from ai.pipeline.pipeline_result import PipelineResult
 from ai.pipeline.intersection_state import IntersectionState, LaneProcessingResult
@@ -19,12 +20,18 @@ class TestMultiCameraPipeline(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Initialize multi-camera manager and pipeline."""
-        cls.camera_manager = CameraManager(config=STREAM_CONFIG)
+        cls.camera_manager = CameraManager(config={})
         cls.pipeline = TrafficPipeline(
             camera_manager=cls.camera_manager,
             save_output=False,
         )
         cls.dashboard = MultiCameraDashboard()
+        frame = cv2.imread(str(Path(__file__).parent / "fixtures" / "ultralytics_bus.jpg"))
+        assert frame is not None
+        cls.result = cls.pipeline.process_step(frames_data={lane: {
+            "frame": frame.copy(), "connected": True, "frame_number": 1,
+            "timestamp": 1.0, "fps": 2.0, "resolution": (frame.shape[1], frame.shape[0]),
+        } for lane in ("north", "east", "south", "west")})
 
     @classmethod
     def tearDownClass(cls):
@@ -44,7 +51,7 @@ class TestMultiCameraPipeline(unittest.TestCase):
 
     def test_02_process_multi_camera_step(self):
         """Verify multi-camera frame step processing, LaneProcessingResult, and IntersectionState."""
-        res: PipelineResult = self.pipeline.process_step()
+        res: PipelineResult = self.result
 
         self.assertTrue(res.has_frame)
         self.assertIsNotNone(res.annotated_frame)
@@ -71,7 +78,7 @@ class TestMultiCameraPipeline(unittest.TestCase):
 
     def test_03_signal_decision_engine_integration(self):
         """Verify Signal Decision Engine receives multi-camera IntersectionState and makes decisions."""
-        res: PipelineResult = self.pipeline.process_step()
+        res: PipelineResult = self.result
 
         self.assertIsNotNone(res.signal_decision)
         self.assertIn(res.signal_decision.green_lane.lower(), ["north", "south", "east", "west"])
@@ -84,7 +91,7 @@ class TestMultiCameraPipeline(unittest.TestCase):
 
     def test_04_decoupled_dashboard_rendering(self):
         """Verify MultiCameraDashboard renders downstream directly from PipelineResult object."""
-        res: PipelineResult = self.pipeline.process_step()
+        res: PipelineResult = self.result
         canvas = self.dashboard.render_from_result(res)
 
         self.assertIsNotNone(canvas)

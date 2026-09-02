@@ -1,11 +1,14 @@
 import asyncio
 import importlib.util
+import socket
 import time
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import fakeredis.aioredis
 import numpy as np
+import psutil
 import pytest
 from fastapi.testclient import TestClient
 
@@ -18,6 +21,7 @@ from server.session_manager import SessionManager
 from ai.state.count_stabilizer import CountStabilizer
 from ai.analytics.analytics_exporter import LaneStatistics
 from web.app import app
+from web.services import node_service
 
 
 def test_tracker_instances_do_not_rewind_existing_ids():
@@ -34,6 +38,20 @@ def test_tracker_instances_do_not_rewind_existing_ids():
     assert north.tracker is not east.tracker
     assert north.tracker.frame_id == 3
     assert east.tracker.frame_id == 1
+
+
+def test_bytetrack_low_confidence_detection_recovers_existing_track():
+    tracker = ByteTracker()
+    strong = Detection('car', 2, .9, (10, 10, 70, 70))
+    first = tracker.update([strong])
+    assert len(first) == 1
+
+    # Between the low and high thresholds: preserve an existing ID without
+    # allowing this weak observation to create a new track by itself.
+    weak = Detection('car', 2, .1, (11, 10, 71, 70))
+    recovered = tracker.update([weak])
+    assert len(recovered) == 1
+    assert recovered[0].track_id == first[0].track_id
 
 
 def test_expired_tokens_cannot_revive_sessions():
@@ -126,6 +144,50 @@ def test_default_pairing_qr_targets_combined_runtime(monkeypatch):
         assert pairing['qr_image'].startswith('data:image/png;base64,')
 
 
+def test_pairing_qr_prefers_active_windows_hotspot_address(monkeypatch):
+    """A phone joined to Mobile Hotspot must receive the hotspot gateway in its QR."""
+    class RouteSocket:
+        def connect(self, _address):
+            pass
+
+        def getsockname(self):
+            return ('192.168.137.137', 50000)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(socket, 'socket', lambda *_args, **_kwargs: RouteSocket())
+    monkeypatch.setattr(psutil, 'net_if_addrs', lambda: {
+        'Wi-Fi': [SimpleNamespace(family=socket.AF_INET, address='192.168.137.137')],
+        'Local Area Connection* 2': [
+            SimpleNamespace(family=socket.AF_INET, address='192.168.137.1')
+        ],
+    })
+    monkeypatch.setattr(psutil, 'net_if_stats', lambda: {
+        'Wi-Fi': SimpleNamespace(isup=True),
+        'Local Area Connection* 2': SimpleNamespace(isup=True),
+    })
+
+    assert node_service.get_local_ip() == '192.168.137.1'
+
+
+def test_pairing_qr_falls_back_when_adapter_discovery_fails(monkeypatch):
+    class RouteSocket:
+        def connect(self, _address):
+            pass
+
+        def getsockname(self):
+            return ('10.2.11.221', 50000)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(socket, 'socket', lambda *_args, **_kwargs: RouteSocket())
+    monkeypatch.setattr(psutil, 'net_if_stats', lambda: (_ for _ in ()).throw(OSError('unavailable')))
+
+    assert node_service.get_local_ip() == '10.2.11.221'
+
+
 def test_legacy_api_redirect_cannot_repeat_v1_prefix():
     with TestClient(app, follow_redirects=False) as client:
         legacy = client.get('/api/system/health')
@@ -202,5 +264,7 @@ async def test_configuration_changes_runtime_and_rejects_invalid_bounds(monkeypa
     with pytest.raises(ValueError):
         await handle_command('CONFIGURE', {'confidenceThreshold': .6, 'minGreenTime': 50, 'maxGreenTime': 40})
     assert ctx.pipeline.signal_scheduler.min_green_sec == 15
+    await handle_command('CONFIGURE', {'confidenceThreshold': .08, 'minGreenTime': 15, 'maxGreenTime': 40})
+    assert ctx.pipeline.model_manager.confidence == .08
     client = TestClient(app)
     assert client.post('/api/v1/system/config', json={'confidenceThreshold': .5}).status_code == 422

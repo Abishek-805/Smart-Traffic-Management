@@ -54,7 +54,7 @@ class EmergencyOverride:
         if lane_stats:
             for lane_name_str, stats in lane_stats.items():
                 if stats.has_priority_vehicle:
-                    emergency_lanes.append(lane_name_str)
+                    emergency_lanes.append(str(lane_name_str).lower())
 
         # 2. If emergency lane identified, grant override
         if not emergency_lanes:
@@ -70,7 +70,7 @@ class EmergencyOverride:
         for score_obj in priority_result.scores:
             lane_str = score_obj.lane.value if isinstance(score_obj.lane, Enum) else str(score_obj.lane)
             
-            if lane_str in emergency_lanes:
+            if lane_str.lower() in emergency_lanes:
                 # Apply emergency boost
                 boosted_total = round(score_obj.score + self.boost_score, 2)
                 

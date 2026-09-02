@@ -81,18 +81,32 @@ def test_scheduler_excludes_stale_approaches():
     stats = _lane_stats({'north': 8, 'south': 3, 'east': 2, 'west': 1})
     selected, starvation = scheduler.select_eligible(result, stats, {'south', 'east'},
         {'North': 0, 'South': 0, 'East': 0, 'West': 0})
-    assert selected.highest_priority.lane == LaneName.SOUTH
+    assert selected.highest_priority.lane == LaneName.EAST
     assert not starvation
 
 
-def test_scheduler_bounds_starvation_after_three_completed_phases():
+def test_scheduler_serves_each_occupied_lane_once_in_clockwise_cycle():
     scheduler = SignalScheduler()
     result = create_sample_priority_result(north_score=100)
-    stats = _lane_stats({'north': 8, 'south': 1, 'east': 0, 'west': 0})
-    selected, starvation = scheduler.select_eligible(result, stats, {'north', 'south'},
-        {'North': 0, 'South': 3, 'East': 0, 'West': 0})
+    stats = _lane_stats({'north': 40, 'south': 1, 'east': 2, 'west': 1})
+    served = []
+    for _ in range(4):
+        selected, starvation = scheduler.select_eligible(
+            result, stats, {'north', 'south', 'east', 'west'})
+        served.append(selected.highest_priority.lane)
+        assert not starvation
+    assert served == [LaneName.NORTH, LaneName.EAST, LaneName.SOUTH, LaneName.WEST]
+
+
+def test_scheduler_skips_empty_lanes_without_allocating_minimum_green():
+    scheduler = SignalScheduler()
+    result = create_sample_priority_result(north_score=100)
+    stats = _lane_stats({'north': 0, 'south': 2, 'east': 0, 'west': 0})
+    selected, _ = scheduler.select_eligible(result, stats, {'north', 'south', 'east', 'west'})
     assert selected.highest_priority.lane == LaneName.SOUTH
-    assert starvation
+    stats['south'].raw_count = 0
+    selected, _ = scheduler.select_eligible(result, stats, {'north', 'south', 'east', 'west'})
+    assert selected is None
 
 
 def test_emergency_preempts_starvation_only_when_fresh():
@@ -106,7 +120,20 @@ def test_emergency_preempts_starvation_only_when_fresh():
     selected, starvation = scheduler.select_eligible(result, stats, {'south'},
         {'North': 0, 'South': 4})
     assert selected.highest_priority.lane == LaneName.SOUTH
-    assert starvation
+    assert not starvation
+
+
+def test_adaptive_green_uses_absolute_demand_and_stays_bounded():
+    scheduler = SignalScheduler(min_green_sec=10, max_green_sec=60)
+    result = create_sample_priority_result(north_score=100)
+    north = next(score for score in result.scores if score.lane == LaneName.NORTH)
+    north.breakdown.raw_pce = 1.0
+    north.breakdown.raw_queue_sec = 0.0
+    low = scheduler.schedule(result).green_duration_sec
+    north.breakdown.raw_pce = 20.0
+    north.breakdown.raw_queue_sec = 120.0
+    high = scheduler.schedule(result).green_duration_sec
+    assert 10 <= low < high <= 60
 
 
 if __name__ == "__main__":

@@ -3,22 +3,17 @@ Stream Configuration module defining camera stream sources (video files, RTSP/HT
 and explicit validation helpers.
 """
 
+import os
 from pathlib import Path
 from typing import Dict, Union
-from config.paths import VIDEOS_DIR
 
-NORTH = str(VIDEOS_DIR / "north.mp4")
-SOUTH = str(VIDEOS_DIR / "south.mp4")
-EAST = str(VIDEOS_DIR / "east.mp4")
-WEST = str(VIDEOS_DIR / "west.mp4")
-
-# Dictionary mapping lane names to stream sources
-STREAM_CONFIG: Dict[str, Union[str, int, Path]] = {
-    "north": NORTH,
-    "south": SOUTH,
-    "east": EAST,
-    "west": WEST,
-}
+# Optional real USB/RTSP/file sources. Mobile WebSocket cameras require no
+# entries here. Example: TRAFFIC_NORTH_SOURCE=rtsp://camera.local/stream
+STREAM_CONFIG: Dict[str, Union[str, int, Path]] = {}
+for _direction in ("north", "east", "south", "west"):
+    _source = os.getenv(f"TRAFFIC_{_direction.upper()}_SOURCE")
+    if _source:
+        STREAM_CONFIG[_direction] = int(_source) if _source.isdigit() else _source
 
 
 def validate_stream_sources(config: Dict[str, Union[str, int, Path]]) -> None:
@@ -37,6 +32,5 @@ def validate_stream_sources(config: Dict[str, Union[str, int, Path]]) -> None:
                     raise FileNotFoundError(
                         f"❌ [Camera Configuration Error] Stream source for camera '{lane_name}' "
                         f"was not found at '{path}'.\n"
-                        f"Please place '{path.name}' inside the '{VIDEOS_DIR}' directory or run "
-                        f"'python videos/generate_sample_video.py' to generate developer sample feeds."
+                        f"Configure an existing real video, USB index, or RTSP/HTTP stream."
                     )

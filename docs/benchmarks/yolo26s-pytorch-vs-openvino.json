@@ -1,0 +1,49 @@
+{
+  "scope": "Identical local traffic frames; runtime/resource comparison only. Not an accuracy or power-meter benchmark.",
+  "source": "tests\\fixtures\\ultralytics_bus.jpg",
+  "vehicle_classes": [
+    1,
+    2,
+    3,
+    5,
+    7
+  ],
+  "results": [
+    {
+      "model": "yolo26s.pt",
+      "frames": 20,
+      "imgsz": 640,
+      "threads": 4,
+      "confidence": 0.15,
+      "iou": 0.6,
+      "max_detections": 300,
+      "p50_ms": 246.59,
+      "p95_ms": 280.51,
+      "mean_ms": 226.38,
+      "throughput_fps": 4.42,
+      "cpu_seconds_per_frame": 0.5305,
+      "rss_after_mb": 370.0,
+      "rss_delta_mb": -0.5,
+      "mean_vehicle_detections": 1.0,
+      "model_size_mb": 19.48
+    },
+    {
+      "model": "yolo26s_openvino_model",
+      "frames": 20,
+      "imgsz": 640,
+      "threads": 4,
+      "confidence": 0.15,
+      "iou": 0.6,
+      "max_detections": 300,
+      "p50_ms": 303.05,
+      "p95_ms": 411.64,
+      "mean_ms": 282.45,
+      "throughput_fps": 3.54,
+      "cpu_seconds_per_frame": 0.9289,
+      "rss_after_mb": 740.8,
+      "rss_delta_mb": 114.3,
+      "mean_vehicle_detections": 1.0,
+      "model_size_mb": 36.69
+    }
+  ]
+}

@@ -7,6 +7,13 @@ from ultralytics.engine.results import Boxes
 from ultralytics.trackers.byte_tracker import BYTETracker
 from ai.tracking.base_tracker import BaseTracker
 from ai.detection.detection_types import Detection
+from config.model import (
+    TRACK_HIGH_THRESHOLD,
+    TRACK_LOW_THRESHOLD,
+    NEW_TRACK_THRESHOLD,
+    TRACK_BUFFER_FRAMES,
+    TRACK_MATCH_THRESHOLD,
+)
 
 
 class CameraBYTETracker(BYTETracker):
@@ -21,8 +28,12 @@ class ByteTracker(BaseTracker):
     def __init__(self, model_manager=None):
         self.model_manager = model_manager
         self.tracker = CameraBYTETracker(SimpleNamespace(
-            track_high_thresh=0.25, track_low_thresh=0.1, new_track_thresh=0.25,
-            track_buffer=30, match_thresh=0.8, fuse_score=True,
+            track_high_thresh=TRACK_HIGH_THRESHOLD,
+            track_low_thresh=TRACK_LOW_THRESHOLD,
+            new_track_thresh=NEW_TRACK_THRESHOLD,
+            track_buffer=TRACK_BUFFER_FRAMES,
+            match_thresh=TRACK_MATCH_THRESHOLD,
+            fuse_score=True,
         ))
 
     def update(self, detections: List[Detection], frame: Optional[np.ndarray] = None,

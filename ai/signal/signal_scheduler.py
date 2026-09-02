@@ -13,7 +13,13 @@ from ai.signal.signal_types import (
     PriorityResult,
 )
 from ai.signal.signal_decision import SignalDecision
-from config.signal import MIN_GREEN_SEC, MAX_GREEN_SEC, YELLOW_SEC
+from config.signal import (
+    MIN_GREEN_SEC,
+    MAX_GREEN_SEC,
+    YELLOW_SEC,
+    FULL_GREEN_PCE,
+    FULL_GREEN_QUEUE_SEC,
+)
 from ai.utils.logger import get_logger
 
 logger = get_logger("SignalScheduler")
@@ -34,6 +40,10 @@ class SignalScheduler:
         self.min_green_sec = min_green_sec
         self.max_green_sec = max_green_sec
         self.yellow_sec = yellow_sec
+        # Clockwise service order. Demand changes green duration, not who gets
+        # the next turn, so a permanently busy approach cannot starve another.
+        self.cycle_order = [LaneName.NORTH, LaneName.EAST, LaneName.SOUTH, LaneName.WEST]
+        self._next_cycle_index = 0
         logger.info(
             f"SignalScheduler initialized (Min Green: {self.min_green_sec}s, "
             f"Max Green: {self.max_green_sec}s, Yellow: {self.yellow_sec}s)"
@@ -76,24 +86,45 @@ class SignalScheduler:
 
         return decision
 
-    def select_eligible(self, result, lane_stats, fresh_lanes, waiting_cycles, max_wait_cycles=3):
-        """Do not serve stale/empty approaches while fresh demand exists.
-        After a bounded number of completed phases, serve the oldest waiting
-        demand even if its weighted score is smaller than a busy approach.
+    def select_eligible(self, result, lane_stats, fresh_lanes, waiting_cycles=None, max_wait_cycles=3):
+        """Select the next fresh, non-empty approach in clockwise order.
+
+        Emergency demand may pre-empt the cursor. Normal demand always resumes
+        from the next position, giving every occupied lane one turn per cycle.
+        Empty and stale lanes are skipped instead of consuming a minimum green.
+        The legacy waiting arguments remain accepted for API compatibility.
         """
         key = lambda score: getattr(score.lane, "value", str(score.lane)).lower()
         demand = [s for s in result.scores if key(s) in fresh_lanes and lane_stats.get(key(s)) and lane_stats[key(s)].raw_count > 0]
-        eligible = demand or [s for s in result.scores if key(s) in fresh_lanes]
-        if not eligible:
+        if not demand:
             return None, False
         emergency = [s for s in demand if lane_stats[key(s)].has_priority_vehicle]
         if emergency:
-            result.highest_priority = max(emergency, key=lambda s: s.score)
+            winner = max(emergency, key=lambda s: s.score)
+            result.highest_priority = winner
+            self._advance_after(winner.lane)
             return result, False
-        overdue = [s for s in demand if waiting_cycles.get(getattr(s.lane, "value", str(s.lane)), 0) >= max_wait_cycles]
-        winner = max(overdue, key=lambda s: (waiting_cycles.get(getattr(s.lane, "value", str(s.lane)), 0), s.score)) if overdue else max(eligible, key=lambda s: s.score)
+
+        demand_by_lane = {key(score): score for score in demand}
+        winner = None
+        for offset in range(len(self.cycle_order)):
+            lane = self.cycle_order[(self._next_cycle_index + offset) % len(self.cycle_order)]
+            candidate = demand_by_lane.get(lane.value.lower())
+            if candidate is not None:
+                winner = candidate
+                break
+        if winner is None:
+            return None, False
         result.highest_priority = winner
-        return result, bool(overdue)
+        self._advance_after(winner.lane)
+        return result, False
+
+    def _advance_after(self, lane) -> None:
+        lane_key = getattr(lane, "value", str(lane)).lower()
+        for index, configured in enumerate(self.cycle_order):
+            if configured.value.lower() == lane_key:
+                self._next_cycle_index = (index + 1) % len(self.cycle_order)
+                return
 
     def _select_green_lane(self, priority_result: PriorityResult) -> PriorityScore:
         """
@@ -112,14 +143,23 @@ class SignalScheduler:
             ratio = winner_score / total_junction_score
             green_time = MIN_GREEN + ratio * (MAX_GREEN - MIN_GREEN)
         """
-        total_score_sum = sum(max(0.0, s.score) for s in priority_result.scores)
-
-        # Edge case: All zero scores or non-positive total
-        if total_score_sum <= 0 or winner.score <= 0:
+        if winner.score <= 0:
             return self.min_green_sec
 
-        # Compute winner ratio
-        ratio = max(0.0, winner.score) / total_score_sum
+        # Use absolute approach demand so one light vehicle does not receive the
+        # maximum merely because all other approaches are empty. PCE captures
+        # vehicle size; accumulated queue time adds a smaller delay component.
+        breakdown = winner.breakdown
+        pce = max(0.0, breakdown.raw_pce)
+        queue_sec = max(0.0, breakdown.raw_queue_sec)
+        if pce > 0 or queue_sec > 0:
+            load_ratio = min(1.0, pce / FULL_GREEN_PCE)
+            queue_ratio = min(1.0, queue_sec / FULL_GREEN_QUEUE_SEC)
+            ratio = 0.75 * load_ratio + 0.25 * queue_ratio
+        else:
+            # Compatibility fallback for callers that only provide scores.
+            total_score_sum = sum(max(0.0, s.score) for s in priority_result.scores)
+            ratio = max(0.0, winner.score) / total_score_sum if total_score_sum else 0.0
 
         # Calculate adaptive duration
         raw_duration = self.min_green_sec + (ratio * (self.max_green_sec - self.min_green_sec))
@@ -150,6 +190,6 @@ class SignalScheduler:
             red_lanes=red_lanes,
             priority_score=winner.score,
             reason=DecisionReason.NORMAL,
-            reason_details=f"Highest weighted priority score ({winner.score:.2f}) for lane '{winner_str}'.",
+            reason_details=f"Fair adaptive cycle selected lane '{winner_str}' with demand score {winner.score:.2f}.",
             timestamp=priority_result.timestamp or time.time(),
         )

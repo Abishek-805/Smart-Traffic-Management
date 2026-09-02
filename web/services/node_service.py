@@ -15,9 +15,35 @@ logger = get_logger("NodeService")
 import socket
 import os
 import uuid
+import ipaddress
+
+import psutil
+
+
+def _active_windows_hotspot_ip() -> str | None:
+    """Return the IPv4 address exposed by an active Windows Mobile Hotspot."""
+    try:
+        stats = psutil.net_if_stats()
+        for name, addresses in psutil.net_if_addrs().items():
+            if not name.lower().startswith("local area connection*"):
+                continue
+            if not stats.get(name) or not stats[name].isup:
+                continue
+            for address in addresses:
+                if address.family != socket.AF_INET:
+                    continue
+                ip = ipaddress.ip_address(address.address)
+                if ip.is_private and not ip.is_link_local and not ip.is_loopback:
+                    return address.address
+    except (OSError, RuntimeError, ValueError):
+        logger.warning("Unable to inspect Windows hotspot adapters; using routed LAN address")
+    return None
 
 def get_local_ip() -> str:
     """Dynamically get the host machine's active LAN IP address."""
+    hotspot_ip = _active_windows_hotspot_ip()
+    if hotspot_ip:
+        return hotspot_ip
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))

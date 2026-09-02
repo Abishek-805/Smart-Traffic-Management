@@ -1,4 +1,4 @@
-"""Reproducible four-camera transport/load benchmark, using explicit local test clips.
+"""Reproducible four-camera load benchmark using explicit real traffic images.
 Never starts demo inputs in the application. Run with no physical cameras connected.
 """
 import argparse, asyncio, base64, json, time
@@ -11,23 +11,19 @@ def summarize(values):
 
 async def benchmark(args):
     directions=('north','east','south','west')
-    frames={}
-    for direction in directions:
-        cap=cv2.VideoCapture(str(Path(args.videos)/f'{direction}.mp4'))
-        if not cap.isOpened(): raise RuntimeError(f'Missing explicit test clip: {direction}')
-        bank=[]
-        native_fps=cap.get(cv2.CAP_PROP_FPS) or 30
-        for i in range(32):
-            cap.set(cv2.CAP_PROP_POS_MSEC, i * 1000/args.fps)
-            ok,frame=cap.read()
-            if not ok: break
-            h,w=frame.shape[:2]; scale=min(1,args.edge/max(h,w))
-            frame=cv2.resize(frame,(round(w*scale),round(h*scale)))
-            _,jpeg=cv2.imencode('.jpg',frame,[cv2.IMWRITE_JPEG_QUALITY,65])
-            bank.append(base64.b64encode(jpeg).decode())
-        cap.release()
-        if not bank: raise RuntimeError(f'Empty test clip: {direction}')
-        frames[direction]=bank
+    image_root=Path(args.images)
+    paths=sorted(path for path in image_root.rglob('*') if path.suffix.lower() in {'.jpg','.jpeg','.png','.webp'})
+    if not paths: raise RuntimeError(f'No real traffic images found under: {image_root}')
+    bank=[]
+    for path in paths[:128]:
+        frame=cv2.imread(str(path))
+        if frame is None: continue
+        h,w=frame.shape[:2]; scale=min(1,args.edge/max(h,w))
+        frame=cv2.resize(frame,(round(w*scale),round(h*scale)))
+        ok,jpeg=cv2.imencode('.jpg',frame,[cv2.IMWRITE_JPEG_QUALITY,65])
+        if ok: bank.append(base64.b64encode(jpeg).decode())
+    if not bank: raise RuntimeError(f'No decodable traffic images under: {image_root}')
+    frames={direction: bank[index::len(directions)] or bank for index,direction in enumerate(directions)}
     results={d:{'ack_ms':[],'server_ms':[],'queue_ms':[],'inference_ms':[],
         'preview_ms':[],'counts':[],'sent':0,'bytes':0,'acked':0} for d in directions}
     pending={}; tasks=[]; samples=[]
@@ -111,7 +107,7 @@ async def benchmark(args):
             errors = [str(e) for e in outcomes if isinstance(e, Exception)]
             if errors: raise RuntimeError('Benchmark task failure: ' + '; '.join(errors))
     out={'config':{'fps_per_camera':args.fps,'edge':args.edge,'seconds':args.seconds,'warmup':warmup},
-        'scope':'Four localhost WebSocket clients replaying local clips; ACK and preview arrival, not physical phone latency or accuracy.',
+        'scope':'Four localhost WebSocket clients replaying real local images; ACK and preview arrival, not physical phone latency or labelled accuracy.',
         'directions':{},'resources':{'cpu_percent_one_core_100':summarize([s[0] for s in samples]),
             'rss_mb':summarize([s[1] for s in samples]),'rss_growth_mb':round(samples[-1][1]-samples[0][1],2) if samples else None}}
     for d,r in results.items():
@@ -125,6 +121,6 @@ async def benchmark(args):
     print(json.dumps(out,indent=2))
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--url',default='http://127.0.0.1:8000');p.add_argument('--pid',type=int,required=True)
-    p.add_argument('--videos',required=True);p.add_argument('--seconds',type=int,default=20);p.add_argument('--fps',type=float,default=4)
+    p.add_argument('--images',required=True,help='Directory containing real traffic images');p.add_argument('--seconds',type=int,default=20);p.add_argument('--fps',type=float,default=4)
     p.add_argument('--edge',type=int,default=640);p.add_argument('--output',required=True)
     asyncio.run(benchmark(p.parse_args()))

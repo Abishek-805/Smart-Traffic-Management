@@ -13,7 +13,7 @@ import time
 from typing import List, Optional, Tuple
 import numpy as np
 
-from config.traffic import VEHICLE_CLASSES, TARGET_CLASS_IDS
+from config.traffic import TARGET_CLASS_NAMES, normalize_vehicle_class
 from ai.models.model_manager import ModelManager
 from ai.detection.detection_types import Detection
 from ai.utils.logger import get_logger
@@ -29,8 +29,20 @@ class VehicleDetector:
 
     def __init__(self, model_manager: Optional[ModelManager] = None):
         self.model_manager = model_manager or ModelManager()
-        self.target_class_ids = list(TARGET_CLASS_IDS)
-        logger.info(f"VehicleDetector initialized focusing on classes: {VEHICLE_CLASSES}")
+        model_names = getattr(self.model_manager.model, "names", {})
+        if isinstance(model_names, list):
+            model_names = dict(enumerate(model_names))
+        self.vehicle_classes = {
+            int(class_id): normalize_vehicle_class(class_name)
+            for class_id, class_name in model_names.items()
+            if normalize_vehicle_class(class_name) in TARGET_CLASS_NAMES
+        }
+        if not self.vehicle_classes:
+            raise ValueError(
+                "The selected model contains none of the supported traffic vehicle classes"
+            )
+        self.target_class_ids = sorted(self.vehicle_classes)
+        logger.info("VehicleDetector model classes: %s", self.vehicle_classes)
 
     def detect(self, frame: np.ndarray, frame_number: int = 0, timestamp: float = 0.0) -> Tuple[List[Detection], float]:
         """
@@ -54,7 +66,7 @@ class VehicleDetector:
                     conf   = float(box.conf[0].item())
                     xyxy   = box.xyxy[0].cpu().numpy().astype(int)
 
-                    class_name = VEHICLE_CLASSES.get(cls_id, "vehicle")
+                    class_name = self.vehicle_classes.get(cls_id, "vehicle")
                     bbox = (int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3]))
 
                     detection = Detection(
@@ -109,7 +121,7 @@ class VehicleDetector:
 
                 for i in range(len(cls_all)):
                     cls_id     = cls_all[i]
-                    class_name = VEHICLE_CLASSES.get(cls_id, "vehicle")
+                    class_name = self.vehicle_classes.get(cls_id, "vehicle")
                     bbox = (
                         int(xyxy_all[i][0]),
                         int(xyxy_all[i][1]),

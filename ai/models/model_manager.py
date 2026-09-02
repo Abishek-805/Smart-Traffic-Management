@@ -79,6 +79,11 @@ class ModelManager:
                 self.max_detections,
                 self.cpu_threads,
             )
+            logger.info(
+                "Detection thresholds: conf=%.2f, iou=%.2f",
+                self.confidence,
+                self.iou,
+            )
         except Exception as e:
             logger.error(f"Failed to load YOLO model '{self.model_name}': {e}", exc_info=True)
             raise e

@@ -210,6 +210,58 @@ class TestCommunicationServer(unittest.TestCase):
                 }
             )
 
+    def test_07_four_independent_phone_sessions(self):
+        """Four phones can pair concurrently; identity is not tied to client IP."""
+        async def scenario():
+            directions = ("north", "east", "south", "west")
+
+            class MockWebSocket:
+                async def send_json(self, data): pass
+                async def close(self, code=1000, reason=None): pass
+
+            sockets = {direction: MockWebSocket() for direction in directions}
+            packets = []
+            for direction in directions:
+                node = f"PHONE-{direction.upper()}"
+                token = f"pair-{direction}"
+                self.session_mgr.register_pairing_session(
+                    direction, node, token, time.time() + 60
+                )
+                packets.append((direction, node, {
+                    "message_type": "REGISTER_CAMERA",
+                    "protocol_version": PROTOCOL_VERSION,
+                    "token": token,
+                    "payload": {"node_id": node, "camera_direction": direction},
+                }))
+
+            responses = await asyncio.gather(*(
+                self.handler.process_message(packet, sockets[direction])
+                for direction, _, packet in packets
+            ))
+            self.assertTrue(all(response["type"] == "REGISTRATION_ACK" for response in responses))
+            self.assertEqual(len(self.session_mgr.sessions), 4)
+            self.assertEqual(len(self.conn_mgr.active_connections), 4)
+            self.assertEqual(
+                {session.camera_direction for session in self.session_mgr.sessions.values()},
+                set(directions),
+            )
+
+            # A north phone cannot submit a frame or heartbeat as east even if
+            # both phones share an address behind the same Wi-Fi router.
+            north_response = responses[0]
+            mismatch = await self.handler.process_message({
+                "message_type": "HEARTBEAT",
+                "protocol_version": PROTOCOL_VERSION,
+                "payload": {
+                    "node_id": "PHONE-NORTH",
+                    "session_token": north_response["payload"]["session_token"],
+                    "direction": "east",
+                },
+            }, sockets["north"])
+            self.assertEqual(mismatch["payload"]["error_code"], "DIRECTION_MISMATCH")
+
+        asyncio.run(scenario())
+
 
 if __name__ == "__main__":
     unittest.main()

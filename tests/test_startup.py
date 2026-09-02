@@ -77,7 +77,7 @@ class TestStartupPackage(unittest.TestCase):
         self.assertEqual(len(issues), 0)
 
         # Invalid camera configuration
-        bad_cfg = StartupConfig(camera=CameraConfig(sources={"north": 0}))
+        bad_cfg = StartupConfig(camera=CameraConfig(mode="usb", sources={"north": 0}))
         is_valid, issues = ConfigValidator.validate(bad_cfg)
         self.assertFalse(is_valid)
 
@@ -102,7 +102,8 @@ class TestStartupPackage(unittest.TestCase):
         config = StartupManager.run(interactive=False)
         self.assertIsNotNone(config)
         self.assertIsInstance(config, StartupConfig)
-        self.assertIn("north", config.camera.sources)
+        self.assertEqual(config.camera.mode, "mobile")
+        self.assertEqual(config.camera.sources, {})
 
     def test_05_com_port_discovery(self):
         """Test discover_com_ports returns a list."""

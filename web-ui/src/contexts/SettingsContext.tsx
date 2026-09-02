@@ -8,7 +8,7 @@ import { UserSettings } from '../types';
 
 const defaultSettings: UserSettings = {
   theme: 'dark',
-  confidenceThreshold: 0.35,
+  confidenceThreshold: 0.08,
   minGreenTime: 10,
   maxGreenTime: 60,
   comPort: 'COM3',
@@ -16,6 +16,8 @@ const defaultSettings: UserSettings = {
   autoRefreshRate: 5,
   enableNotifications: true,
 };
+
+const SETTINGS_VERSION = '2';
 
 interface SettingsContextType {
   settings: UserSettings;
@@ -33,7 +35,14 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [settings, setSettings] = useState<UserSettings>(() => {
     try {
       const saved = localStorage.getItem('app_user_settings');
-      return saved ? JSON.parse(saved) : defaultSettings;
+      if (!saved) return defaultSettings;
+      const parsed = { ...defaultSettings, ...JSON.parse(saved) };
+      // Version 2 lowers the detector floor so ByteTrack can recover weak,
+      // partially occluded vehicles. Migrate the old 0.35 default once.
+      if (localStorage.getItem('app_user_settings_version') !== SETTINGS_VERSION) {
+        parsed.confidenceThreshold = defaultSettings.confidenceThreshold;
+      }
+      return parsed;
     } catch {
       return defaultSettings;
     }
@@ -41,6 +50,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   useEffect(() => {
     localStorage.setItem('app_user_settings', JSON.stringify(settings));
+    localStorage.setItem('app_user_settings_version', SETTINGS_VERSION);
   }, [settings]);
 
   const updateSettings = (partial: Partial<UserSettings>) => {

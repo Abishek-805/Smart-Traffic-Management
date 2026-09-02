@@ -19,7 +19,7 @@ import psutil
 import torch
 from ultralytics import YOLO
 
-VEHICLE_CLASSES = [2, 3, 5, 7]
+VEHICLE_CLASSES = [1, 2, 3, 5, 7]
 
 
 def load_frames(source: Path, count: int) -> list[np.ndarray]:
@@ -43,15 +43,16 @@ def load_frames(source: Path, count: int) -> list[np.ndarray]:
     return frames
 
 
-def benchmark(model_name: str, frames: list[np.ndarray], imgsz: int, threads: int) -> dict:
+def benchmark(model_name: str, frames: list[np.ndarray], imgsz: int, threads: int,
+              conf: float, iou: float, max_det: int) -> dict:
     torch.set_num_threads(threads)
     try:
         torch.set_num_interop_threads(1)
     except RuntimeError:
         pass
     model = YOLO(model_name)
-    predict_args = dict(device="cpu", imgsz=imgsz, conf=0.35, iou=0.45,
-                        classes=VEHICLE_CLASSES, verbose=False)
+    predict_args = dict(device="cpu", imgsz=imgsz, conf=conf, iou=iou,
+                        max_det=max_det, classes=VEHICLE_CLASSES, verbose=False)
     for frame in frames[: min(3, len(frames))]:
         model.predict(frame, **predict_args)
 
@@ -79,6 +80,9 @@ def benchmark(model_name: str, frames: list[np.ndarray], imgsz: int, threads: in
         "frames": len(frames),
         "imgsz": imgsz,
         "threads": threads,
+        "confidence": conf,
+        "iou": iou,
+        "max_detections": max_det,
         "p50_ms": round(float(np.percentile(latencies, 50)), 2),
         "p95_ms": round(float(np.percentile(latencies, 95)), 2),
         "mean_ms": round(float(np.mean(latencies)), 2),
@@ -93,17 +97,21 @@ def benchmark(model_name: str, frames: list[np.ndarray], imgsz: int, threads: in
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Benchmark edge models on identical traffic frames")
-    parser.add_argument("--models", nargs="+", default=["yolo11n.pt", "yolo26n.pt"])
-    parser.add_argument("--source", default="videos/traffic.mp4")
+    parser.add_argument("--models", nargs="+", default=["yolo26n.pt", "yolo26s.pt"])
+    parser.add_argument("--source", default="tests/fixtures/ultralytics_bus.jpg")
     parser.add_argument("--frames", type=int, default=40)
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--threads", type=int, default=4)
+    parser.add_argument("--conf", type=float, default=0.15)
+    parser.add_argument("--iou", type=float, default=0.60)
+    parser.add_argument("--max-det", type=int, default=300)
     parser.add_argument("--output", default="docs/benchmarks/edge-models-laptop.json")
     args = parser.parse_args()
 
     source = Path(args.source)
     frames = load_frames(source, max(5, args.frames))
-    results = [benchmark(name, frames, args.imgsz, args.threads) for name in args.models]
+    results = [benchmark(name, frames, args.imgsz, args.threads,
+                         args.conf, args.iou, args.max_det) for name in args.models]
     report = {
         "scope": "Identical local traffic frames; runtime/resource comparison only. Not an accuracy or power-meter benchmark.",
         "source": str(source),

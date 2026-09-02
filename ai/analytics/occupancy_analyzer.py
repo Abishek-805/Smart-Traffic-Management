@@ -27,6 +27,7 @@ class OccupancyAnalyzer:
             "bus": 0,
             "truck": 0,
             "motorcycle": 0,
+            "bicycle": 0,
         }
         pce_score = 0.0
 

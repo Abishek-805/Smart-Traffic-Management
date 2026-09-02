@@ -1,6 +1,6 @@
-"""Exercise four simulated camera clients against an already running local runtime.
+"""Exercise four camera clients against an already running local runtime.
 
-Uses synthetic blank JPEGs to test transport and isolation, not detector accuracy.
+Uses a real street-photo fixture to test transport and isolation, not accuracy.
 Run: .venv/Scripts/python scripts/smoke_runtime.py
 """
 import asyncio
@@ -11,22 +11,27 @@ from contextlib import AsyncExitStack
 
 import cv2
 import httpx
-import numpy as np
+from pathlib import Path
 import websockets
 
 
 async def main():
     directions = ('north', 'east', 'south', 'west')
-    _, image = cv2.imencode('.jpg', np.zeros((360, 640, 3), np.uint8))
+    source = cv2.imread(str(Path(__file__).parents[1] / 'tests' / 'fixtures' / 'ultralytics_bus.jpg'))
+    if source is None:
+        raise RuntimeError('Missing real traffic fixture')
+    _, image = cv2.imencode('.jpg', source)
     jpeg = base64.b64encode(image).decode()
     async with AsyncExitStack() as stack:
         http = await stack.enter_async_context(httpx.AsyncClient(base_url='http://127.0.0.1:8000'))
         await http.post('/api/v1/system/start')
         clients = []
         for direction in directions:
+            qr = (await http.get('/api/v1/qr/generate', params={'direction': direction})).json()['data']['payload']
             ws = await stack.enter_async_context(websockets.connect('ws://127.0.0.1:8000/ws/camera'))
-            node = 'SMOKE-' + direction.upper()
-            await ws.send(json.dumps({'type': 'REGISTER_CAMERA', 'payload': {'node_id': node, 'camera_direction': direction}}))
+            node = qr['session']
+            await ws.send(json.dumps({'type': 'REGISTER_CAMERA', 'token': qr['token'],
+                'payload': {'node_id': node, 'session': node, 'camera_direction': direction}}))
             ack = json.loads(await asyncio.wait_for(ws.recv(), 5))
             assert ack['type'] == 'REGISTRATION_ACK', ack
             clients.append((ws, node, ack['payload']['session_token'], direction))

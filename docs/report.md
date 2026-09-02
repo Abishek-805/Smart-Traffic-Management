@@ -120,7 +120,7 @@ npx expo start
 ```bash
 python main.py
 ```
-- Launches the standalone OpenCV desktop visualization dashboard with automatic synthetic traffic video fallback generation.
+- Launches the standalone OpenCV dashboard only with explicitly configured real USB, RTSP, or video sources; there is no synthetic fallback.
 
 ---
 

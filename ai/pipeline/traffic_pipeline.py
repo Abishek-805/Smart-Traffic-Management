@@ -10,8 +10,8 @@ import math
 import cv2
 import numpy as np
 
-from config.paths import DEFAULT_VIDEO_PATH, get_timestamped_output_path
-from ai.camera import CameraManager, STREAM_CONFIG
+from config.paths import get_timestamped_output_path
+from ai.camera import CameraManager
 from ai.models.model_manager import ModelManager
 from ai.detection.detector import VehicleDetector
 from ai.tracking.byte_tracker import ByteTracker
@@ -21,7 +21,6 @@ from ai.state.count_stabilizer import CountStabilizer
 from ai.analytics.analytics_exporter import AnalyticsExporter, LaneStatistics
 from ai.signal import (
     PriorityCalculator,
-    FairnessManager,
     EmergencyOverride,
     SignalScheduler,
     SignalController,
@@ -36,6 +35,7 @@ from ai.pipeline.pipeline_health import PipelineHealth
 from ai.pipeline.intersection_state import LaneProcessingResult, IntersectionState
 from ai.pipeline.pipeline_result import PipelineResult
 from ai.utils.logger import get_logger
+from config.signal import EMPTY_LANE_RELEASE_SEC, ALL_RED_SEC
 
 import threading
 
@@ -95,7 +95,6 @@ class TrafficPipeline:
 
         # 3. Adaptive Signal Decision Layer
         self.priority_calculator = PriorityCalculator()
-        self.fairness_manager = FairnessManager()
         self.emergency_override = EmergencyOverride()
         self.signal_scheduler = SignalScheduler()
         self.signal_controller = SignalController()
@@ -106,6 +105,7 @@ class TrafficPipeline:
         self.active_hardware_cmd: Optional[HardwareCommand] = None
         self.last_priority_result: Optional[PriorityResult] = None
         self.phase_start_time: float = 0.0
+        self._active_empty_since: Optional[float] = None
 
         # 5. Output Video Recording Path
         if save_output and output_path is None:
@@ -348,9 +348,37 @@ class TrafficPipeline:
         current_mono_time = time.monotonic()
         elapsed_sec = current_mono_time - self.phase_start_time if self.phase_start_time > 0 else 999.0
 
+        # When the currently green approach becomes empty, end green after a
+        # short confirmation window. Yellow and all-red clearance still run;
+        # the next occupied approach is then selected by the cycle cursor.
+        if self.active_decision:
+            active_key = getattr(self.active_decision.green_lane, "value", str(self.active_decision.green_lane)).lower()
+            active_stats = lane_stats_map.get(active_key)
+            has_fresh_active_observation = active_key in frames_data
+            active_is_empty = bool(
+                has_fresh_active_observation
+                and active_stats is not None
+                and active_stats.raw_count == 0
+            )
+            if active_is_empty:
+                if self._active_empty_since is None:
+                    self._active_empty_since = current_mono_time
+                elif (
+                    current_mono_time - self._active_empty_since >= EMPTY_LANE_RELEASE_SEC
+                    and elapsed_sec < self.active_decision.green_duration_sec
+                ):
+                    self.active_decision.green_duration_sec = max(1, int(math.floor(elapsed_sec)))
+                    logger.info("[SCHEDULER EVENT] ending empty lane '%s' green early", active_key)
+            elif has_fresh_active_observation:
+                self._active_empty_since = None
+
         is_phase_expired = (
             self.active_decision is None
-            or elapsed_sec >= (self.active_decision.green_duration_sec + self.active_decision.yellow_duration_sec + 1)
+            or elapsed_sec >= (
+                self.active_decision.green_duration_sec
+                + self.active_decision.yellow_duration_sec
+                + ALL_RED_SEC
+            )
         )
 
         is_phase_change = False
@@ -363,32 +391,30 @@ class TrafficPipeline:
             # Priority Calculation across all 4 approach lanes
             base_priority_result = self.priority_calculator.calculate(lane_stats_map)
 
-            # Starvation Fairness Manager
-            fairness_priority_result = self.fairness_manager.apply_fairness(base_priority_result)
-
             # Emergency Vehicle Override
             final_priority_result = self.emergency_override.check_and_override(
-                fairness_priority_result, lane_stats_map
+                base_priority_result, lane_stats_map
             )
 
             fresh_lanes = {name for name in lane_stats_map if now_mono - ctx.lane_last_seen.get(name, 0) < 3}
-            final_priority_result, starvation = self.signal_scheduler.select_eligible(
-                final_priority_result, lane_stats_map, fresh_lanes, self.fairness_manager.cycles_since_served)
+            final_priority_result, _ = self.signal_scheduler.select_eligible(
+                final_priority_result, lane_stats_map, fresh_lanes)
             if final_priority_result is None:
                 self.active_decision = None
                 self.active_hardware_cmd = None
                 return PipelineResult(has_frame=bool(frames_data), lane_stats=lane_stats_map,
                     intersection_state=intersection_state, signal_state="ALL_RED")
             self.active_decision = self.signal_scheduler.schedule(final_priority_result, phase_id=self.phase_counter)
-            if starvation:
-                from ai.signal.signal_types import DecisionReason
-                self.active_decision.reason = DecisionReason.STARVATION
-                self.active_decision.reason_details = "Bounded waiting: serving a fresh approach after three waiting phases"
+            from ai.signal.signal_types import DecisionReason
+            selected_key = getattr(
+                self.active_decision.green_lane, "value", str(self.active_decision.green_lane)
+            ).lower()
+            if lane_stats_map[selected_key].has_priority_vehicle:
+                self.active_decision.reason = DecisionReason.EMERGENCY
+                self.active_decision.reason_details = "Fresh emergency vehicle detection pre-empted the normal cycle"
             self.last_priority_result = final_priority_result
             self.phase_start_time = current_mono_time
-
-            # Update Fairness Manager served lane
-            self.fairness_manager.update_served(self.active_decision.green_lane)
+            self._active_empty_since = None
 
             # Phase 3.5: Track scheduler decision stability
             green_lane_str = (

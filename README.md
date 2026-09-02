@@ -1,8 +1,10 @@
 # Smart Traffic Management System
 
 A local traffic-monitoring prototype: four Android camera nodes send JPEG samples to
-YOLO26n and independent ByteTrack trackers. FastAPI serves the dashboard, directional
-camera previews, measured telemetry and a simulated adaptive signal controller.
+a configurable YOLO detector and independent ByteTrack trackers. The laptop test
+profile uses YOLO26s; the Raspberry Pi candidate is a fine-tuned YOLO26n NCNN model.
+FastAPI serves the dashboard, directional camera previews, measured telemetry and a
+simulated adaptive signal controller.
 
 **Use only on a trusted LAN.** Camera registration uses an expiring one-time QR
 secret and the server issues a session token for later frames/reconnects. REST
@@ -72,7 +74,7 @@ Generate new QR codes after changing the address or port.
 ```text
 Android JPEG samples -> /ws/camera -> latest frame per direction
   -> shared configurable YOLO detector -> independent per-camera ByteTrack
-  -> vehicle state / PCE / waiting estimates -> simulated scheduler
+  -> vehicle state / PCE / waiting estimates -> fair clockwise adaptive scheduler
   -> /ws/telemetry + /api/v1/cameras/{direction}/feed -> React dashboard
 ```
 
@@ -98,9 +100,20 @@ Android JPEG samples -> /ws/camera -> latest frame per direction
   limits take effect at the next phase. Runtime settings reset on server restart;
   theme and notification preferences stay in the browser.
 
-The supplied COCO model supports cars, motorcycles, buses and trucks. Emergency
+The supplied COCO model supports bicycles, cars, motorcycles, buses and trucks. Emergency
 recognition and reinforcement learning are **not implemented**. ESP32 is kept in
 simulation in the combined and split web runtimes.
+
+The laptop profile uses a detector floor of 0.08 and ByteTrack high/new-track
+thresholds of 0.15. This lets ByteTrack use weak boxes to maintain an existing
+vehicle through occlusion without allowing every weak box to create a new count.
+These values were calibrated on a small UVH-26 validation sample and still require
+full validation before deployment.
+
+For the production detector, prepare the real IISc UVH-26 traffic-camera dataset
+and fine-tune YOLO26n using [the model training guide](docs/MODEL_TRAINING.md).
+The runtime discovers supported classes from the loaded model, so 14-class
+fine-tuned weights work without hard-coded COCO class IDs.
 
 ## Optional split deployment
 
@@ -134,16 +147,15 @@ Browser API and WebSocket URLs are relative so the dashboard also works from ano
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q --timeout=60
 .\.venv\Scripts\python.exe scripts/smoke_runtime.py
-.\.venv\Scripts\python.exe scripts/benchmark_runtime.py --pid SERVER_PID --videos videos --seconds 60 --fps 4 --output docs/benchmarks/local-four.json
-# When a labelled project dataset is available:
-.\.venv\Scripts\python.exe scripts/evaluate_detector.py --data path/to/traffic.yaml
+.\.venv\Scripts\python.exe scripts/benchmark_runtime.py --pid SERVER_PID --images path/to/real-traffic-images --seconds 60 --fps 4 --output docs/benchmarks/local-four.json
+.\.venv\Scripts\python.exe scripts/evaluate_detector.py --data datasets/uvh26/traffic.yaml
 cd web-ui
 npm run build
 npm audit
 ```
 
 Run the smoke test with the combined service already listening on 8000. It creates
-four temporary synthetic camera clients, checks independent staleness and exercises
+four temporary camera clients using a real street-photo fixture, checks independent staleness and exercises
 Stop/Start; run it when no real phones are connected. It does not measure detector
 accuracy. Physical phone capture/endurance and annotated traffic accuracy tests
 remain required; see the validation report.

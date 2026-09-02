@@ -6,9 +6,9 @@ Verifies: REGISTER_CAMERA → VIDEO_FRAME → TrafficPipeline → PipelineResult
 import unittest
 import base64
 import cv2
-import numpy as np
 import asyncio
 import time
+from pathlib import Path
 
 from web.app import app
 from core.application_context import ApplicationContext
@@ -48,9 +48,10 @@ class TestE2EPipelineWebSocket(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(reg_response)
         self.assertEqual(reg_response.get("message_type"), "REGISTRATION_ACK")
 
-        # 2. Generate synthetic black frame with white rectangle (vehicle mock)
-        img = np.zeros((480, 640, 3), dtype=np.uint8)
-        cv2.rectangle(img, (100, 100), (300, 300), (255, 255, 255), -1)
+        # 2. Use a real street photograph. This remains a pipeline smoke test;
+        # labelled dataset evaluation is handled by evaluate_detector.py.
+        img = cv2.imread(str(Path(__file__).parent / "fixtures" / "ultralytics_bus.jpg"))
+        self.assertIsNotNone(img)
         ret, enc = cv2.imencode(".jpg", img)
         self.assertTrue(ret)
         frame_b64 = base64.b64encode(enc.tobytes()).decode("utf-8")

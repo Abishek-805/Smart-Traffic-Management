@@ -40,7 +40,7 @@ provided conversation export. Historical completion claims are not verification.
 
 ## Capability limits
 
-YOLO11 COCO weights currently recognize car, motorcycle, bus and truck classes.
+YOLO26n COCO weights currently recognize bicycle, car, motorcycle, bus and truck classes.
 Emergency-vehicle recognition and reinforcement learning are not implemented
 capabilities of this model. Do not advertise them as verified features.
 Native preview FPS, transmitted samples per second, inference FPS and network
@@ -58,10 +58,10 @@ hardware is not activated without selecting the physical port.
 | Connections | Issued credentials, socket ownership, direction collisions, reconnect cleanup and real REST command acknowledgments implemented and regression-tested. |
 | Mobile capture | Stable preview lifecycle, serial native resize/encode, processed-frame ACK backpressure, selectable 2/4 FPS profiles, resource disposal, cancellation and keep-awake implemented; TypeScript/Android JS export pass. Native build/device check remains open. |
 | Perception | Shared detector with separate ByteTrack associations, global-ID reset fix, confirmed track history and correct metric units implemented. Accuracy calibration remains open. |
-| Signals | Time-driven green/yellow/all-red phases, fresh-input eligibility, emergency precedence and three-phase starvation bound implemented and tested; stale/paused UI is all-red. Hardware remains simulation. |
+| Signals | Clockwise demand-aware phases, empty/stale skipping, bounded adaptive green, early empty-lane release, green/yellow/all-red timing and emergency precedence implemented and tested; stale/paused UI is all-red. Hardware remains simulation. |
 | Observability | Actual per-direction freshness/rates/counters, processed-frame/server/queue/inference latency, retained Redis state, error acknowledgments, and removal of fabricated history/status implemented. |
 | UI | Four feeds, top phase bar, always-visible main-dashboard directional QR pairing, larger metrics, honest unavailable states, responsive controls and light/dark theme implemented and browser-checked. |
-| Validation | 54 Python tests, live QR-to-WebSocket registration/start verification, mobile protocol regressions, production web build, Android JS export and lossless four-client 60-second load pass. See OPTIMIZATION_REPORT.md and VALIDATION_REPORT.md for measurements and release gates. |
+| Validation | Four independent session tests, real-image pipeline smoke tests, production web build, Android type checking and prior four-client load measurements are available. Physical four-phone and trained-model accuracy gates remain. |
 
 ## Remaining release gates, in order
 
@@ -70,9 +70,9 @@ hardware is not activated without selecting the physical port.
 2. Run one/two/four-phone tests for at least 15 minutes, including stop/start,
    disconnect/reconnect and background/foreground. Measure frame age, CPU, memory
    and visible preview stability instead of assuming the code fix proves them.
-3. Evaluate representative labelled traffic clips, including occlusion and night
-   scenes. Calibrate camera framing, thresholds and stop/queue estimates. Fine-tune
-   only if measured results justify it; no accuracy target or dataset was supplied.
+3. Download the official IISc UVH-26 release, prepare it with
+   `scripts/prepare_uvh26.py`, fine-tune YOLO26n, and evaluate the untouched
+   validation plus a labelled local-camera set. See `docs/MODEL_TRAINING.md`.
 4. Resolve remaining Expo 54 dependency advisories through a native-tested upgrade.
 5. Validate the Docker topology with real Redis, including service restarts and
    temporary loss of Redis; in-process fake-Redis contract tests are not that check.

@@ -539,7 +539,7 @@ config/
 
 tests/
 
-videos/
+datasets/ (local real traffic data; ignored by Git)
 
 logs/
 
@@ -561,7 +561,7 @@ The application must allow the user to choose the camera source.
 
 4. Webcam
 
-5. Demo Videos
+5. Explicit real video files for offline replay
 ```
 
 The system must NOT automatically use demo videos.

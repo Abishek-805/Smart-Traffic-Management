@@ -32,9 +32,12 @@ class ConfigValidator:
         cam_cfg = config.camera
         sources = cam_cfg.sources
 
-        for lane in cls.REQUIRED_LANES:
-            if lane not in sources:
-                issues.append(f"Missing camera stream source for direction '{lane}'.")
+        # Mobile mode receives dynamically paired WebSocket cameras, so an
+        # empty source map is expected. Fixed USB/RTSP/file modes need all lanes.
+        if cam_cfg.mode != "mobile":
+            for lane in cls.REQUIRED_LANES:
+                if lane not in sources:
+                    issues.append(f"Missing camera stream source for direction '{lane}'.")
 
         if cam_cfg.mode == "demo":
             for lane, path_str in sources.items():
@@ -48,7 +51,7 @@ class ConfigValidator:
             if len(set(indices)) != len(indices) and len(indices) > 1:
                 logger.warning(f"Multiple directions assigned identical USB camera indices: {indices}")
 
-        elif cam_cfg.mode in ("mobile", "rtsp"):
+        elif cam_cfg.mode == "rtsp":
             for lane, url_str in sources.items():
                 if isinstance(url_str, str) and not (
                     url_str.startswith("http://")

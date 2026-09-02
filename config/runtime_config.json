@@ -1,13 +1,8 @@
 {
     "version": 1,
     "camera": {
-        "mode": "demo",
-        "sources": {
-            "north": "C:\\Users\\ashek\\Desktop\\smart-traffic-management\\videos\\north.mp4",
-            "south": "C:\\Users\\ashek\\Desktop\\smart-traffic-management\\videos\\south.mp4",
-            "east": "C:\\Users\\ashek\\Desktop\\smart-traffic-management\\videos\\east.mp4",
-            "west": "C:\\Users\\ashek\\Desktop\\smart-traffic-management\\videos\\west.mp4"
-        }
+        "mode": "mobile",
+        "sources": {}
     },
     "hardware": {
         "port": "COM3 (SIMULATED)",

@@ -8,7 +8,6 @@ from config.paths import (
     VIDEOS_DIR,
     OUTPUTS_DIR,
     LOGS_DIR,
-    DEFAULT_VIDEO_PATH,
     DEFAULT_OUTPUT_PATH,
     APP_LOG_PATH,
     DETECTION_LOG_PATH,
@@ -33,8 +32,6 @@ from config.ui import (
     HUD_TEXT_COLOR,
 )
 from config.traffic import (
-    VEHICLE_CLASSES,
-    TARGET_CLASS_IDS,
     TARGET_CLASS_NAMES,
 )
 
@@ -44,7 +41,6 @@ __all__ = [
     "VIDEOS_DIR",
     "OUTPUTS_DIR",
     "LOGS_DIR",
-    "DEFAULT_VIDEO_PATH",
     "DEFAULT_OUTPUT_PATH",
     "APP_LOG_PATH",
     "DETECTION_LOG_PATH",
@@ -63,7 +59,5 @@ __all__ = [
     "TEXT_COLOR",
     "HUD_BG_COLOR",
     "HUD_TEXT_COLOR",
-    "VEHICLE_CLASSES",
-    "TARGET_CLASS_IDS",
     "TARGET_CLASS_NAMES",
 ]

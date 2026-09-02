@@ -135,18 +135,22 @@ export const ConfigAccordions: React.FC = () => {
           <div style={{ padding: '20px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <label style={{ fontSize: '0.82rem', fontWeight: 700 }}>Detection Confidence Threshold</label>
+                <label style={{ fontSize: '0.82rem', fontWeight: 700 }}>Detector confidence floor</label>
                 <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--color-primary)' }}>
                   {(settings.confidenceThreshold * 100).toFixed(0)}%
                 </span>
               </div>
               <input
-                type="range" min={0.1} max={0.9} step={0.05}
+                type="range" min={0.05} max={0.9} step={0.01}
                 value={settings.confidenceThreshold}
                 onChange={(e) => updateSettings({ confidenceThreshold: parseFloat(e.target.value) })}
                 aria-label="Detector confidence threshold"
                 style={{ width: '100%' }}
               />
+              <div style={{ marginTop: '6px', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                Calibrated default: 8%. ByteTrack creates new tracks at 15% and uses
+                weaker boxes only to recover an existing vehicle.
+              </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
               <div>

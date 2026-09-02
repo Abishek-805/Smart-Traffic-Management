@@ -20,6 +20,9 @@ models/*.pt
 models/*_ncnn_model/
 videos/*.mp4
 outputs/*.mp4
+outputs/training/
+outputs/evaluations/
+datasets/
 logs/
 *.log
 .venv*

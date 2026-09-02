@@ -1,5 +1,16 @@
 # Four-camera optimization report — 1 September 2026
 
+## Dense-traffic calibration update — 2 September 2026
+
+The throughput-oriented YOLO26n baseline undercounted small vehicles in a real
+UVH-26 validation sample. Across four 1920x1080 frames containing 41 labelled
+vehicles, YOLO26n at 640 pixels and confidence 0.35 returned 13 detections.
+YOLO26s at 640 pixels and confidence 0.15 returned 38 candidates and gave the best
+measured class-agnostic F1 (0.734) among the tested settings. Its mean warmed-up
+detector time was about 89 ms on this laptop. The laptop default is therefore
+YOLO26s, while the CPU-only Raspberry Pi target remains a fine-tuned YOLO26n NCNN
+export. Full UVH-26 and local-camera validation remain required.
+
 ## Edge model A/B
 
 YOLO26n was selected over YOLO11n after a controlled current-machine comparison.
@@ -16,15 +27,15 @@ accuracy still requires the labelled-data gate in `scripts/evaluate_detector.py`
 
 ## What was measured
 
-The reproducible benchmark opens four camera WebSockets, one for each direction,
-replays the supplied 640-pixel local clips at 4 FPS per camera, consumes all four
+The recorded benchmark opened four camera WebSockets, one for each direction,
+and replayed the former 640-pixel generated clips at 4 FPS per camera, consuming all four
 MJPEG previews, sends heartbeats, and records processed-frame ACK, server queue,
 inference, preview-byte arrival, process CPU and RSS.
 
 This is a localhost transport/load test. It does **not** measure Wi-Fi, physical
 phone capture/encode, screen rendering, battery watts, or model accuracy. The
-supplied direction clips produced zero vehicle detections, so they test four-feed
-throughput and isolation rather than detector quality.
+generated direction clips produced zero vehicle detections and have now been removed.
+Future runs require an explicit real-image directory via `--images`.
 
 ## Before and after
 
@@ -70,12 +81,13 @@ used the same laptop, model weights, 640-pixel images and four replay sources.
 
 - Only fresh camera approaches are eligible for a phase.
 - An empty/stale intersection falls back to all-red.
-- Green is followed by yellow and a one-second all-red clearance before another
+- Green is followed by yellow and a two-second all-red clearance before another
   phase is selected in software.
 - Fresh emergency demand preempts normal/starvation selection. The current COCO
   model does not identify emergency vehicles, so this is a tested control rule for
   a future detector input rather than a claimed live capability.
-- Fresh demand waiting for three completed phases is served to bound starvation.
+- Occupied approaches are served clockwise (North, East, South, West); empty or
+  stale lanes are skipped, so count changes duration without stealing another turn.
 - Minimum/maximum green settings remain enforced, and paused or unavailable inputs
   never appear green in telemetry.
 

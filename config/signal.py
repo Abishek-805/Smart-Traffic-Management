@@ -8,6 +8,12 @@ MAX_GREEN_SEC = 60
 YELLOW_SEC = 3
 ALL_RED_SEC = 2
 
+# Adaptive-cycle tuning. A green ends early only after consecutive fresh empty
+# observations, then still passes through yellow/all-red clearance.
+EMPTY_LANE_RELEASE_SEC = 1.0
+FULL_GREEN_PCE = 20.0
+FULL_GREEN_QUEUE_SEC = 120.0
+
 # Priority scoring weights
 PRIORITY_WEIGHTS = {
     "pce": 0.45,
