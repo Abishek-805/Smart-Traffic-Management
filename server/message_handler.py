@@ -227,8 +227,8 @@ class MessageHandler:
                 "timestamp": time.time(),
                 "payload": {
                     "target_fps": 2,
-                    "resolution": "640 max edge",
-                    "quality": 65,
+                    "resolution": "1280 max edge",
+                    "quality": 75,
                     "session_start_count": count,
                 },
             }
