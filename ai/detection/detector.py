@@ -64,7 +64,18 @@ class VehicleDetector:
                 for box in boxes:
                     cls_id = int(box.cls[0].item())
                     conf   = float(box.conf[0].item())
-                    xyxy   = box.xyxy[0].cpu().numpy().astype(int)
+                    xyxy   = box.xyxy[0].cpu().numpy().astype(float)
+
+                    if cls_id not in self.vehicle_classes or not np.isfinite(conf):
+                        continue
+                    height, width = frame.shape[:2]
+                    if not np.all(np.isfinite(xyxy)):
+                        continue
+                    xyxy[[0, 2]] = np.clip(xyxy[[0, 2]], 0, width)
+                    xyxy[[1, 3]] = np.clip(xyxy[[1, 3]], 0, height)
+                    if xyxy[2] <= xyxy[0] or xyxy[3] <= xyxy[1]:
+                        continue
+                    xyxy = xyxy.astype(int)
 
                     class_name = self.vehicle_classes.get(cls_id, "vehicle")
                     bbox = (int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3]))
@@ -121,12 +132,19 @@ class VehicleDetector:
 
                 for i in range(len(cls_all)):
                     cls_id     = cls_all[i]
+                    if cls_id not in self.vehicle_classes or not np.isfinite(conf_all[i]):
+                        continue
                     class_name = self.vehicle_classes.get(cls_id, "vehicle")
+                    height, width = frame.shape[:2]
+                    coords = np.asarray(xyxy_all[i], dtype=float)
+                    if not np.all(np.isfinite(coords)):
+                        continue
+                    coords[[0, 2]] = np.clip(coords[[0, 2]], 0, width)
+                    coords[[1, 3]] = np.clip(coords[[1, 3]], 0, height)
+                    if coords[2] <= coords[0] or coords[3] <= coords[1]:
+                        continue
                     bbox = (
-                        int(xyxy_all[i][0]),
-                        int(xyxy_all[i][1]),
-                        int(xyxy_all[i][2]),
-                        int(xyxy_all[i][3]),
+                        int(coords[0]), int(coords[1]), int(coords[2]), int(coords[3]),
                     )
                     conf     = float(conf_all[i])
                     track_id = int(ids_all[i]) if ids_all[i] is not None else None

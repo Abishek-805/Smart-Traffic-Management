@@ -18,8 +18,10 @@ from core.application_context import ApplicationContext
 from server.message_handler import MessageHandler
 from server.runtime import runtime_snapshot
 from server.session_manager import SessionManager
+from server.frame_normalization import normalize_frame_orientation
 from ai.state.count_stabilizer import CountStabilizer
 from ai.analytics.analytics_exporter import LaneStatistics
+from ai.pipeline.traffic_pipeline import detector_is_due
 from web.app import app
 from web.services import node_service
 
@@ -40,6 +42,61 @@ def test_tracker_instances_do_not_rewind_existing_ids():
     assert east.tracker.frame_id == 1
 
 
+def test_frame_orientation_normalizes_all_device_rotations():
+    frame = np.zeros((2, 3, 3), dtype=np.uint8)
+    frame[0, 0] = (1, 2, 3)
+
+    same, info = normalize_frame_orientation(frame, 0)
+    assert same.shape == (2, 3, 3)
+    assert info["rotation"] == 0
+
+    clockwise, info = normalize_frame_orientation(frame, 90)
+    assert clockwise.shape == (3, 2, 3)
+    assert tuple(clockwise[0, 1]) == (1, 2, 3)
+    assert info["rotation"] == 90
+
+    upside_down, _ = normalize_frame_orientation(frame, 180)
+    assert tuple(upside_down[1, 2]) == (1, 2, 3)
+
+    counter_clockwise, _ = normalize_frame_orientation(frame, 270)
+    assert counter_clockwise.shape == (3, 2, 3)
+    assert tuple(counter_clockwise[2, 0]) == (1, 2, 3)
+
+
+def test_detector_cadence_is_time_based():
+    assert detector_is_due(None, 100.0, 2.0)
+    assert not detector_is_due(100.0, 100.49, 2.0)
+    assert detector_is_due(100.0, 100.5, 2.0)
+    assert detector_is_due(100.0, 1.0, 2.0), "a restarted device clock must not stall detection"
+
+
+@pytest.mark.asyncio
+async def test_latest_frame_slots_are_bounded_and_isolated_per_camera():
+    handler = MessageHandler()
+    handler.latest_frames = {}
+    handler.frame_events = {}
+    handler.dropped_frames_count = 0
+    # Sentinels prevent consumers from draining the slots during this unit test.
+    handler.worker_tasks = {direction: object() for direction in ('north', 'south')}
+    ctx = ApplicationContext.get_instance()
+    previous_running = ctx.system_running
+    ctx.system_running = True
+    try:
+        def packet(direction, frame_id):
+            return {'payload': {'direction': direction, 'frame_id': frame_id, 'frame_data': 'a'}}
+        await handler._handle_video_frame(packet('north', 'NORTH-1'))
+        await handler._handle_video_frame(packet('north', 'NORTH-2'))
+        await handler._handle_video_frame(packet('south', 'SOUTH-1'))
+        assert set(handler.latest_frames) == {'north', 'south'}
+        assert handler.latest_frames['north']['payload']['frame_id'] == 'NORTH-2'
+        assert handler.latest_frames['south']['payload']['frame_id'] == 'SOUTH-1'
+        assert handler.dropped_frames_count == 1
+    finally:
+        ctx.system_running = previous_running
+        handler.worker_tasks = {}
+        await handler.shutdown()
+
+
 def test_bytetrack_low_confidence_detection_recovers_existing_track():
     tracker = ByteTracker()
     strong = Detection('car', 2, .9, (10, 10, 70, 70))
@@ -54,11 +111,32 @@ def test_bytetrack_low_confidence_detection_recovers_existing_track():
     assert recovered[0].track_id == first[0].track_id
 
 
+def test_bytetrack_predicts_between_detector_frames_without_fake_observation():
+    tracker = ByteTracker()
+    strong = Detection('car', 2, .9, (10, 10, 70, 70))
+    detected = tracker.update([strong], frame_number=10, timestamp=10.0)
+    predicted = tracker.predict(frame_number=11, timestamp=10.1)
+    assert len(predicted) == 1
+    assert predicted[0].track_id == detected[0].track_id
+    assert predicted[0].frame_number == 11
+    assert tracker.tracker.frame_id == 1, "prediction must not masquerade as a fresh ByteTrack observation"
+
+
 def test_expired_tokens_cannot_revive_sessions():
     sessions = SessionManager(timeout_sec=1)
     session = sessions.create_session('test', 'north')
     session.last_heartbeat -= 2
     assert not sessions.update_heartbeat('test', session.session_token)
+
+
+def test_prediction_depends_on_elapsed_time_not_number_of_preview_frames():
+    tracker = ByteTracker()
+    for i in range(6):
+        tracker.update([Detection('car', 2, .9, (10+i*5, 10, 70+i*5, 70))], timestamp=10+i*.5)
+    first = tracker.predict(timestamp=12.75)
+    repeated = tracker.predict(timestamp=12.75)
+    assert first[0].bbox == repeated[0].bbox
+    assert tracker.predict(timestamp=30) == [], 'Predictions must expire without fresh observations'
 
 
 def test_unexpected_socket_loss_preserves_short_reconnect_window():

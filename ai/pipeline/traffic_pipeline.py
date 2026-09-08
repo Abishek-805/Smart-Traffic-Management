@@ -36,10 +36,17 @@ from ai.pipeline.intersection_state import LaneProcessingResult, IntersectionSta
 from ai.pipeline.pipeline_result import PipelineResult
 from ai.utils.logger import get_logger
 from config.signal import EMPTY_LANE_RELEASE_SEC, ALL_RED_SEC
+from config.model import DETECTOR_FPS
 
 import threading
 
 logger = get_logger("TrafficPipeline")
+
+
+def detector_is_due(last_detection_ts: Optional[float], frame_ts: float, detector_fps: float) -> bool:
+    """Time-based cadence gate, independent of input frame rate."""
+    return (last_detection_ts is None or frame_ts < last_detection_ts
+            or frame_ts - last_detection_ts >= 1.0 / detector_fps)
 
 
 class TrafficPipeline:
@@ -88,6 +95,12 @@ class TrafficPipeline:
         self.lane_managers: Dict[str, LaneManager] = {}
         self.state_managers: Dict[str, VehicleStateManager] = {}
         self.analytics_exporters: Dict[str, AnalyticsExporter] = {}
+        self._last_detection_ts: Dict[str, float] = {}
+        self._last_detection_frame: Dict[str, int] = {}
+        self._last_tracked_frame: Dict[str, int] = {}
+        self._detector_runs: Dict[str, int] = {}
+        self._tracker_runs: Dict[str, int] = {}
+        self._temporal_started_at: Dict[str, float] = {}
 
         # Initialize per-lane perception & analytics components
         for lane_name, stream in self.camera_manager.streams.items():
@@ -182,6 +195,7 @@ class TrafficPipeline:
         multi_detections: Dict[str, List[Any]] = {}
         multi_annotated_frames: Dict[str, np.ndarray] = {}
         max_inference_ms = 0.0
+        max_tracking_ms = 0.0
 
         # Step 1-5: Process each camera feed independently
         for lane_name, payload in frames_data.items():
@@ -218,16 +232,31 @@ class TrafficPipeline:
                 resolution = payload.get("resolution", (1280, 720))
                 self._init_lane_components(lane_name, resolution)
 
-            # One detection pass; each camera associates tracks independently.
-            tracked_detections, inference_ms = self.detector.detect(
-                frame, frame_number=frame_num, timestamp=timestamp
-            )
-            max_inference_ms = max(max_inference_ms, inference_ms)
-
-            # Association consumes detections without another inference pass.
-            tracked_detections = self.trackers[lane_name].update(
-                tracked_detections, frame=frame, frame_number=frame_num, timestamp=timestamp
-            )
+            # YOLO runs at a configurable cadence. ByteTrack projects active
+            # identities on intermediate fresh frames without fake detections.
+            last_detection_ts = self._last_detection_ts.get(lane_name)
+            detector_due = detector_is_due(last_detection_ts, timestamp, DETECTOR_FPS)
+            if detector_due:
+                detections, inference_ms = self.detector.detect(
+                    frame, frame_number=frame_num, timestamp=timestamp
+                )
+                tracking_start = time.perf_counter()
+                tracked_detections = self.trackers[lane_name].update(
+                    detections, frame=frame, frame_number=frame_num, timestamp=timestamp
+                )
+                self._last_detection_ts[lane_name] = timestamp
+                self._last_detection_frame[lane_name] = frame_num
+                self._detector_runs[lane_name] = self._detector_runs.get(lane_name, 0) + 1
+                max_inference_ms = max(max_inference_ms, inference_ms)
+            else:
+                tracking_start = time.perf_counter()
+                tracked_detections = self.trackers[lane_name].predict(
+                    frame_number=frame_num, timestamp=timestamp
+                )
+            max_tracking_ms = max(max_tracking_ms, (time.perf_counter() - tracking_start) * 1000.0)
+            self._last_tracked_frame[lane_name] = frame_num
+            self._tracker_runs[lane_name] = self._tracker_runs.get(lane_name, 0) + 1
+            self._temporal_started_at.setdefault(lane_name, time.monotonic())
 
             # Step 3: Bind observations to the registered approach.
             w_f, h_f = frame.shape[1], frame.shape[0]
@@ -403,7 +432,13 @@ class TrafficPipeline:
                 self.active_decision = None
                 self.active_hardware_cmd = None
                 return PipelineResult(has_frame=bool(frames_data), lane_stats=lane_stats_map,
-                    intersection_state=intersection_state, signal_state="ALL_RED")
+                    intersection_state=intersection_state, signal_state="ALL_RED",
+                    multi_detections=multi_detections,
+                    multi_annotated_frames=multi_annotated_frames,
+                    latency_metrics={"yolo_ms": round(max_inference_ms, 2),
+                        "tracking_ms": round(max_tracking_ms, 2),
+                        "detector_ran": max_inference_ms > 0,
+                        "total_ms": round((time.perf_counter() - t_start) * 1000, 2)})
             self.active_decision = self.signal_scheduler.schedule(final_priority_result, phase_id=self.phase_counter)
             from ai.signal.signal_types import DecisionReason
             selected_key = getattr(
@@ -473,7 +508,14 @@ class TrafficPipeline:
             "frame_id": frame_id,
             "timestamp": round(time.time(), 3),
             "yolo_ms": round(max_inference_ms, 2),
+            "tracking_ms": round(max_tracking_ms, 2),
             "total_ms": round(t_total_ms, 2),
+            "detector_fps_target": DETECTOR_FPS,
+            "detector_ran": max_inference_ms > 0,
+            "last_detection_frame": self._last_detection_frame.get(primary_lane),
+            "last_tracked_frame": self._last_tracked_frame.get(primary_lane),
+            "detector_fps": round(self._detector_runs.get(primary_lane, 0) / max(0.001, time.monotonic() - self._temporal_started_at.get(primary_lane, time.monotonic())), 2),
+            "tracker_fps": round(self._tracker_runs.get(primary_lane, 0) / max(0.001, time.monotonic() - self._temporal_started_at.get(primary_lane, time.monotonic())), 2),
         }
         logger.debug(
             f"[LATENCY TRACE] Frame #{frame_id} | Total Step: {t_total_ms:.1f}ms | Max YOLO: {max_inference_ms:.1f}ms | "

@@ -226,7 +226,7 @@ class MessageHandler:
                 "message_type": "START_STREAM",
                 "timestamp": time.time(),
                 "payload": {
-                    "target_fps": 2,
+                    "target_fps": 4,
                     "resolution": "1280 max edge",
                     "quality": 75,
                     "session_start_count": count,
@@ -323,9 +323,16 @@ class MessageHandler:
                         upload_ts = cap_ts
                     rx_ts = raw_json.get("backend_receive_timestamp", time.time() * 1000.0)
 
+                    rotation = payload_raw.get("rotation", 0)
+                    width = payload_raw.get("width")
+                    height = payload_raw.get("height")
+                    logger.info(
+                        "FRAME_RECEIVED frame_id=%s direction=%s width=%s height=%s",
+                        frame_id, direction, width, height,
+                    )
                     res = await asyncio.get_running_loop().run_in_executor(
                         self.frame_executor, _process_frame_worker,
-                        frame_b64, direction, cap_ts, upload_ts, rx_ts, frame_id)
+                        frame_b64, direction, cap_ts, upload_ts, rx_ts, frame_id, rotation)
                     logger.debug(f"[LATENCY-CONTROL] Background process worker finished for frame '{frame_id}'. res is None: {res is None}")
                     if res:
                         node_id = payload_raw.get("node_id")
@@ -457,12 +464,12 @@ class MessageHandler:
         return err.model_dump()
 
 
-def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upload_ts: float, rx_ts: float, frame_id: str = "NORTH-000000"):
+def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upload_ts: float, rx_ts: float, frame_id: str = "NORTH-000000", rotation: int = 0):
     with _frame_worker_lock:
-        return _process_frame_locked(frame_b64, direction, capture_ts, upload_ts, rx_ts, frame_id)
+        return _process_frame_locked(frame_b64, direction, capture_ts, upload_ts, rx_ts, frame_id, rotation)
 
 
-def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upload_ts: float, rx_ts: float, frame_id: str):
+def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upload_ts: float, rx_ts: float, frame_id: str, rotation: int = 0):
     """
     Worker thread task executing CPU-bound base64/JPEG decoding, passing transport-agnostic np.ndarray
     frame into TrafficPipeline and ControlManager, and building immutable PipelineStateSnapshot.
@@ -470,6 +477,7 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
     import base64
     import cv2
     import numpy as np
+    from server.frame_normalization import normalize_frame_orientation
     from core.application_context import ApplicationContext
     from ai.pipeline.traffic_pipeline import TrafficPipeline
     from ai.controller.control_manager import ControlManager
@@ -490,6 +498,17 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
         ctx.increment_stage_counter("decode_failed")
         return None
 
+    img, orientation_info = normalize_frame_orientation(img, rotation)
+    logger.info(
+        "FRAME_ORIENTATION frame_id=%s direction=%s rotation=%s",
+        frame_id, direction, orientation_info["rotation"],
+    )
+    logger.info(
+        "FRAME_NORMALIZED frame_id=%s direction=%s width=%s height=%s rotation=%s",
+        frame_id, direction, orientation_info["width"], orientation_info["height"],
+        orientation_info["rotation"],
+    )
+
     ctx.increment_stage_counter("decoded")
     ctx.last_backend_decoded_frame_id = frame_id
 
@@ -500,15 +519,31 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
         ctx.control_manager = ControlManager(simulation_mode=True, headless=True)
 
     # 1. AI Perception, ByteTrack, Lane Assignment, Analytics & Signal Scheduler via TrafficPipeline
-    yolo_start = int(time.time() * 1000)
+    yolo_start = time.time() * 1000.0
+    logger.info(
+        "YOLO_START frame_id=%s direction=%s input_width=%s input_height=%s",
+        frame_id, direction, img.shape[1], img.shape[0],
+    )
     pipeline_result = ctx.pipeline.process_single_frame(img, lane_name=direction, timestamp=capture_ts / 1000)
-    inference_time = int(time.time() * 1000)
-    ctx.last_yolo_frame_id = frame_id
+    tracking_ts = time.time() * 1000.0
+    detector_ran = bool(getattr(pipeline_result, "latency_metrics", {}).get("detector_ran", False))
+    if detector_ran:
+        ctx.last_yolo_frame_id = frame_id
+        if not hasattr(ctx, "last_yolo_frame_ids"):
+            ctx.last_yolo_frame_ids = {}
+        ctx.last_yolo_frame_ids[direction] = frame_id
     ctx.last_tracked_frame_id = frame_id
+    logger.info(
+        "YOLO_COMPLETE frame_id=%s direction=%s inference_ms=%.2f detections=%s input_width=%s input_height=%s ran=%s",
+        frame_id, direction,
+        float(getattr(pipeline_result, "latency_metrics", {}).get("yolo_ms", 0.0)),
+        sum(len(dets) for dets in pipeline_result.multi_detections.values()),
+        img.shape[1], img.shape[0], detector_ran,
+    )
 
     # 2. Control Layer execution via ControlManager (handles ESP32 hardware command & decision logging)
     ctx.control_manager.process_result(pipeline_result)
-    scheduler_time = int(time.time() * 1000)
+    scheduler_time = time.time() * 1000.0
 
     # Extract annotated tile frame
     annotated_tile = pipeline_result.multi_annotated_frames.get(direction, img)
@@ -597,15 +632,34 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
             "uploadTimestamp": int(upload_ts),
             "backendReceiveTimestamp": int(rx_ts),
             "decodeTimestamp": int(decode_ts),
-            "inferenceTimestamp": int(inference_time),
+            "yoloStartTimestamp": int(yolo_start) if detector_ran else None,
+            "yoloEndTimestamp": int(tracking_ts) if detector_ran else None,
+            "trackingTimestamp": int(tracking_ts),
             "schedulerTimestamp": int(scheduler_time),
             "stageCounters": ctx.get_stage_counters(),
+            "frameOrientation": orientation_info,
         },
     }
 
+    telemetry_ts = time.time() * 1000.0
     telemetry = {
-        "server_processing_ms": round(time.time() * 1000 - rx_ts, 2),
+        "server_processing_ms": round(telemetry_ts - rx_ts, 2),
         "queue_wait_ms": round(decode_start - rx_ts, 2),
+        # Phone and backend wall clocks are not synchronized. One-way network
+        # and capture-to-backend latency cannot be reported truthfully here;
+        # the mobile computes RTT from FRAME_ACK using its own monotonic clock.
+        "network_latency_ms": None,
+        "capture_to_upload_ms": round(upload_ts - capture_ts, 2),
+        "decode_latency_ms": round(decode_ts - decode_start, 2),
+        "yolo_latency_ms": round(float(getattr(pipeline_result, "latency_metrics", {}).get("yolo_ms", 0.0)), 2),
+        "tracking_latency_ms": round(float(getattr(pipeline_result, "latency_metrics", {}).get("tracking_ms", 0.0)), 2),
+        "end_to_end_latency_ms": None,
+        "frame_age_ms": round(telemetry_ts - rx_ts, 2),
+        "cross_device_clock_synchronized": False,
+        "detector_ran": detector_ran,
+        "latest_frame_id": frame_id,
+        "last_detection_frame_id": getattr(ctx, "last_yolo_frame_ids", {}).get(direction),
+        "last_tracked_frame_id": frame_id,
         "frame_id": frame_id,
         "vehicle_count": total_vehicles,
         "detected_count": raw_detections_count,
@@ -614,6 +668,7 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
         "pce_score": pce_score,
         "latency_metrics": getattr(pipeline_result, "latency_metrics", {}),
         "last_updated": time.time(),
+        "orientation": orientation_info,
     }
 
     return direction, annotated_bytes, snapshot, telemetry

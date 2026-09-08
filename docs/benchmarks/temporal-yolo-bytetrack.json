@@ -1,0 +1,35 @@
+{
+  "scope": "Warm CPU run on tests/fixtures/ultralytics_bus.jpg at 2 input FPS; same model and frame sequence.",
+  "baseline_every_frame": {
+    "frames": 12,
+    "detector_runs": 12,
+    "wall_ms": 1144.75,
+    "cpu_seconds": 5.3125,
+    "mean_yolo_ms": 94.61,
+    "mean_non_yolo_tracking_ms": 0.781,
+    "last_ids": [
+      1
+    ]
+  },
+  "temporal_every_second_frame": {
+    "frames": 12,
+    "detector_runs": 6,
+    "wall_ms": 549.89,
+    "cpu_seconds": 2.1562,
+    "mean_yolo_ms": 90.7,
+    "mean_non_yolo_tracking_ms": 0.474,
+    "last_ids": [
+      2
+    ]
+  },
+  "measured_change": {
+    "detector_run_reduction_percent": 50.0,
+    "wall_time_reduction_percent": 52.0,
+    "cpu_time_reduction_percent": 59.4
+  },
+  "notes": [
+    "Warm-run benchmark excludes model initialization.",
+    "ByteTrack prediction uses a copied Kalman state and never submits skipped frames as detections.",
+    "Physical four-phone testing is still required for radio/network and camera-orientation validation."
+  ]
+}

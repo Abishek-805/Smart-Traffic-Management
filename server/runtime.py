@@ -21,13 +21,22 @@ def runtime_snapshot(ctx):
         age = (now - seen) * 1000 if seen else None
         session = ctx.session_manager.get_session_by_direction(direction)
         live = bool(ctx.system_running and session and age is not None and age < 3000)
-        lane.update(frameId=ctx.live_telemetry.get(direction, {}).get("frame_id"),
-                    serverProcessingMs=ctx.live_telemetry.get(direction, {}).get("server_processing_ms"),
-                    queueWaitMs=ctx.live_telemetry.get(direction, {}).get("queue_wait_ms"),
+        lane_telemetry = ctx.live_telemetry.get(direction, {})
+        temporal = lane_telemetry.get("latency_metrics", {})
+        lane.update(frameId=lane_telemetry.get("frame_id"),
+                    latestFrameId=lane_telemetry.get("latest_frame_id"),
+                    lastDetectionFrameId=lane_telemetry.get("last_detection_frame_id"),
+                    lastTrackedFrameId=lane_telemetry.get("last_tracked_frame_id"),
+                    detectorRan=lane_telemetry.get("detector_ran", False),
+                    detectorFps=temporal.get("detector_fps", 0),
+                    trackerFps=temporal.get("tracker_fps", 0),
+                    trackingTimeMs=temporal.get("tracking_ms", 0),
+                    serverProcessingMs=lane_telemetry.get("server_processing_ms"),
+                    queueWaitMs=lane_telemetry.get("queue_wait_ms"),
                     frameAgeMs=round(age, 1) if age is not None else None,
                     streamStatus="LIVE" if live else "STALE" if session and seen else "CONNECTING" if session else "OFFLINE",
-                    fps=ctx.live_telemetry.get(direction, {}).get("fps", 0) if live else 0,
-                    inferenceTimeMs=ctx.live_telemetry.get(direction, {}).get("latency_metrics", {}).get("yolo_ms", 0))
+                    fps=lane_telemetry.get("fps", 0) if live else 0,
+                    inferenceTimeMs=temporal.get("yolo_ms", 0))
     live_lanes = [v for v in lanes.values() if v["streamStatus"] == "LIVE"]
     payload.update(
         systemRunning=ctx.system_running, streamStatus="LIVE" if live_lanes else "STALE",

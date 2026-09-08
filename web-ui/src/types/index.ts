@@ -68,6 +68,13 @@ export interface LaneTelemetryItem {
   serverProcessingMs?: number;
   queueWaitMs?: number;
   frameId?: string | null;
+  latestFrameId?: string | null;
+  lastDetectionFrameId?: string | null;
+  lastTrackedFrameId?: string | null;
+  detectorRan?: boolean;
+  detectorFps?: number;
+  trackerFps?: number;
+  trackingTimeMs?: number;
   vehicles: number;
   queue: number;
   wait: number;

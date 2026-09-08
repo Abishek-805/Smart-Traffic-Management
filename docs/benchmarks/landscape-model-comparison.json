@@ -1,0 +1,67 @@
+{
+  "scope": "Identical local traffic frames; runtime/resource comparison only. Not an accuracy or power-meter benchmark.",
+  "source": "outputs\\diagnostics\\traffic_source_crop.jpg",
+  "vehicle_classes": [
+    1,
+    2,
+    3,
+    5,
+    7
+  ],
+  "results": [
+    {
+      "model": "yolo26n.pt",
+      "frames": 15,
+      "imgsz": 640,
+      "threads": 4,
+      "confidence": 0.15,
+      "iou": 0.6,
+      "max_detections": 300,
+      "p50_ms": 130.17,
+      "p95_ms": 143.19,
+      "mean_ms": 131.68,
+      "throughput_fps": 7.59,
+      "cpu_seconds_per_frame": 0.2562,
+      "rss_after_mb": 292.8,
+      "rss_delta_mb": 0.2,
+      "mean_vehicle_detections": 24.0,
+      "model_size_mb": 5.29
+    },
+    {
+      "model": "yolo26s.pt",
+      "frames": 15,
+      "imgsz": 640,
+      "threads": 4,
+      "confidence": 0.15,
+      "iou": 0.6,
+      "max_detections": 300,
+      "p50_ms": 301.12,
+      "p95_ms": 323.44,
+      "mean_ms": 286.47,
+      "throughput_fps": 3.49,
+      "cpu_seconds_per_frame": 0.7135,
+      "rss_after_mb": 344.8,
+      "rss_delta_mb": -29.5,
+      "mean_vehicle_detections": 22.0,
+      "model_size_mb": 19.48
+    },
+    {
+      "model": "yolov8n.pt",
+      "frames": 15,
+      "imgsz": 640,
+      "threads": 4,
+      "confidence": 0.15,
+      "iou": 0.6,
+      "max_detections": 300,
+      "p50_ms": 102.41,
+      "p95_ms": 106.08,
+      "mean_ms": 102.69,
+      "throughput_fps": 9.74,
+      "cpu_seconds_per_frame": 0.2427,
+      "rss_after_mb": 431.7,
+      "rss_delta_mb": 1.4,
+      "mean_vehicle_detections": 59.0,
+      "model_size_mb": 6.25
+    }
+  ]
+}
