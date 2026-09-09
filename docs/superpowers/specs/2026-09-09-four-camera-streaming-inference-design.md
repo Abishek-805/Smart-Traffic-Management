@@ -4,7 +4,7 @@
 
 ## Objective
 
-Improve four-camera throughput and latency while preserving accurate, fair traffic decisions. The same perception pipeline must accept QR-paired Android cameras during laptop testing and direct, USB, or RTSP cameras during Raspberry Pi deployment.
+Improve four-camera throughput and latency while preserving accurate, fair traffic decisions. The same perception pipeline must accept four independently QR-paired Android video cameras during laptop testing and direct, USB, or RTSP cameras during Raspberry Pi deployment. The delivered system must operate continuously, recover from ordinary LAN interruptions, expose truthful health and latency, and remain bounded under overload.
 
 ## Current limitation
 
@@ -14,9 +14,13 @@ Changing the wire format to H.264 video would reduce bandwidth, but it would not
 
 ## Selected architecture
 
-### 1. Transport-independent frames
+### 1. QR-paired mobile video and transport-independent frames
 
-All inputs produce a common `CameraFrame` containing direction, frame ID, BGR image, capture timestamp, receive timestamp, dimensions, rotation metadata, and source kind. Mobile WebSocket JSON JPEG remains supported. Binary WebSocket JPEG is added as an optional protocol after registration; its small metadata header carries the same authenticated identity and timing information. Direct Picamera2, USB, file, and RTSP sources feed decoded frames through the same interface.
+Each phone scans a direction-specific QR code and registers with the existing node, token, direction, and expiry checks. After registration, the authenticated WebSocket is also the signalling and health channel for a WebRTC peer connection. Each of the four directions owns a different session and peer connection. WebRTC is the preferred mobile video transport because it provides hardware-supported video encoding where the phone permits it, congestion control, timestamps, and low-latency delivery without sending base64 inside JSON.
+
+The existing sampled JPEG protocol remains available for version 1.0.6 clients and as a fallback when WebRTC negotiation or device support fails. Binary WebSocket JPEG is the efficient fallback for updated clients; base64 JSON remains the final compatibility path. Fallback is reported in telemetry and never happens silently.
+
+All inputs produce a common `CameraFrame` containing direction, frame ID, BGR image, capture timestamp, receive timestamp, dimensions, rotation metadata, and source kind. WebRTC, mobile JPEG, direct Picamera2, USB, file, and RTSP sources feed decoded frames through the same interface.
 
 The detector never depends on QR, WebSocket, RTSP, or camera-library details.
 
@@ -36,11 +40,11 @@ The batch coordinator uses an adaptive detector interval. It starts at two detec
 
 ### 4. Camera modes
 
-**Laptop with Android phones:** The camera preview runs continuously. The application sends selected newest frames at the server-requested rate. Binary JPEG is preferred when supported; the existing base64 JSON path remains a compatibility fallback. Full 30 FPS video is unnecessary for a detector targeting one to four observations per second per lane.
+**Laptop with Android phones:** The camera preview runs continuously and the phone transmits a WebRTC video track after QR-authenticated signalling. Four phones may stream at the same time, each assigned to a different direction. The backend decodes continuously but retains only the newest frame per lane for inference. The transport may run at 10-15 FPS while the detector samples at the adaptive one-to-four FPS rate; YOLO does not infer every transmitted frame. Binary JPEG is the fallback and existing base64 JSON remains compatible.
 
 **Raspberry Pi with local cameras:** Picamera2 or USB sources provide decoded frames directly. No network video encode/decode is performed. Capture can run at camera rate while the coordinator selects current frames for inference.
 
-**Remote mobile or IP cameras:** RTSP/H.264 or a future WebRTC adapter may decode continuously into the same latest-frame slots. Decode queues must drop old frames. Transport selection does not change detector or scheduler behavior.
+**Remote mobile or IP cameras:** WebRTC and RTSP/H.264 decode continuously into the same latest-frame slots. Decode queues drop old frames. Transport selection does not change detector or scheduler behavior.
 
 ### 5. Model deployment
 
@@ -54,6 +58,8 @@ No model is declared accurate from unlabelled photographs. Model selection requi
 - Replaced, stale, malformed, unauthorized, and decode-failed frames increment distinct counters.
 - A failing source cannot block other directions.
 - Camera heartbeats remain independent of inference acknowledgements.
+- WebRTC negotiation has a bounded timeout, explicit failure reason, and automatic fallback to binary JPEG when both peers support it.
+- A lost mobile peer connection retries signalling with bounded exponential backoff while heartbeat status distinguishes camera, signalling, transport, and inference failures.
 - A disconnected lane becomes stale and is excluded from fresh scheduling data.
 - Batch failure reports an error for affected frames and leaves the previous confirmed traffic state marked stale rather than inventing zero traffic.
 - The scheduler retains clockwise service, minimum and maximum green bounds, empty-lane release, maximum-wait fairness, and emergency preemption.
@@ -64,7 +70,7 @@ Per lane telemetry reports capture rate, accepted-frame rate, processed rate, de
 
 ## Compatibility
 
-Existing version 1.0.6 mobile clients remain functional through the JSON/base64 protocol. QR payloads, session tokens, direction ownership, system start/stop, telemetry WebSocket, MJPEG dashboard previews, and REST endpoints retain their current behavior. Binary mobile frames and direct/RTSP sources are additive.
+Existing version 1.0.6 mobile clients remain functional through the JSON/base64 protocol. QR payloads, session tokens, direction ownership, system start/stop, telemetry WebSocket, MJPEG dashboard previews, and REST endpoints retain their current behavior. WebRTC negotiation, binary mobile frames, and direct/RTSP sources are additive protocol capabilities. Updated clients advertise their supported transports during registration, and the server selects the best common option.
 
 ## Validation
 
@@ -78,14 +84,15 @@ Automated tests must cover:
 6. Base64 and binary JPEG inputs normalize portrait and landscape frames identically.
 7. Scheduler ordering, fairness, empty-lane behavior, green bounds, and emergency preemption remain unchanged.
 8. Direct/file/RTSP adapters reconnect and discard stale decoded frames.
+9. Four separately authenticated WebRTC peers can transmit concurrently without frame or direction crossover.
+10. WebRTC loss reconnects or falls back without restarting the inference service or affecting healthy lanes.
 
-The reproducible benchmark uses four concurrent streams of real moving traffic video and compares the existing serial baseline with the batched path. It records p50/p95 acknowledgement latency, frame age, batch size, processed FPS, CPU, RSS, detection count stability, and dropped/replaced frames. The laptop target is p95 processed-frame age below 750 ms at two offered samples per second per camera. Accuracy acceptance requires a labelled set: per-class precision/recall, count mean absolute error, and ByteTrack ID switches. Raspberry Pi performance and power are measured on the actual board.
+The reproducible benchmark uses four concurrent streams of real moving traffic video and compares the existing serial baseline with the batched path. It records p50/p95 transport latency, processed acknowledgement latency, frame age, batch size, processed FPS, CPU, RSS, detection count stability, reconnect time, and dropped/replaced frames. The laptop target is four simultaneous mobile-equivalent video inputs, at least two detector observations per second per active lane, p95 processed-frame age below 750 ms, bounded memory over a 30-minute soak, and no direction crossover. Accuracy acceptance requires a labelled set: per-class precision/recall, count mean absolute error, and ByteTrack ID switches. Raspberry Pi performance and power are measured on the actual board; failure to meet the target is reported rather than hidden by stale frames.
 
 ## Out of scope for this iteration
 
 - Replacing QR pairing or authentication.
-- Browser playback of the original full-rate camera video.
+- Browser playback of the original full-rate camera video; the dashboard continues to show bounded annotated previews.
 - Cloud streaming or internet-facing deployment.
 - Claiming Raspberry Pi performance without an on-device benchmark.
 - Automatically controlling physical lights before labelled accuracy, fail-safe, and hardware tests pass.
-
