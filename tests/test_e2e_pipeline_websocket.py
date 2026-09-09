@@ -13,6 +13,7 @@ from pathlib import Path
 from web.app import app
 from core.application_context import ApplicationContext
 from server.message_handler import MessageHandler
+from ai.pipeline.traffic_pipeline import TrafficPipeline
 
 
 class TestE2EPipelineWebSocket(unittest.IsolatedAsyncioTestCase):
@@ -20,9 +21,12 @@ class TestE2EPipelineWebSocket(unittest.IsolatedAsyncioTestCase):
 
     async def test_e2e_camera_to_traffic_pipeline_flow(self):
         """Verify that incoming camera frames trigger TrafficPipeline, update ControlManager, and generate a valid snapshot."""
-        handler = MessageHandler()
         ApplicationContext._instance = None
         ctx = ApplicationContext.get_instance()
+        # Match the application lifespan: warm perception before opening a
+        # short-lived mobile session so startup cost cannot expire the session.
+        ctx.pipeline = TrafficPipeline(save_output=False, headless=True)
+        handler = MessageHandler()
         handler.session_manager.register_pairing_session(
             "north", "TEST-CAM-NORTH", "test-pair", time.time() + 60
         )

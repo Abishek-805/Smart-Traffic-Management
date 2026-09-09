@@ -137,6 +137,9 @@ async def start_runtime(message_handler, publish=None):
     ctx.pipeline = await loop.run_in_executor(
         message_handler.frame_executor, partial(TrafficPipeline, save_output=False, headless=True))
     ctx.control_manager = ControlManager(simulation_mode=True, headless=True)
+    from server.local_sources import LocalCameraSources
+    message_handler.local_sources = LocalCameraSources(message_handler)
+    await message_handler.local_sources.start()
 
     async def ticker():
         while True:

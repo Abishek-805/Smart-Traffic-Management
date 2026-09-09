@@ -1,0 +1,26 @@
+{
+  "scope": "Four real WebRTC video peers replaying separate photographs through QR, YOLO and ByteTrack; not physical-phone or moving-video accuracy.",
+  "seconds": 20,
+  "lanes": {
+    "north": {
+      "processed": 0,
+      "server_p95_ms": null,
+      "last_count": null
+    },
+    "east": {
+      "processed": 0,
+      "server_p95_ms": null,
+      "last_count": null
+    },
+    "south": {
+      "processed": 0,
+      "server_p95_ms": null,
+      "last_count": null
+    },
+    "west": {
+      "processed": 0,
+      "server_p95_ms": null,
+      "last_count": null
+    }
+  }
+}

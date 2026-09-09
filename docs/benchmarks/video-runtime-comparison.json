@@ -1,0 +1,44 @@
+[
+  {
+    "model": "yolov8n.pt",
+    "batch": 1,
+    "p50_ms": 42.16,
+    "p95_ms": 43.21,
+    "counts": [
+      81
+    ]
+  },
+  {
+    "model": "yolov8n.pt",
+    "batch": 4,
+    "p50_ms": 136.58,
+    "p95_ms": 139.64,
+    "counts": [
+      81,
+      81,
+      81,
+      81
+    ]
+  },
+  {
+    "model": "yolov8n.onnx",
+    "batch": 1,
+    "p50_ms": 34.99,
+    "p95_ms": 43.91,
+    "counts": [
+      81
+    ]
+  },
+  {
+    "model": "yolov8n.onnx",
+    "batch": 4,
+    "p50_ms": 111.34,
+    "p95_ms": 114.15,
+    "counts": [
+      81,
+      81,
+      81,
+      81
+    ]
+  }
+]

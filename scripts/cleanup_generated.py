@@ -35,23 +35,28 @@ def collect() -> list[tuple[Path, Path]]:
         path = BACKEND_ROOT / relative
         if path.exists():
             selected[verified(path, BACKEND_ROOT)] = BACKEND_ROOT
-    for container in (BACKEND_ROOT / "outputs", BACKEND_ROOT / "logs"):
+    # Runtime logs are disposable. Benchmark inputs/results under outputs are
+    # retained because they are tracked validation evidence.
+    for container in (BACKEND_ROOT / "logs", BACKEND_ROOT / ".logs"):
         if container.exists():
             for child in container.iterdir():
                 selected[verified(child, BACKEND_ROOT)] = BACKEND_ROOT
     for path in BACKEND_ROOT.rglob("__pycache__"):
         if not any(part in {".git", ".venv", "venv", "node_modules"} for part in path.parts):
             selected[verified(path, BACKEND_ROOT)] = BACKEND_ROOT
-    old_weight = BACKEND_ROOT / "yolo11n.pt"
-    if old_weight.exists():
-        selected[verified(old_weight, BACKEND_ROOT)] = BACKEND_ROOT
+    for weight_name in ("yolo11n.pt", "yolo26n.pt", "yolo26s.pt"):
+        old_weight = BACKEND_ROOT / weight_name
+        if old_weight.exists():
+            selected[verified(old_weight, BACKEND_ROOT)] = BACKEND_ROOT
 
     if MOBILE_ROOT.exists():
         for relative in (
             ".expo",
             "dist-android",
             "dist-android-crashfix",
+            "dist-android-1.0.2",
             "android/.gradle",
+            "android/.kotlin",
             "android/build",
             "android/app/build",
         ):

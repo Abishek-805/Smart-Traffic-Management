@@ -6,6 +6,8 @@ import os
 import threading
 import torch
 import cv2
+import numpy as np
+import time
 from pathlib import Path
 from typing import Any, Union, Dict
 from ultralytics import YOLO
@@ -84,6 +86,20 @@ class ModelManager:
                 self.confidence,
                 self.iou,
             )
+            warmup_started = time.perf_counter()
+            self.model.predict(
+                source=np.zeros((self.input_size, self.input_size, 3), dtype=np.uint8),
+                conf=self.confidence,
+                iou=self.iou,
+                imgsz=self.input_size,
+                max_det=self.max_detections,
+                device=None if self.device == "auto" else self.device,
+                verbose=False,
+            )
+            logger.info(
+                "Model predictor warmed in %.0f ms before accepting camera frames",
+                (time.perf_counter() - warmup_started) * 1000,
+            )
         except Exception as e:
             logger.error(f"Failed to load YOLO model '{self.model_name}': {e}", exc_info=True)
             raise e
@@ -94,6 +110,9 @@ class ModelManager:
         Returns detection results only (no track IDs).
         """
         with self._inference_lock:
+            # OpenMP settings belong to the calling native worker as well.
+            if self.device == 'cpu' or not torch.cuda.is_available():
+                torch.set_num_threads(self.cpu_threads)
             result = self.model.predict(
                 source=frame,
                 conf=self.confidence,
@@ -110,6 +129,14 @@ class ModelManager:
                 if torch.get_num_threads() != self.cpu_threads:
                     torch.set_num_threads(self.cpu_threads)
             return result
+
+    def predict_batch(self, frames, classes=None):
+        """Ordered results; one model call for a bounded list of images."""
+        if not frames:
+            return []
+        if len(frames) > 4:
+            raise ValueError('At most four camera frames per batch')
+        return self.predict(frames, classes=classes)
 
 
     def track(self, frame: Any, classes: list = None) -> Any:

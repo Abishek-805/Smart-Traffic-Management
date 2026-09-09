@@ -9,7 +9,7 @@ from ultralytics import YOLO
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Export an Ultralytics detector for Raspberry Pi")
-    parser.add_argument("--model", default="yolo26n.pt", help="PyTorch weights or trained traffic model")
+    parser.add_argument("--model", default="yolov8n.pt", help="PyTorch weights or trained traffic model")
     parser.add_argument("--format", choices=("ncnn", "onnx"), default="ncnn")
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--output-dir", default="models")

@@ -7,7 +7,8 @@ from pathlib import Path
 
 # Provisional laptop profile: faster on the local CPU and better coverage of
 # the supplied traffic scene. Validate on labelled video before Pi deployment.
-MODEL_NAME = os.getenv("YOLO_MODEL_NAME", "yolov8n.pt")
+MODEL_NAME = os.getenv("YOLO_MODEL_NAME", "yolov8n.onnx" if
+    (Path(__file__).resolve().parents[1] / 'yolov8n.onnx').exists() else "yolov8n.pt")
 
 # Inference parameters
 CONFIDENCE_THRESHOLD = float(os.getenv("YOLO_CONFIDENCE_THRESHOLD", "0.08"))
@@ -41,4 +42,4 @@ def _display_name(model_name: str) -> str:
 
 
 MODEL_DISPLAY_NAME = os.getenv("YOLO_DISPLAY_NAME", _display_name(MODEL_NAME))
-MODEL_RUNTIME = "NCNN" if "ncnn" in MODEL_NAME.lower() else "PyTorch"
+MODEL_RUNTIME = "NCNN" if "ncnn" in MODEL_NAME.lower() else "ONNX Runtime" if MODEL_NAME.endswith('.onnx') else "PyTorch"

@@ -6,7 +6,7 @@ import json, time
 from pathlib import Path
 import cv2, numpy as np, psutil, torch
 from ultralytics import YOLO
-model=YOLO('yolo26n.pt')
+model=YOLO('yolov8n.pt')
 frame=cv2.imread('.venv/Lib/site-packages/ultralytics/assets/bus.jpg')
 model.predict(frame,device='cpu',imgsz=640,conf=.35,classes=[2,3,5,7],verbose=False)
 rows=[]; reference=None; proc=psutil.Process()

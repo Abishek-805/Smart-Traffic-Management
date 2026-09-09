@@ -2,7 +2,7 @@
 
 A local traffic-monitoring prototype: four Android camera nodes send JPEG samples to
 a configurable YOLO detector and independent ByteTrack trackers. The laptop test
-profile uses YOLO26s; the Raspberry Pi candidate is a fine-tuned YOLO26n NCNN model.
+profile uses YOLOv8n; the Raspberry Pi candidate is a fine-tuned YOLOv8n NCNN model.
 FastAPI serves the dashboard, directional camera previews, measured telemetry and a
 simulated adaptive signal controller.
 
@@ -111,7 +111,7 @@ These values were calibrated on a small UVH-26 validation sample and still requi
 full validation before deployment.
 
 For the production detector, prepare the real IISc UVH-26 traffic-camera dataset
-and fine-tune YOLO26n using [the model training guide](docs/MODEL_TRAINING.md).
+and fine-tune YOLOv8n using [the model training guide](docs/MODEL_TRAINING.md).
 The runtime discovers supported classes from the loaded model, so 14-class
 fine-tuned weights work without hard-coded COCO class IDs.
 

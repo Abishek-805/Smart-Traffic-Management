@@ -57,6 +57,21 @@ class VehicleDetector:
         results = self.model_manager.predict(frame, classes=self.target_class_ids)
         inference_time_ms = (time.perf_counter() - start_time) * 1000.0
 
+        return self._convert(results[0], frame, frame_number, timestamp) if results else [], inference_time_ms
+
+    def detect_batch(self, frames, frame_numbers, timestamps):
+        if not (len(frames) == len(frame_numbers) == len(timestamps)):
+            raise ValueError('Batch metadata must match frames')
+        started = time.perf_counter()
+        results = self.model_manager.predict_batch(frames, classes=self.target_class_ids)
+        elapsed = (time.perf_counter() - started) * 1000
+        if len(results) != len(frames):
+            raise RuntimeError('Detector returned an incomplete batch')
+        return [self._convert(result, frame, number, timestamp)
+                for result, frame, number, timestamp in zip(results, frames, frame_numbers, timestamps)], elapsed
+
+    def _convert(self, result, frame, frame_number, timestamp):
+        results = [result]
         detections: List[Detection] = []
         if results and len(results) > 0:
             boxes = results[0].boxes
@@ -90,7 +105,7 @@ class VehicleDetector:
                     )
                     detections.append(detection)
 
-        return detections, inference_time_ms
+        return detections
 
     def detect_and_track(
         self,

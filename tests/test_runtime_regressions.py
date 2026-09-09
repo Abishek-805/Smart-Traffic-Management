@@ -22,6 +22,7 @@ from server.frame_normalization import normalize_frame_orientation
 from ai.state.count_stabilizer import CountStabilizer
 from ai.analytics.analytics_exporter import LaneStatistics
 from ai.pipeline.traffic_pipeline import detector_is_due
+from ai.models.model_manager import ModelManager
 from web.app import app
 from web.services import node_service
 
@@ -68,6 +69,13 @@ def test_detector_cadence_is_time_based():
     assert not detector_is_due(100.0, 100.49, 2.0)
     assert detector_is_due(100.0, 100.5, 2.0)
     assert detector_is_due(100.0, 1.0, 2.0), "a restarted device clock must not stall detection"
+
+
+def test_model_is_warmed_before_camera_frames_are_accepted():
+    manager = ModelManager(model_name="yolov8n.pt", device="cpu", input_size=320)
+    assert manager.model.predictor is not None, (
+        "model construction must initialize the predictor instead of charging cold start to the first camera"
+    )
 
 
 @pytest.mark.asyncio

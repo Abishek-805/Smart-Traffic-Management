@@ -9,13 +9,13 @@ from ultralytics import YOLO
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train and validate the 14-class traffic detector")
     parser.add_argument("--data", default="datasets/uvh26/traffic.yaml")
-    parser.add_argument("--model", default="yolo26n.pt")
+    parser.add_argument("--model", default="yolov8n.pt")
     parser.add_argument("--epochs", type=int, default=80)
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--batch", type=float, default=-1, help="-1 lets Ultralytics size the batch")
     parser.add_argument("--device", default="0", help="GPU index, cpu, or mps")
     parser.add_argument("--workers", type=int, default=4)
-    parser.add_argument("--name", default="yolo26n-uvh26")
+    parser.add_argument("--name", default="yolov8n-uvh26")
     args = parser.parse_args()
     data = Path(args.data)
     if not data.is_file():

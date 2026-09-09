@@ -2,18 +2,9 @@
 
 ## Selected model path
 
-The retained fallback is **YOLO11n at 640 pixels**. It is a mature option and
-already improves on YOLOv8n: Ultralytics reports 39.5 COCO box mAP, 2.6 million
-parameters and 6.5 GFLOPs for YOLO11n, versus 37.3 mAP, 3.2 million parameters and
-8.7 GFLOPs for YOLOv8n.
-
-The laptop test profile uses **YOLO26s** for better small-vehicle recall. The
-Raspberry Pi candidate remains **YOLO26n fine-tuned on UVH-26** because four-stream
-CPU freshness matters more than the generic small-model accuracy gain. Export the
-fine-tuned nano model to NCNN for Raspberry Pi CPU testing.
-Ultralytics' current Raspberry Pi 5 benchmark reports the YOLO26n NCNN export at
-about 67 ms inference per 640-pixel image, faster than its ONNX and OpenVINO results.
-NCNN is the runtime Ultralytics recommends for ARM edge devices.
+The laptop test profile and Raspberry Pi candidate now use **YOLOv8n**. Fine-tune
+it on UVH-26, then export the trained nano model to NCNN for Raspberry Pi CPU
+testing. NCNN is the runtime Ultralytics recommends for ARM edge devices.
 It must still pass the project's labelled traffic validation before any public-road
 deployment; current generic COCO weights have not been validated on local traffic.
 
@@ -32,7 +23,7 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-python scripts/export_edge_model.py --model outputs/training/yolo26n-uvh26/weights/best.pt --format ncnn --imgsz 640
+python scripts/export_edge_model.py --model outputs/training/yolov8n-uvh26/weights/best.pt --format ncnn --imgsz 640
 cp .env.example .env
 ```
 
@@ -63,7 +54,7 @@ precision or recall. Evaluate both candidates on labelled camera images from the
 actual mounting height, road geometry, lighting, rain, and local vehicle mix:
 
 ```bash
-python scripts/evaluate_detector.py --data datasets/uvh26/traffic.yaml --model outputs/training/yolo26n-uvh26/weights/best.pt --output docs/benchmarks/yolo26n-uvh26-accuracy.json
+python scripts/evaluate_detector.py --data datasets/uvh26/traffic.yaml --model outputs/training/yolov8n-uvh26/weights/best.pt --output docs/benchmarks/yolov8n-uvh26-accuracy.json
 python scripts/benchmark_runtime.py --pid SERVER_PID --images datasets/uvh26/images/val --seconds 60 --fps 2 --output docs/benchmarks/pi-four-real.json
 ```
 

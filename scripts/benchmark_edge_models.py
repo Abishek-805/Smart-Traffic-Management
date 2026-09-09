@@ -97,7 +97,7 @@ def benchmark(model_name: str, frames: list[np.ndarray], imgsz: int, threads: in
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Benchmark edge models on identical traffic frames")
-    parser.add_argument("--models", nargs="+", default=["yolo26n.pt", "yolo26s.pt"])
+    parser.add_argument("--models", nargs="+", default=["yolov8n.pt"])
     parser.add_argument("--source", default="tests/fixtures/ultralytics_bus.jpg")
     parser.add_argument("--frames", type=int, default=40)
     parser.add_argument("--imgsz", type=int, default=640)

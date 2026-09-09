@@ -17,6 +17,8 @@ async def camera_websocket_endpoint(websocket: WebSocket):
     except (WebSocketDisconnect, RuntimeError, ValueError):
         pass
     finally:
+        if node_id and hasattr(message_handler, "rtc"):
+            await message_handler.rtc.close(node_id, websocket)
         # An older socket must never remove a newly registered replacement.
         if node_id and message_handler.connection_manager.get_connection(node_id) is websocket:
             message_handler.handle_connection_loss(node_id)

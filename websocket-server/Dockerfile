@@ -20,7 +20,7 @@ COPY ai /app/ai
 COPY server /app/server
 COPY config /app/config
 COPY dashboard /app/dashboard
-COPY yolo26n.pt /app/yolo26n.pt
+COPY yolov8n.pt /app/yolov8n.pt
 COPY websocket-server/app /app/app
 
 EXPOSE 8001

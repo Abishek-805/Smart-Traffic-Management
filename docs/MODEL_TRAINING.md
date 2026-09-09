@@ -1,18 +1,16 @@
 # Real-traffic model preparation
 
-The deployment candidate is **YOLO26n fine-tuned on UVH-26**, then exported to
-NCNN for Raspberry Pi. Generic YOLO26s COCO weights are the higher-recall laptop
-bootstrap model;
+The deployment candidate is **YOLOv8n fine-tuned on UVH-26**, then exported to
+NCNN for Raspberry Pi. Generic COCO weights are only the laptop bootstrap model;
 they are not the final detector for Indian traffic.
 
 ## Why this model and dataset
 
-Ultralytics reports YOLO26n at 40.9 COCO box mAP with 2.4 million fused
-parameters, and its Raspberry Pi guide measures the YOLO26n NCNN export at about
-67 ms inference per 640-pixel image on a Raspberry Pi 5. NCNN was the fastest of
-the formats in that published Pi test:
+YOLOv8n is retained because it was substantially faster than the previous
+YOLO26s configuration on this laptop and is supported by the NCNN export path.
+The actual Pi speed and accuracy still require measurement on the target board.
 
-- https://docs.ultralytics.com/models/yolo26/
+- https://docs.ultralytics.com/models/yolov8/
 - https://docs.ultralytics.com/guides/raspberry-pi/
 
 The official IISc UVH-26 release is better matched to this project than COCO. It
@@ -34,9 +32,9 @@ Download the official `UVH-26-Train` and `UVH-26-Val` release outside Git. Then:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\prepare_uvh26.py --source D:\datasets\UVH-26 --output datasets\uvh26
-.\.venv\Scripts\python.exe scripts\train_traffic_model.py --data datasets\uvh26\traffic.yaml --model yolo26n.pt --device 0
-.\.venv\Scripts\python.exe scripts\evaluate_detector.py --data datasets\uvh26\traffic.yaml --model outputs\training\yolo26n-uvh26\weights\best.pt --device 0 --output docs\benchmarks\yolo26n-uvh26-accuracy.json
-.\.venv\Scripts\python.exe scripts\export_edge_model.py --model outputs\training\yolo26n-uvh26\weights\best.pt --format ncnn
+.\.venv\Scripts\python.exe scripts\train_traffic_model.py --data datasets\uvh26\traffic.yaml --model yolov8n.pt --device 0
+.\.venv\Scripts\python.exe scripts\evaluate_detector.py --data datasets\uvh26\traffic.yaml --model outputs\training\yolov8n-uvh26\weights\best.pt --device 0 --output docs\benchmarks\yolov8n-uvh26-accuracy.json
+.\.venv\Scripts\python.exe scripts\export_edge_model.py --model outputs\training\yolov8n-uvh26\weights\best.pt --format ncnn
 ```
 
 `prepare_uvh26.py` converts COCO boxes to YOLO labels and uses hard links by

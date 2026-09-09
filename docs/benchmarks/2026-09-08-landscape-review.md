@@ -6,7 +6,7 @@
 - Processing acknowledgements no longer gate capture: overwritten backend frames do not receive processed ACKs. Socket buffered bytes still apply backpressure and acknowledgement history stays bounded to 64 entries.
 - ByteTrack intermediate predictions use elapsed time relative to the detector observation interval, rather than advancing one full step per preview frame. Predictions expire after at most two seconds without observations. This is short extrapolation, not a new measurement or guaranteed identity recovery through long gaps.
 - Empty/all-red scheduler results preserve perception output and timing. Last detection frame IDs are reported per camera.
-- Provisional CPU default is YOLOv8n, configurable via YOLO_MODEL_NAME. Existing YOLO26 weights are retained for comparison.
+- Provisional CPU default is YOLOv8n, configurable via YOLO_MODEL_NAME. Superseded YOLO26 weights were removed after the saved comparison.
 
 ## Measurements
 

@@ -13,7 +13,7 @@ from ultralytics import YOLO
 def main():
     parser = argparse.ArgumentParser(description="Measure detector precision, recall and mAP on labelled traffic data")
     parser.add_argument("--data", required=True, help="Dataset YAML containing labelled validation images")
-    parser.add_argument("--model", default="yolo26n.pt")
+    parser.add_argument("--model", default="yolov8n.pt")
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--conf", type=float, default=0.001, help="Evaluation confidence floor; keep low for PR/mAP curves")
     parser.add_argument("--device", default="cpu")

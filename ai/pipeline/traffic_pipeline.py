@@ -148,7 +148,8 @@ class TrafficPipeline:
         self.analytics_exporters[lane_name] = AnalyticsExporter()
 
     def process_single_frame(
-        self, frame: np.ndarray, lane_name: str = "north", timestamp: Optional[float] = None
+        self, frame: np.ndarray, lane_name: str = "north", timestamp: Optional[float] = None,
+        precomputed_detection=None,
     ) -> PipelineResult:
         """
         Transport-agnostic frame processor accepting a decoded numpy image frame.
@@ -166,6 +167,8 @@ class TrafficPipeline:
             }
         }
         self._frame_count = getattr(self, "_frame_count", 0) + 1
+        if precomputed_detection is not None:
+            frames_data[lane_name.lower()]["precomputed_detection"] = precomputed_detection
         return self.process_step(frames_data=frames_data)
 
     def process_step(
@@ -237,9 +240,12 @@ class TrafficPipeline:
             last_detection_ts = self._last_detection_ts.get(lane_name)
             detector_due = detector_is_due(last_detection_ts, timestamp, DETECTOR_FPS)
             if detector_due:
-                detections, inference_ms = self.detector.detect(
-                    frame, frame_number=frame_num, timestamp=timestamp
-                )
+                if "precomputed_detection" in payload:
+                    detections, inference_ms = payload["precomputed_detection"]
+                else:
+                    detections, inference_ms = self.detector.detect(
+                        frame, frame_number=frame_num, timestamp=timestamp
+                    )
                 tracking_start = time.perf_counter()
                 tracked_detections = self.trackers[lane_name].update(
                     detections, frame=frame, frame_number=frame_num, timestamp=timestamp

@@ -84,6 +84,7 @@ class MessageHandler:
         # Normalize message_type key
         raw_json["message_type"] = msg_type_str
         raw_json["type"] = msg_type_str
+        raw_json["owner_socket"] = websocket
 
         try:
             msg_type = MessageType(msg_type_str)
@@ -106,6 +107,19 @@ class MessageHandler:
             if direction and direction.lower() != session.camera_direction:
                 return self._build_error("DIRECTION_MISMATCH", "Frame direction does not match registration")
             payload["direction"] = session.camera_direction
+            payload["session_token"] = token
+            if msg_type in (MessageType.WEBRTC_OFFER, MessageType.WEBRTC_STOP):
+                if not hasattr(self, "rtc"):
+                    from server.webrtc_ingest import WebRTCIngest
+                    self.rtc = WebRTCIngest(self)
+                if msg_type == MessageType.WEBRTC_STOP:
+                    await self.rtc.close(node_id, websocket)
+                    return {"type": "WEBRTC_STOP", "payload": {}}
+                try:
+                    answer = await self.rtc.offer(node_id, token, websocket, payload.get("sdp"))
+                    return {"type": "WEBRTC_ANSWER", "timestamp": time.time(), "payload": answer}
+                except Exception as exc:
+                    return self._build_error("WEBRTC_FAILED", str(exc))
             if msg_type in (MessageType.START_STREAM, MessageType.STOP_STREAM):
                 from core.application_context import ApplicationContext
                 if msg_type == MessageType.START_STREAM and not ApplicationContext.get_instance().system_running:
@@ -190,6 +204,8 @@ class MessageHandler:
         payload = msg.payload
         await self.connection_manager.connect(node_id, websocket)
         session = self.session_manager.create_session(node_id, direction)
+        from core.application_context import ApplicationContext
+        session.streaming = ApplicationContext.get_instance().system_running
         if is_pairing_authorized:
             self.session_manager.clear_pairing_session(direction)
 
@@ -208,6 +224,7 @@ class MessageHandler:
         )
         d = ack.model_dump()
         d["type"] = "REGISTRATION_ACK"
+        d["payload"]["transports"] = ["webrtc", "jpeg-json"]
         logger.info(f"[PAIRING] REGISTER â†’ ACK | node={node_id} | direction={direction} | token={session.session_token[:8]}...")
 
         # Schedule single authoritative START_STREAM signal to camera node so mobile app switches to STREAMING state
@@ -371,7 +388,7 @@ class MessageHandler:
         payload_raw = raw_json.get("payload", {})
         if isinstance(payload_raw, dict):
             frame_data = payload_raw.get("frame_data")
-            if not isinstance(frame_data, str) or not frame_data or len(frame_data) > 2_000_000:
+            if payload_raw.get("decoded_image") is None and (not isinstance(frame_data, (str, bytes)) or not frame_data or len(frame_data) > 2_000_000):
                 return self._build_error("INVALID_FRAME", "JPEG base64 must be nonempty and below 2MB")
             direction = (
                 payload_raw.get("direction")
@@ -402,14 +419,39 @@ class MessageHandler:
                 ctx.increment_stage_counter("dropped")
                 logger.debug(f"[LATENCY-CONTROL] Dropping stale frame for '{direction}' (Total dropped: {self.dropped_frames_count})")
 
+            cap = payload_raw.get("capture_timestamp")
+            if not isinstance(cap, (float, int)) or not math.isfinite(cap):
+                cap = time.time()*1000
+            payload_raw["capture_timestamp"] = cap
+            upload = payload_raw.get("upload_timestamp", cap)
+            payload_raw["upload_timestamp"] = upload if isinstance(upload,(float,int)) and math.isfinite(upload) else cap
+            payload_raw.setdefault("frame_id", f"{direction}-{time.time_ns()}")
             self.latest_frames[direction] = raw_json
             self.frame_events.setdefault(direction, asyncio.Event()).set()
 
-            # Lazy start loop task
-            if direction not in self.worker_tasks:
-                self.worker_tasks[direction] = asyncio.create_task(self._process_direction_loop(direction))
+            if not hasattr(self, "batch_ready"):
+                self.batch_ready = asyncio.Event()
+            self.batch_ready.set()
+            if not self.worker_tasks:
+                from server.frame_coordinator import run_coordinator
+                self.worker_tasks["batch"] = asyncio.create_task(run_coordinator(self))
 
         return None
+
+    async def submit_decoded_frame(self, image, direction, node_id, token, websocket, frame_id, received_ms):
+        from core.application_context import ApplicationContext
+        if (not ApplicationContext.get_instance().system_running
+                or not self.session_manager.validate_session(node_id, token)
+                or self.connection_manager.get_connection(node_id) is not websocket):
+            return
+        session = self.session_manager.get_session(node_id)
+        if not session.streaming or session.camera_direction != direction:
+            return
+        await self._handle_video_frame({'owner_socket':websocket, 'payload':{
+            'decoded_image':image, 'direction':direction, 'node_id':node_id,
+            'session_token':token, 'frame_id':f'{node_id}-{frame_id}',
+            'capture_timestamp':received_ms,'upload_timestamp':received_ms,
+            'source_kind':'video'}})
 
     async def _handle_disconnect(self, raw_json: dict) -> Optional[dict]:
         """Handle DISCONNECT message and clean up node session & connection."""
@@ -434,6 +476,12 @@ class MessageHandler:
         return None
 
     async def shutdown(self):
+        if hasattr(self, "local_sources"):
+            await self.local_sources.shutdown()
+            del self.local_sources
+        if hasattr(self, "rtc"):
+            await self.rtc.shutdown()
+            del self.rtc
         tasks = list(getattr(self, "worker_tasks", {}).values())
         for task in tasks:
             task.cancel()
@@ -469,11 +517,16 @@ def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upl
         return _process_frame_locked(frame_b64, direction, capture_ts, upload_ts, rx_ts, frame_id, rotation)
 
 
-def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upload_ts: float, rx_ts: float, frame_id: str, rotation: int = 0):
+def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upload_ts: float, rx_ts: float, frame_id: str, rotation: int = 0, decoded=None, precomputed_detection=None):
     """
     Worker thread task executing CPU-bound base64/JPEG decoding, passing transport-agnostic np.ndarray
     frame into TrafficPipeline and ControlManager, and building immutable PipelineStateSnapshot.
     """
+    # Check freshness before first-use imports initialize OpenCV/PyTorch. The
+    # direction loop already rejects frames that waited behind other inference.
+    if time.time() * 1000 - rx_ts > 2500:
+        return None
+
     import base64
     import cv2
     import numpy as np
@@ -482,23 +535,21 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
     from ai.pipeline.traffic_pipeline import TrafficPipeline
     from ai.controller.control_manager import ControlManager
 
-    if time.time() * 1000 - rx_ts > 2500:
-        return None
     decode_start = time.time() * 1000.0
-    if "," in frame_b64:
-        frame_b64 = frame_b64.split(",")[1]
-    frame_bytes = base64.b64decode(frame_b64, validate=True)
-    nparr = np.frombuffer(frame_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    decode_ts = time.time() * 1000.0
-
+    frame_bytes = b''
     ctx = ApplicationContext.get_instance()
-
-    if img is None:
-        ctx.increment_stage_counter("decode_failed")
-        return None
-
-    img, orientation_info = normalize_frame_orientation(img, rotation)
+    if decoded is None:
+        if "," in frame_b64:
+            frame_b64 = frame_b64.split(",")[1]
+        frame_bytes = base64.b64decode(frame_b64, validate=True)
+        img = cv2.imdecode(np.frombuffer(frame_bytes, np.uint8), cv2.IMREAD_COLOR)
+        if img is None:
+            ctx.increment_stage_counter("decode_failed")
+            return None
+        img, orientation_info = normalize_frame_orientation(img, rotation)
+    else:
+        img, orientation_info = decoded
+    decode_ts = time.time() * 1000.0
     logger.info(
         "FRAME_ORIENTATION frame_id=%s direction=%s rotation=%s",
         frame_id, direction, orientation_info["rotation"],
@@ -524,7 +575,7 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
         "YOLO_START frame_id=%s direction=%s input_width=%s input_height=%s",
         frame_id, direction, img.shape[1], img.shape[0],
     )
-    pipeline_result = ctx.pipeline.process_single_frame(img, lane_name=direction, timestamp=capture_ts / 1000)
+    pipeline_result = ctx.pipeline.process_single_frame(img, lane_name=direction, timestamp=capture_ts / 1000, precomputed_detection=precomputed_detection)
     tracking_ts = time.time() * 1000.0
     detector_ran = bool(getattr(pipeline_result, "latency_metrics", {}).get("detector_ran", False))
     if detector_ran:
