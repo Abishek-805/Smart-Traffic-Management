@@ -158,11 +158,13 @@ def test_unexpected_socket_loss_preserves_short_reconnect_window():
 async def test_frame_requires_socket_ownership_and_direction():
     handler = MessageHandler()
     socket = AsyncMock()
+    ApplicationContext.get_instance().system_running = True
     handler.session_manager.register_pairing_session(
         'north', 'regression', 'pair-token', time.time() + 60
     )
     ack = await handler.process_message({'type': 'REGISTER_CAMERA', 'payload': {
         'node_id': 'regression', 'camera_direction': 'north'}, 'token': 'pair-token'}, socket)
+    assert handler.session_manager.get_session('regression').streaming is True
     packet = {'type': 'VIDEO_FRAME', 'payload': {'node_id': 'regression',
         'session_token': ack['payload']['session_token'], 'direction': 'north', 'frame_data': 'a'}}
     assert (await handler.process_message(packet, AsyncMock()))['payload']['error_code'] == 'UNAUTHORIZED_SESSION'

@@ -26,7 +26,7 @@ class RoadTrack(VideoStreamTrack):
         self.image=cv2.resize(image,(round(w*640/max(w,h)),round(h*640/max(w,h))))
         self.index=0
     async def recv(self):
-        await asyncio.sleep(.1)
+        await asyncio.sleep(.2)
         frame=VideoFrame.from_ndarray(self.image,format='bgr24')
         frame.pts=self.index*9000;frame.time_base=Fraction(1,90000);self.index+=1
         return frame
@@ -73,8 +73,12 @@ async def run(seconds=20):
             await asyncio.sleep(seconds)
             import numpy as np
             report={'scope':'Four real WebRTC video peers replaying separate photographs through QR, YOLO and ByteTrack; not physical-phone or moving-video accuracy.',
-                    'seconds':seconds,'lanes':{d:{'processed':len(rows),
+                    'seconds':seconds,'peer_states':[{'connection':pc.connectionState,'ice':pc.iceConnectionState,
+                    'signaling':pc.signalingState} for pc in peers],
+                    'lanes':{d:{'processed':len(rows),
                     'server_p95_ms':round(float(np.percentile([r['server_processing_ms'] for r in rows],95)),2) if rows else None,
+                    'inference_p95_ms':round(float(np.percentile([r['inference_ms'] for r in rows],95)),2) if rows else None,
+                    'queue_p95_ms':round(float(np.percentile([r['queue_wait_ms'] for r in rows],95)),2) if rows else None,
                     'last_count':rows[-1]['vehicle_count'] if rows else None} for d,rows in results.items()}}
             (ROOT/'docs/benchmarks/four-webrtc-runtime.json').write_text(json.dumps(report,indent=2))
             print(json.dumps(report,indent=2))

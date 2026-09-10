@@ -77,6 +77,7 @@ class WebRTCIngest:
 
         @peer.pc.on('track')
         def on_track(track):
+            logger.info('WebRTC track received node=%s kind=%s', node_id, track.kind)
             if track.kind != 'video' or peer.tasks:
                 self._schedule_close(peer)
                 return
@@ -85,6 +86,7 @@ class WebRTCIngest:
 
         @peer.pc.on('connectionstatechange')
         def on_state_change():
+            logger.info('WebRTC state node=%s state=%s', node_id, peer.pc.connectionState)
             if peer.pc.connectionState in ('failed', 'closed') and self.peers.get(node_id) is peer:
                 self._schedule_close(peer)
 

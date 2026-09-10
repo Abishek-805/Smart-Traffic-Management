@@ -103,6 +103,7 @@ class MessageHandler:
                     or self.connection_manager.get_connection(node_id) is not websocket):
                 return self._build_error("UNAUTHORIZED_SESSION", "Register this connection first")
             session = self.session_manager.get_session(node_id)
+            session.last_heartbeat = time.time()
             direction = payload.get("direction") or payload.get("camera_direction")
             if direction and direction.lower() != session.camera_direction:
                 return self._build_error("DIRECTION_MISMATCH", "Frame direction does not match registration")
@@ -135,6 +136,7 @@ class MessageHandler:
         elif msg_type == MessageType.HEARTBEAT:
             response = await self._handle_heartbeat(raw_json)
         elif msg_type == MessageType.VIDEO_FRAME:
+            raw_json["owner_socket"] = websocket
             response = await self._handle_video_frame(raw_json)
         elif msg_type == MessageType.DISCONNECT:
             return await self._handle_disconnect(raw_json)
@@ -447,6 +449,7 @@ class MessageHandler:
         session = self.session_manager.get_session(node_id)
         if not session.streaming or session.camera_direction != direction:
             return
+        session.last_heartbeat = time.time()
         await self._handle_video_frame({'owner_socket':websocket, 'payload':{
             'decoded_image':image, 'direction':direction, 'node_id':node_id,
             'session_token':token, 'frame_id':f'{node_id}-{frame_id}',
@@ -524,7 +527,7 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
     """
     # Check freshness before first-use imports initialize OpenCV/PyTorch. The
     # direction loop already rejects frames that waited behind other inference.
-    if time.time() * 1000 - rx_ts > 2500:
+    if precomputed_detection is None and time.time() * 1000 - rx_ts > 2500:
         return None
 
     import base64

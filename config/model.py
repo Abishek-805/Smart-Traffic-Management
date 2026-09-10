@@ -7,13 +7,12 @@ from pathlib import Path
 
 # Provisional laptop profile: faster on the local CPU and better coverage of
 # the supplied traffic scene. Validate on labelled video before Pi deployment.
-MODEL_NAME = os.getenv("YOLO_MODEL_NAME", "yolov8n.onnx" if
-    (Path(__file__).resolve().parents[1] / 'yolov8n.onnx').exists() else "yolov8n.pt")
+MODEL_NAME = os.getenv("YOLO_MODEL_NAME", "yolov8n.pt")
 
 # Inference parameters
 CONFIDENCE_THRESHOLD = float(os.getenv("YOLO_CONFIDENCE_THRESHOLD", "0.08"))
 IOU_THRESHOLD = float(os.getenv("YOLO_IOU", "0.60"))
-INPUT_SIZE = max(320, min(1280, int(os.getenv("YOLO_INPUT_SIZE", "640"))))
+INPUT_SIZE = max(320, min(1280, int(os.getenv("YOLO_INPUT_SIZE", "576"))))
 MAX_DETECTIONS = max(10, min(1000, int(os.getenv("YOLO_MAX_DETECTIONS", "300"))))
 CPU_THREADS = max(1, min(16, int(os.getenv("YOLO_CPU_THREADS", "4"))))
 DETECTOR_FPS = max(0.1, min(30.0, float(os.getenv("DETECTOR_FPS", "2.0"))))

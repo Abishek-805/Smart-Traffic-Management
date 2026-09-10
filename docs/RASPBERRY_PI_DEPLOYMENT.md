@@ -31,21 +31,22 @@ Set these values in `.env`:
 
 ```dotenv
 YOLO_MODEL_NAME=models/best_ncnn_model
-YOLO_INPUT_SIZE=640
+YOLO_INPUT_SIZE=512
 YOLO_CPU_THREADS=4
 YOLO_MAX_DETECTIONS=300
 YOLO_CONFIDENCE_THRESHOLD=0.08
+DETECTOR_FPS=1.0
 TRACK_HIGH_THRESHOLD=0.15
 TRACK_LOW_THRESHOLD=0.08
 NEW_TRACK_THRESHOLD=0.15
 YOLO_DEVICE=cpu
 ```
 
-Use the mobile **Low power** profile at 2 sampled frames per second. Four cameras
-then request at most about eight inferences per second, while processed-frame ACK
-backpressure prevents queues from growing. If p95 frame age exceeds the control
-limit, try `YOLO_INPUT_SIZE=512` and re-run labelled accuracy evaluation before
-keeping that reduction.
+Start a CPU-only Pi at one detector update per second per lane and 512 pixels.
+The coordinator always keeps only the newest frame, so overload reduces update
+rate instead of growing latency. Try 416 pixels only after a labelled comparison.
+For sustained four-camera rates near the laptop profile, use the AI HAT+ path
+below rather than assuming a Pi CPU can match this laptop.
 
 ## Accuracy gate
 

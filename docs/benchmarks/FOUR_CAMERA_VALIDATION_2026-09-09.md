@@ -43,5 +43,17 @@ The low-demand East lane was still served after North, so the high North count d
 - **Smart timing:** passes the current fairness, empty-lane skip, ordering, minimum, and maximum duration rules.
 - **Four-camera latency target:** fails for dense scenes on this laptop. The documented target is p95 below 750 ms at 2 FPS per camera; the measured p95 is about 2.3 seconds.
 
-The limiting component is the single serialized inference worker shared by all four directions, not QR registration or WebSocket routing. Lowering phone FPS prevents backlog but cannot make simultaneous four-lane inference meet 750 ms. Reaching that target requires a batched multi-lane inference path, a faster exported runtime or accelerator, and validation on labelled moving traffic video. A Raspberry Pi CPU should not be expected to outperform this laptop; Pi deployment needs an optimized NCNN/OpenVINO/TFLite profile or an accelerator and must be benchmarked on the actual board.
+The results above describe the former serialized JPEG implementation. On 10
+September it was replaced by QR-negotiated WebRTC video, one bounded latest-frame
+coordinator, and four-frame YOLO batches with independent ByteTrack state. In a
+fresh four-peer run at 576 pixels, all peers were connected simultaneously and
+each lane processed 59-60 updates in 20 seconds. Direction p95 server latency was
+633-679 ms, p95 inference 472-509 ms, and p95 queue wait 217-226 ms. That run is
+stored in `four-webrtc-runtime.json` and meets the software p95 target on this
+laptop. It remains an unlabelled, same-laptop replay rather than a physical-phone
+Wi-Fi or accuracy certification.
 
+The server-focused `pt576-batch-four-2fps.json` run acknowledged all 41 offered
+frames for each lane, with p95 server latency of 416-544 ms. Median server CPU was
+141% of one core and median RSS was about 458 MB. This removes the same-PC H.264
+sender cost but still does not include real phone Wi-Fi latency.

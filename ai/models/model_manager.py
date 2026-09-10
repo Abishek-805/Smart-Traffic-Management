@@ -87,8 +87,9 @@ class ModelManager:
                 self.iou,
             )
             warmup_started = time.perf_counter()
+            warm_frame = np.zeros((self.input_size, self.input_size, 3), dtype=np.uint8)
             self.model.predict(
-                source=np.zeros((self.input_size, self.input_size, 3), dtype=np.uint8),
+                source=[warm_frame] * 4,
                 conf=self.confidence,
                 iou=self.iou,
                 imgsz=self.input_size,
@@ -111,7 +112,8 @@ class ModelManager:
         """
         with self._inference_lock:
             # OpenMP settings belong to the calling native worker as well.
-            if self.device == 'cpu' or not torch.cuda.is_available():
+            if ((self.device == 'cpu' or not torch.cuda.is_available())
+                    and torch.get_num_threads() != self.cpu_threads):
                 torch.set_num_threads(self.cpu_threads)
             result = self.model.predict(
                 source=frame,
