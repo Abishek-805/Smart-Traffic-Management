@@ -1,7 +1,6 @@
 """One bounded handoff for JPEG and decoded video; never queue executor work."""
 import asyncio
 import base64
-import os
 import time
 import logging
 
@@ -45,9 +44,8 @@ def process_batch(packets):
                if detector_is_due(ctx.pipeline._last_detection_ts.get(packet['payload']['direction']),
                                   packet['payload']['capture_timestamp']/1000, DETECTOR_FPS)]
         computed = {}
-        # Exported runtimes may only support batch1. Explicit tuning selects 1-4.
-        size = max(1, min(4, int(os.getenv('YOLO_BATCH_SIZE',
-            '1' if 'ncnn' in ctx.pipeline.model_manager.model_name else '4'))))
+        # Warm-up and inference share the model manager's validated batch size.
+        size = ctx.pipeline.model_manager.batch_size
         for start in range(0, len(due), size):
             group = due[start:start+size]
             boxes, elapsed = ctx.pipeline.detector.detect_batch(
@@ -65,7 +63,7 @@ def process_batch(packets):
                 precomputed_detection=computed.get(p['direction']))
             if result:
                 result[3]['queue_wait_ms'] = round(max(0, preprocess_done_ms - packet['backend_receive_timestamp']), 2)
-                result[3]['batch_size'] = min(size,len(due))
+                result[3]['batch_size'] = min(size, len(due))
                 result[3]['source_kind'] = p.get('source_kind','jpeg')
                 results.append((packet,result))
         return results

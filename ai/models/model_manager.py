@@ -20,6 +20,7 @@ from config.model import (
     INPUT_SIZE,
     MAX_DETECTIONS,
     CPU_THREADS,
+    BATCH_SIZE,
 )
 from config.paths import MODELS_DIR
 from ai.utils.logger import get_logger
@@ -40,6 +41,7 @@ class ModelManager:
         device: str = DEVICE,
         input_size: int = INPUT_SIZE,
         max_detections: int = MAX_DETECTIONS,
+        batch_size: int = BATCH_SIZE,
     ):
         self.model_name = model_name
         self.confidence = confidence
@@ -47,6 +49,7 @@ class ModelManager:
         self.device = device
         self.input_size = input_size
         self.max_detections = max_detections
+        self.batch_size = 1 if "ncnn" in model_name.lower() else max(1, min(4, batch_size))
         self.cpu_threads = CPU_THREADS
         cv2.setNumThreads(1)
         if not torch.cuda.is_available() or self.device == "cpu":
@@ -75,11 +78,12 @@ class ModelManager:
             target = str(model_path if model_path.exists() else root_path if root_path.exists() else self.model_name)
             self.model = YOLO(target)
             logger.info(
-                "Model '%s' loaded successfully (input=%s, max_det=%s, threads=%s)",
+                "Model '%s' loaded successfully (input=%s, max_det=%s, threads=%s, batch=%s)",
                 self.model_name,
                 self.input_size,
                 self.max_detections,
                 self.cpu_threads,
+                self.batch_size,
             )
             logger.info(
                 "Detection thresholds: conf=%.2f, iou=%.2f",
@@ -89,7 +93,7 @@ class ModelManager:
             warmup_started = time.perf_counter()
             warm_frame = np.zeros((self.input_size, self.input_size, 3), dtype=np.uint8)
             self.model.predict(
-                source=[warm_frame] * 4,
+                source=[warm_frame] * self.batch_size,
                 conf=self.confidence,
                 iou=self.iou,
                 imgsz=self.input_size,
@@ -136,8 +140,10 @@ class ModelManager:
         """Ordered results; one model call for a bounded list of images."""
         if not frames:
             return []
-        if len(frames) > 4:
-            raise ValueError('At most four camera frames per batch')
+        if len(frames) > self.batch_size:
+            raise ValueError(
+                f"At most the configured batch size of {self.batch_size} camera frames per batch"
+            )
         return self.predict(frames, classes=classes)
 
 
