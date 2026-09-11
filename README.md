@@ -3,8 +3,8 @@
 A local traffic-monitoring prototype: four Android camera nodes send JPEG samples to
 a configurable YOLO detector and independent ByteTrack trackers. The laptop test
 profile uses YOLOv8n; the Raspberry Pi candidate is a fine-tuned YOLOv8n NCNN model.
-FastAPI serves the dashboard, directional camera previews, measured telemetry and a
-simulated adaptive signal controller.
+FastAPI serves the dashboard, directional camera previews, measured telemetry and an
+explicit simulation-by-default or configured ESP32 signal output.
 
 **Use only on a trusted LAN.** Camera registration uses an expiring one-time QR
 secret and the server issues a session token for later frames/reconnects. REST
@@ -14,7 +14,9 @@ public-road signals.
 
 See the [implementation plan](docs/IMPLEMENTATION_PLAN.md),
 [optimization measurements](docs/OPTIMIZATION_REPORT.md) and
-[validation report](docs/VALIDATION_REPORT.md) for scope and remaining checks.
+[validation report](docs/VALIDATION_REPORT.md) for scope and remaining checks. The
+[SIH correctness remediation](docs/SIH_CRITICAL_CORRECTNESS_REMEDIATION_2026-09-11.md)
+records the hardware, tracking, batching, telemetry, and operational fixes.
 The [Raspberry Pi deployment guide](docs/RASPBERRY_PI_DEPLOYMENT.md) records the
 edge model choice, NCNN setup, and required accuracy gate.
 
@@ -49,6 +51,22 @@ Python-only launch after installation and web build:
 ```powershell
 .\.venv\Scripts\python.exe run.py --host 0.0.0.0 --port 8000
 ```
+
+Simulation is the explicit default. To request a physical controller, configure it
+before startup; a missing/unavailable requested device keeps the system paused and
+all-red instead of silently changing to simulation:
+
+```powershell
+$env:HARDWARE = 'esp32'
+$env:ESP32_PORT = 'COM11'       # Use the actual operator-selected port
+$env:ESP32_BAUDRATE = '115200'
+.\start.ps1 -Lan -SkipInstall
+```
+
+Set `HARDWARE=simulation` to deliberately use simulation. `TRAFFIC_PROFILE` accepts
+`laptop` (default) or `raspberry_pi`; the Raspberry Pi values are proposed and
+unvalidated until measured on target hardware. Health and telemetry responses publish
+the effective profile and actual hardware connection state.
 
 ## Connect the Android apps
 
@@ -101,8 +119,9 @@ Android JPEG samples -> /ws/camera -> latest frame per direction
   theme and notification preferences stay in the browser.
 
 The supplied COCO model supports bicycles, cars, motorcycles, buses and trucks. Emergency
-recognition and reinforcement learning are **not implemented**. ESP32 is kept in
-simulation in the combined and split web runtimes.
+recognition and reinforcement learning are **not implemented**. ESP32 simulation is
+available, but physical mode is used only when explicitly requested with a configured
+serial port; physical operation has not been validated by this software-only test run.
 
 The laptop profile uses a detector floor of 0.08 and ByteTrack high/new-track
 thresholds of 0.15. This lets ByteTrack use weak boxes to maintain an existing
