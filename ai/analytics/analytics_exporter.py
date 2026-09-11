@@ -69,7 +69,9 @@ class AnalyticsExporter:
         """
         Generate LaneStatistics objects for all active lanes.
         """
-        grouped_vehicles = state_manager.get_active_vehicles_by_lane()
+        # Scheduling and queue metrics require confirmed detector evidence.
+        # Display-only ByteTrack predictions are intentionally excluded.
+        grouped_vehicles = state_manager.get_confirmed_vehicles_by_lane()
         all_lanes = ["North", "South", "East", "West"]
         
         lane_stats: Dict[str, LaneStatistics] = {}

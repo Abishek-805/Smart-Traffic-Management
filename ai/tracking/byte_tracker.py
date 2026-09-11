@@ -7,7 +7,7 @@ import numpy as np
 from ultralytics.engine.results import Boxes
 from ultralytics.trackers.byte_tracker import BYTETracker
 from ai.tracking.base_tracker import BaseTracker
-from ai.detection.detection_types import Detection
+from ai.detection.detection_types import Detection, ObservationState
 from config.model import (
     TRACK_HIGH_THRESHOLD,
     TRACK_LOW_THRESHOLD,
@@ -54,7 +54,8 @@ class ByteTracker(BaseTracker):
             if 0 <= index < len(detections):
                 tracked.append(replace(detections[index], track_id=int(row[4]),
                     bbox=tuple(int(v) for v in row[:4]),
-                    frame_number=frame_number, timestamp=timestamp))
+                    frame_number=frame_number, timestamp=timestamp,
+                    observation_state=ObservationState.OBSERVED))
         self._prediction_horizon = 0
         if self._observation_timestamp is not None and timestamp > self._observation_timestamp:
             self._observation_interval = timestamp - self._observation_timestamp
@@ -87,6 +88,7 @@ class ByteTracker(BaseTracker):
                 continue
             bbox = tuple(int(round(v)) for v in track.xyxy)
             output.append(replace(
-                previous, bbox=bbox, frame_number=frame_number, timestamp=timestamp
+                previous, bbox=bbox, frame_number=frame_number, timestamp=timestamp,
+                observation_state=ObservationState.PREDICTED,
             ))
         return output

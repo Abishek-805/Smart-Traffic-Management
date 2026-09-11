@@ -28,9 +28,15 @@ class TestMultiCameraPipeline(unittest.TestCase):
         cls.dashboard = MultiCameraDashboard()
         frame = cv2.imread(str(Path(__file__).parent / "fixtures" / "ultralytics_bus.jpg"))
         assert frame is not None
-        cls.result = cls.pipeline.process_step(frames_data={lane: {
+        cls.pipeline.process_step(frames_data={lane: {
             "frame": frame.copy(), "connected": True, "frame_number": 1,
             "timestamp": 1.0, "fps": 2.0, "resolution": (frame.shape[1], frame.shape[0]),
+        } for lane in ("north", "east", "south", "west")})
+        # A second detector observation confirms tracks before they can drive
+        # authoritative counts or a signal decision.
+        cls.result = cls.pipeline.process_step(frames_data={lane: {
+            "frame": frame.copy(), "connected": True, "frame_number": 2,
+            "timestamp": 1.5, "fps": 2.0, "resolution": (frame.shape[1], frame.shape[0]),
         } for lane in ("north", "east", "south", "west")})
 
     @classmethod

@@ -3,7 +3,15 @@ Data structures representing detection outputs in standard format.
 """
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Tuple, Optional, Dict, Any
+
+
+class ObservationState(str, Enum):
+    """Whether a box is detector evidence or display-only tracker projection."""
+
+    OBSERVED = "OBSERVED"
+    PREDICTED = "PREDICTED"
 
 
 @dataclass
@@ -25,6 +33,7 @@ class Detection:
     frame_number: int = 0
     timestamp: float = 0.0
     extra_metadata: Dict[str, Any] = field(default_factory=dict)
+    observation_state: ObservationState = ObservationState.OBSERVED
 
     @property
     def centroid(self) -> Tuple[int, int]:
@@ -50,4 +59,5 @@ class Detection:
             "is_priority": self.is_priority,
             "frame_number": self.frame_number,
             "timestamp": round(self.timestamp, 3),
+            "observation_state": self.observation_state.value,
         }

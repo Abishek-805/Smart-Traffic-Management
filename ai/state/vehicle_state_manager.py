@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 import time
 
-from ai.detection.detection_types import Detection
+from ai.detection.detection_types import Detection, ObservationState
 from config.traffic import (
     QUEUE_MOTION_THRESHOLD_PX_SEC,
     CONSECUTIVE_QUEUE_FRAMES,
@@ -76,6 +76,17 @@ class VehicleStateManager:
                 continue
 
             tid = det.track_id
+            if det.observation_state == ObservationState.PREDICTED:
+                # Tracker projections are visualization continuity, not new
+                # evidence. Never confirm, refresh, or grow queues from them.
+                predicted_state = self.active_states.get(tid)
+                if predicted_state is not None:
+                    det.motion_px_sec = predicted_state.motion_px_sec
+                    det.time_in_lane_sec = predicted_state.time_in_lane_sec
+                    det.queue_time_sec = predicted_state.queue_time_sec
+                    det.is_priority = predicted_state.is_priority
+                continue
+
             current_frame_track_ids.add(tid)
             lane_name = det.lane or "Unknown"
 

@@ -101,6 +101,7 @@ class TrafficPipeline:
         self._detector_runs: Dict[str, int] = {}
         self._tracker_runs: Dict[str, int] = {}
         self._temporal_started_at: Dict[str, float] = {}
+        self._last_authoritative_stats: Dict[str, LaneStatistics] = {}
 
         # Initialize per-lane perception & analytics components
         for lane_name, stream in self.camera_manager.streams.items():
@@ -195,6 +196,7 @@ class TrafficPipeline:
 
         lane_results: Dict[str, LaneProcessingResult] = {}
         lane_stats_map: Dict[str, LaneStatistics] = {}
+        observed_stats_map: Dict[str, LaneStatistics] = {}
         multi_detections: Dict[str, List[Any]] = {}
         multi_annotated_frames: Dict[str, np.ndarray] = {}
         max_inference_ms = 0.0
@@ -270,31 +272,39 @@ class TrafficPipeline:
             from dataclasses import replace
             lane_detections = [replace(d, lane=lane_name.capitalize()) for d in tracked_detections]
 
-            # Step 4: Analytics (Vehicle Motion Tracking for this camera direction)
-            enriched_detections = self.state_managers[lane_name].update(
-                lane_detections, frame_number=frame_num, timestamp=timestamp
-            )
-
-            # Step 5: Analytics (LaneStatistics Generation)
-            stats_map = self.analytics_exporters[lane_name].generate_stats(self.state_managers[lane_name])
-            
-            lane_stat = stats_map.get(lane_name) or stats_map.get(lane_name.capitalize())
-            if lane_stat is None and stats_map:
-                first_stat = next(iter(stats_map.values()))
-                total_vehicles = sum(s.live_count for s in stats_map.values())
-                total_queue = sum(s.total_queue_time_sec for s in stats_map.values())
-                total_pce = sum(s.pce_score for s in stats_map.values())
-                has_emergency = any(s.has_priority_vehicle for s in stats_map.values())
-                lane_stat = LaneStatistics(
-                    lane_name=lane_name,
-                    live_count=total_vehicles,
-                    total_queue_time_sec=total_queue,
-                    pce_score=total_pce,
-                    density=first_stat.density,
-                    has_priority_vehicle=has_emergency,
+            # Step 4-5: only detector observations mutate vehicle state or
+            # authoritative analytics. Predictions remain display-only.
+            if detector_due:
+                enriched_detections = self.state_managers[lane_name].update(
+                    lane_detections, frame_number=frame_num, timestamp=timestamp
                 )
-            elif lane_stat is None:
-                lane_stat = LaneStatistics(lane_name=lane_name, live_count=len(enriched_detections))
+                stats_map = self.analytics_exporters[lane_name].generate_stats(
+                    self.state_managers[lane_name]
+                )
+                lane_stat = stats_map.get(lane_name) or stats_map.get(lane_name.capitalize())
+                if lane_stat is None and stats_map:
+                    first_stat = next(iter(stats_map.values()))
+                    total_vehicles = sum(s.live_count for s in stats_map.values())
+                    total_queue = sum(s.total_queue_time_sec for s in stats_map.values())
+                    total_pce = sum(s.pce_score for s in stats_map.values())
+                    has_emergency = any(s.has_priority_vehicle for s in stats_map.values())
+                    lane_stat = LaneStatistics(
+                        lane_name=lane_name,
+                        live_count=total_vehicles,
+                        total_queue_time_sec=total_queue,
+                        pce_score=total_pce,
+                        density=first_stat.density,
+                        has_priority_vehicle=has_emergency,
+                    )
+                elif lane_stat is None:
+                    lane_stat = LaneStatistics(lane_name=lane_name, live_count=len(enriched_detections))
+                observed_stats_map[lane_name] = lane_stat
+            else:
+                enriched_detections = lane_detections
+                lane_stat = self._last_authoritative_stats.get(
+                    lane_name, LaneStatistics(lane_name=lane_name)
+                )
+                stats_map = {lane_name.capitalize(): lane_stat}
 
             lane_stats_map[lane_name] = lane_stat
             multi_detections[lane_name] = enriched_detections
@@ -327,7 +337,12 @@ class TrafficPipeline:
         ctx = ApplicationContext.get_instance()
         now_mono = time.monotonic()
 
-        lane_stats_map = self.count_stabilizer.stabilize(lane_stats_map, timestamp=time.time()) if lane_stats_map else {}
+        if observed_stats_map:
+            stabilized = self.count_stabilizer.stabilize(
+                observed_stats_map, timestamp=time.time()
+            )
+            self._last_authoritative_stats.update(stabilized)
+            lane_stats_map.update(stabilized)
 
         # Update persistent history with fresh lane stats
         for l_name, l_stat in lane_stats_map.items():
