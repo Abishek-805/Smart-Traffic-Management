@@ -1,7 +1,9 @@
 # SIH Critical Correctness Remediation
 
-Date: 2026-09-11  
-Branch: `codex/four-lane-video`  
+Date: 2026-09-11
+
+Branch: `codex/four-lane-video`
+
 Scope baseline: commit `c664ff7` (`docs: add SIH technical audit`)
 
 ## Outcome
