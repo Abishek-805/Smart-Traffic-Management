@@ -41,7 +41,9 @@ export const DiagnosticsDrawer: React.FC<DiagnosticsDrawerProps> = ({ isOpen, on
     downloadAnchor.remove();
   };
 
-  const isEsp32Connected = health?.components?.esp32?.status === 'HEALTHY';
+  const esp32 = health?.components?.esp32;
+  const esp32State = esp32?.connection_state ?? 'DISCONNECTED';
+  const isEsp32Connected = esp32State === 'CONNECTED';
   const isAiHealthy = health?.components?.ai?.status === 'HEALTHY' || health?.system_status === 'RUNNING';
 
   return (
@@ -109,7 +111,7 @@ export const DiagnosticsDrawer: React.FC<DiagnosticsDrawerProps> = ({ isOpen, on
               <span style={{ color: 'var(--text-muted)' }}>AI Processing State</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: isAiHealthy ? 'var(--color-success)' : 'var(--color-warning)' }}>
                 {isAiHealthy ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
-                {isAiHealthy ? `ACTIVE / ${health?.components?.ai?.fps || 30.0} FPS` : 'INACTIVE'}
+                {isAiHealthy ? (health?.components?.ai?.fps != null ? `ACTIVE / ${health.components.ai.fps} FPS` : 'ACTIVE / MEASURING') : 'INACTIVE'}
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -166,21 +168,21 @@ export const DiagnosticsDrawer: React.FC<DiagnosticsDrawerProps> = ({ isOpen, on
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>ESP32 Interface</span>
-              <span style={{ color: isEsp32Connected ? 'var(--color-success)' : 'var(--color-warning)' }}>
-                {isEsp32Connected ? 'CONNECTED' : 'SIMULATION MODE (Active)'}
+              <span style={{ color: isEsp32Connected ? 'var(--color-success)' : esp32State === 'SIMULATION' ? 'var(--color-warning)' : 'var(--color-danger)' }}>
+                {esp32State}
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>Serial Connection</span>
-              <strong>{isEsp32Connected ? 'COM3 / TTYUSB0 (Active)' : 'Simulation Mode'}</strong>
+              <strong>{esp32?.port ?? 'NOT_CONNECTED'}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>Baud Rate</span>
-              <strong>115200 bps</strong>
+              <strong>{esp32?.baudrate != null ? `${esp32.baudrate} bps` : 'UNAVAILABLE'}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>Controller Status</span>
-              <strong>Active Green Cycle Scheduler</strong>
+              <strong>{esp32?.last_error ? `ERROR: ${esp32.last_error}` : esp32?.last_ack ? `Last ACK: ${esp32.last_ack}` : 'No ACK received'}</strong>
             </div>
           </div>
         </div>
@@ -230,15 +232,15 @@ export const DiagnosticsDrawer: React.FC<DiagnosticsDrawerProps> = ({ isOpen, on
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>CPU Utilization</span>
-              <strong>{health?.cpu_percent !== undefined ? `${health.cpu_percent}%` : 'Unavailable'}</strong>
+              <strong>{health?.cpu_percent != null ? `${health.cpu_percent}%` : 'Unavailable'}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>System Memory</span>
-              <strong>{health?.memory_used_gb !== undefined ? `${health.memory_used_gb} GB / ${health.memory_total_gb || 8.0} GB` : 'Unavailable'}</strong>
+              <strong>{health?.memory_used_gb != null && health?.memory_total_gb != null ? `${health.memory_used_gb} GB / ${health.memory_total_gb} GB` : 'Unavailable'}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>System Uptime</span>
-              <strong>{health?.uptime_seconds ? `${health.uptime_seconds}s (Operational)` : 'Unavailable'}</strong>
+              <strong>{health?.uptime_seconds != null ? `${health.uptime_seconds}s (Operational)` : 'Unavailable'}</strong>
             </div>
           </div>
         </div>

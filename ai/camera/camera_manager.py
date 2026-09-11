@@ -113,7 +113,7 @@ class CameraManager:
         for lane_name, stream in self.streams.items():
             health[lane_name] = {
                 "connected": stream.is_connected(),
-                "fps": round(stream.fps, 1),
+                "fps": round(stream.fps, 1) if stream.fps is not None else None,
                 "resolution": stream.resolution,
                 "frame_number": stream.frame_number,
                 "source": stream.source,
@@ -133,10 +133,10 @@ class CameraManager:
         return False, None, 0, 0.0
 
     @property
-    def fps(self) -> float:
+    def fps(self) -> Optional[float]:
         """Get primary stream FPS."""
         if not self.streams:
-            return 30.0
+            return None
         primary_lane = next(iter(self.streams.keys()))
         return self.streams[primary_lane].fps
 

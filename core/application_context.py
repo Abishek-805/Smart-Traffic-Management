@@ -108,13 +108,13 @@ class ApplicationContext:
                     "components": payload.get("healthComponents", {}) if fresh else {},
                     "stage_counters": payload.get("stageCounters", {}),
                     "frame_processing_errors": payload.get("processingErrors", 0),
-                    "inference_latency_ms": payload.get("latencyMetrics", {}).get("yolo_ms", 0)}
+                    "inference_latency_ms": payload.get("latencyMetrics", {}).get("yolo_ms")}
         node_count = len(self.session_manager.sessions)
         active = sum(time.monotonic() - t < 3 for t in self.frame_updated_at.values())
         healthy = self.system_running and self.pipeline is not None and active > 0
-        cpu_pct = 0.0
-        mem_used = 0.0
-        mem_total = 8.0
+        cpu_pct = None
+        mem_used = None
+        mem_total = None
         try:
             import psutil
             cpu_pct = round(psutil.cpu_percent(interval=None), 1)
@@ -122,11 +122,10 @@ class ApplicationContext:
             mem_used = round(vm.used / (1024**3), 1)
             mem_total = round(vm.total / (1024**3), 1)
         except Exception:
-            cpu_pct = 0.0
-            mem_used = 0.0
+            pass
 
         latest_pop = (self.latest_snapshot or {}).get("payload", {})
-        inf_ms = (latest_pop.get("latencyMetrics") or {}).get("yolo_ms", 0.0)
+        inf_ms = (latest_pop.get("latencyMetrics") or {}).get("yolo_ms")
 
         hardware = None
         if self.control_manager and getattr(self.control_manager, "esp32_interface", None):
@@ -170,7 +169,10 @@ class ApplicationContext:
             "components": {
                 "ai": {
                     "status": "HEALTHY" if healthy else "DEGRADED",
-                    "message": f"{MODEL_DISPLAY_NAME} {MODEL_RUNTIME} + ByteTrack | {active} fresh feeds | {inf_ms}ms",
+                    "message": (
+                        f"{MODEL_DISPLAY_NAME} {MODEL_RUNTIME} + ByteTrack | {active} fresh feeds | "
+                        f"{f'{inf_ms}ms' if inf_ms is not None else 'inference UNAVAILABLE'}"
+                    ),
                     "running": self.system_running,
                     "fps": sum(v.get("fps", 0) for v in self.live_telemetry.values()) if healthy else 0,
                     "model": MODEL_DISPLAY_NAME,

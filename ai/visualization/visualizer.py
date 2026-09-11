@@ -26,6 +26,7 @@ from ai.signal.signal_decision import SignalDecision
 from ai.pipeline.pipeline_health import PipelineHealth, HealthSeverity
 from ai.utils.statistics import StatisticsTracker
 from ai.utils.logger import get_logger
+from config.deployment import ACTIVE_PROFILE
 
 logger = get_logger("Visualizer")
 
@@ -75,7 +76,7 @@ class Visualizer:
         remaining_green_sec: int = 0,
         health: Optional[PipelineHealth] = None,
         stats: Optional[StatisticsTracker] = None,
-        source_fps: float = 30.0,
+        source_fps: Optional[float] = None,
     ) -> np.ndarray:
         """
         Draw debug perception vectors, lane ROIs, vehicle badges, health status, and analytics HUD onto frame.
@@ -84,7 +85,9 @@ class Visualizer:
 
         # Initialize VideoWriter if configured
         if self.save_video and not self._is_writer_initialized:
-            self._init_video_writer(frame.shape, fps=source_fps)
+            self._init_video_writer(
+                frame.shape, fps=source_fps or ACTIVE_PROFILE.preview_fps
+            )
 
         # 1. Render Lane ROI Polygons
         if lane_manager:

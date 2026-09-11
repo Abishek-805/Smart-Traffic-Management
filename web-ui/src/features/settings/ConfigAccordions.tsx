@@ -13,7 +13,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useObservability } from '../../shared/hooks/useObservability';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { useCameraConfigs } from '../../shared/hooks/useSystemQueries';
+import { useCameraConfigs, useSystemHealth } from '../../shared/hooks/useSystemQueries';
 import { StatusBadge } from '../../shared/components/scada/StatusBadge';
 import { FEATURE_FLAGS } from '../../config/featureFlags';
 import {
@@ -84,6 +84,7 @@ export const ConfigAccordions: React.FC = () => {
   const { settings, updateSettings } = useSettings();
   const { addToast } = useNotifications();
   const { data: cameraConfigs } = useCameraConfigs();
+  const { data: health } = useSystemHealth();
   const obs = useObservability();
   const [openSection, setOpenSection] = useState<string | null>('ai');
 
@@ -205,19 +206,15 @@ export const ConfigAccordions: React.FC = () => {
           <div style={{ padding: '20px', borderTop: '1px solid var(--border-color)', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
             <div>
               <label style={labelStyle}>SERIAL PORT (COM / TTY)</label>
-              <input type="text" value={settings.comPort}
-                onChange={(e) => updateSettings({ comPort: e.target.value })}
-                aria-label="Serial port" style={inputStyle} />
+              <div style={inputStyle}>{health?.components?.esp32?.port ?? 'NOT_CONNECTED'}</div>
             </div>
             <div>
               <label style={labelStyle}>BAUD RATE</label>
-              <select value={settings.baudRate}
-                onChange={(e) => updateSettings({ baudRate: Number(e.target.value) })}
-                aria-label="Baud rate" style={inputStyle}>
-                <option value={9600}>9600 Baud</option>
-                <option value={115200}>115200 Baud</option>
-              </select>
+              <div style={inputStyle}>{health?.components?.esp32?.baudrate != null ? `${health.components.esp32.baudrate} Baud` : 'UNAVAILABLE'}</div>
             </div>
+            <p style={{ gridColumn: '1 / -1', color: 'var(--text-muted)', margin: 0 }}>
+              Hardware mode is applied at server startup from HARDWARE, ESP32_PORT, and ESP32_BAUDRATE.
+            </p>
           </div>
         )}
       </div>

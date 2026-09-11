@@ -33,6 +33,12 @@ logger = get_logger("MessageHandler")
 _frame_worker_lock = threading.Lock()
 
 
+def log_frame_trace(event: str, **fields) -> None:
+    """Emit opt-in structured diagnostics for a single frame."""
+    details = " ".join(f"{key}={value}" for key, value in fields.items())
+    logger.debug("%s%s", event, f" {details}" if details else "")
+
+
 class MessageHandler:
     """
     Handles parsing and processing of incoming WebSocket messages (REGISTER_CAMERA, HEARTBEAT, DISCONNECT).
@@ -346,9 +352,9 @@ class MessageHandler:
                     rotation = payload_raw.get("rotation", 0)
                     width = payload_raw.get("width")
                     height = payload_raw.get("height")
-                    logger.info(
-                        "FRAME_RECEIVED frame_id=%s direction=%s width=%s height=%s",
-                        frame_id, direction, width, height,
+                    log_frame_trace(
+                        "FRAME_RECEIVED", frame_id=frame_id, direction=direction,
+                        width=width, height=height,
                     )
                     res = await asyncio.get_running_loop().run_in_executor(
                         self.frame_executor, _process_frame_worker,
@@ -554,14 +560,14 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
     else:
         img, orientation_info = decoded
     decode_ts = time.time() * 1000.0
-    logger.info(
-        "FRAME_ORIENTATION frame_id=%s direction=%s rotation=%s",
-        frame_id, direction, orientation_info["rotation"],
+    log_frame_trace(
+        "FRAME_ORIENTATION", frame_id=frame_id, direction=direction,
+        rotation=orientation_info["rotation"],
     )
-    logger.info(
-        "FRAME_NORMALIZED frame_id=%s direction=%s width=%s height=%s rotation=%s",
-        frame_id, direction, orientation_info["width"], orientation_info["height"],
-        orientation_info["rotation"],
+    log_frame_trace(
+        "FRAME_NORMALIZED", frame_id=frame_id, direction=direction,
+        width=orientation_info["width"], height=orientation_info["height"],
+        rotation=orientation_info["rotation"],
     )
 
     ctx.increment_stage_counter("decoded")
@@ -576,9 +582,9 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
 
     # 1. AI Perception, ByteTrack, Lane Assignment, Analytics & Signal Scheduler via TrafficPipeline
     yolo_start = time.time() * 1000.0
-    logger.info(
-        "YOLO_START frame_id=%s direction=%s input_width=%s input_height=%s",
-        frame_id, direction, img.shape[1], img.shape[0],
+    log_frame_trace(
+        "YOLO_START", frame_id=frame_id, direction=direction,
+        input_width=img.shape[1], input_height=img.shape[0],
     )
     pipeline_result = ctx.pipeline.process_single_frame(
         img, lane_name=direction,
@@ -593,12 +599,11 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
             ctx.last_yolo_frame_ids = {}
         ctx.last_yolo_frame_ids[direction] = frame_id
     ctx.last_tracked_frame_id = frame_id
-    logger.info(
-        "YOLO_COMPLETE frame_id=%s direction=%s inference_ms=%.2f detections=%s input_width=%s input_height=%s ran=%s",
-        frame_id, direction,
-        float(getattr(pipeline_result, "latency_metrics", {}).get("yolo_ms", 0.0)),
-        sum(len(dets) for dets in pipeline_result.multi_detections.values()),
-        img.shape[1], img.shape[0], detector_ran,
+    log_frame_trace(
+        "YOLO_COMPLETE", frame_id=frame_id, direction=direction,
+        inference_ms=round(float(getattr(pipeline_result, "latency_metrics", {}).get("yolo_ms", 0.0)), 2),
+        detections=sum(len(dets) for dets in pipeline_result.multi_detections.values()),
+        input_width=img.shape[1], input_height=img.shape[0], ran=detector_ran,
     )
 
     # 2. Control Layer execution via ControlManager (handles ESP32 hardware command & decision logging)
@@ -719,6 +724,9 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
         "detector_ran": detector_ran,
         "latest_frame_id": frame_id,
         "last_detection_frame_id": getattr(ctx, "last_yolo_frame_ids", {}).get(direction),
+        "last_prediction_frame_id": (
+            frame_id if not detector_ran else ctx.live_telemetry.get(direction, {}).get("last_prediction_frame_id")
+        ),
         "last_tracked_frame_id": frame_id,
         "frame_id": frame_id,
         "vehicle_count": total_vehicles,

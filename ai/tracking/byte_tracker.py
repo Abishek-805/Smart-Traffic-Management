@@ -55,7 +55,7 @@ class ByteTracker(BaseTracker):
                 tracked.append(replace(detections[index], track_id=int(row[4]),
                     bbox=tuple(int(v) for v in row[:4]),
                     frame_number=frame_number, timestamp=timestamp,
-                    observation_state=ObservationState.OBSERVED))
+                    observation_type=ObservationState.OBSERVED))
         self._prediction_horizon = 0
         if self._observation_timestamp is not None and timestamp > self._observation_timestamp:
             self._observation_interval = timestamp - self._observation_timestamp
@@ -89,6 +89,6 @@ class ByteTracker(BaseTracker):
             bbox = tuple(int(round(v)) for v in track.xyxy)
             output.append(replace(
                 previous, bbox=bbox, frame_number=frame_number, timestamp=timestamp,
-                observation_state=ObservationState.PREDICTED,
+                observation_type=ObservationState.PREDICTED,
             ))
         return output

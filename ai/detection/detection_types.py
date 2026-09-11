@@ -33,7 +33,7 @@ class Detection:
     frame_number: int = 0
     timestamp: float = 0.0
     extra_metadata: Dict[str, Any] = field(default_factory=dict)
-    observation_state: ObservationState = ObservationState.OBSERVED
+    observation_type: ObservationState = ObservationState.OBSERVED
 
     @property
     def centroid(self) -> Tuple[int, int]:
@@ -59,5 +59,5 @@ class Detection:
             "is_priority": self.is_priority,
             "frame_number": self.frame_number,
             "timestamp": round(self.timestamp, 3),
-            "observation_state": self.observation_state.value,
+            "observation_type": self.observation_type.value,
         }

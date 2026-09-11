@@ -8,8 +8,10 @@ from fastapi import WebSocket
 from core.application_context import ApplicationContext
 from config.deployment import ACTIVE_PROFILE, DeploymentProfile
 from ai.hardware import HardwareConnectionState, hardware_is_safe_to_run
+from ai.utils.logger import get_logger
 
 DIRECTIONS = ("north", "east", "south", "west")
+logger = get_logger("Runtime")
 
 
 def initialize_control_manager(
@@ -65,17 +67,18 @@ def runtime_snapshot(ctx):
         lane.update(frameId=lane_telemetry.get("frame_id"),
                     latestFrameId=lane_telemetry.get("latest_frame_id"),
                     lastDetectionFrameId=lane_telemetry.get("last_detection_frame_id"),
+                    lastPredictionFrameId=lane_telemetry.get("last_prediction_frame_id"),
                     lastTrackedFrameId=lane_telemetry.get("last_tracked_frame_id"),
                     detectorRan=lane_telemetry.get("detector_ran", False),
-                    detectorFps=temporal.get("detector_fps", 0),
-                    trackerFps=temporal.get("tracker_fps", 0),
-                    trackingTimeMs=temporal.get("tracking_ms", 0),
+                    detectorFps=temporal.get("detector_fps"),
+                    trackerFps=temporal.get("tracker_fps"),
+                    trackingTimeMs=temporal.get("tracking_ms"),
                     serverProcessingMs=lane_telemetry.get("server_processing_ms"),
                     queueWaitMs=lane_telemetry.get("queue_wait_ms"),
                     frameAgeMs=round(age, 1) if age is not None else None,
                     streamStatus="LIVE" if live else "STALE" if session and seen else "CONNECTING" if session else "OFFLINE",
                     fps=lane_telemetry.get("fps", 0) if live else 0,
-                    inferenceTimeMs=temporal.get("yolo_ms", 0))
+                    inferenceTimeMs=temporal.get("yolo_ms"))
     live_lanes = [v for v in lanes.values() if v["streamStatus"] == "LIVE"]
     hardware = _hardware_status(ctx)
     profile = ctx.startup_config or ACTIVE_PROFILE
@@ -83,7 +86,7 @@ def runtime_snapshot(ctx):
         systemRunning=ctx.system_running, streamStatus="LIVE" if live_lanes else "STALE",
         pipelineHealthy=bool(ctx.system_running and live_lanes),
         stageCounters=ctx.get_stage_counters(), processingErrors=ctx.frame_processing_errors,
-        frameAgeMs=round((now - ctx.last_frame_monotonic) * 1000, 1) if ctx.frame_updated_at else 0,
+        frameAgeMs=round((now - ctx.last_frame_monotonic) * 1000, 1) if ctx.frame_updated_at else None,
         totalVehicles=sum(v.get("vehicles", 0) for v in live_lanes),
         queueLength=sum(v.get("queue", 0) for v in live_lanes),
         capabilities={"emergencyDetection": False, "reinforcementLearning": False,
@@ -195,27 +198,44 @@ async def start_runtime(message_handler, publish=None):
 
     async def ticker():
         while True:
-            try:
-                for node_id in ctx.session_manager.get_expired_sessions():
-                    ctx.session_manager.remove_session(node_id)
-                    await ctx.connection_manager.disconnect(node_id)
-                if ctx.system_running and ctx.pipeline.active_decision:
-                    result = await loop.run_in_executor(message_handler.frame_executor, ctx.pipeline.process_step, {})
-                    await loop.run_in_executor(message_handler.frame_executor, ctx.control_manager.process_result, result)
-                    if ctx.latest_snapshot:
-                        apply_signal(ctx.latest_snapshot["payload"], result)
-                snapshot = runtime_snapshot(ctx)
-                # One immutable snapshot, one writer per browser, no per-frame broadcast fanout.
-                ctx.latest_snapshot = snapshot
-                if publish:
-                    await publish(snapshot)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                ctx.frame_processing_errors += 1
+            await run_runtime_iteration(ctx, message_handler, publish)
             await asyncio.sleep(0.5)
     ctx.on_snapshot_updated = None
     return asyncio.create_task(ticker())
+
+
+async def run_runtime_iteration(ctx, message_handler, publish=None) -> bool:
+    """Run one fault-contained maintenance/scheduler iteration."""
+    try:
+        for node_id in ctx.session_manager.get_expired_sessions():
+            ctx.session_manager.remove_session(node_id)
+            await ctx.connection_manager.disconnect(node_id)
+        if ctx.system_running and ctx.pipeline and ctx.pipeline.active_decision:
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                message_handler.frame_executor, ctx.pipeline.process_step, {}
+            )
+            await loop.run_in_executor(
+                message_handler.frame_executor, ctx.control_manager.process_result, result
+            )
+            if ctx.latest_snapshot:
+                apply_signal(ctx.latest_snapshot["payload"], result)
+        snapshot = runtime_snapshot(ctx)
+        ctx.latest_snapshot = snapshot
+        if publish:
+            await publish(snapshot)
+        return True
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        ctx.frame_processing_errors += 1
+        logger.error("Runtime ticker failed (%s): %s", type(exc).__name__, exc)
+        logger.debug("Runtime ticker traceback", exc_info=True)
+        if ctx.control_manager:
+            status = ctx.control_manager.esp32_interface.get_status()
+            if not hardware_is_safe_to_run(status):
+                ctx.system_running = False
+        return False
 
 
 async def stop_runtime(task, message_handler):

@@ -23,7 +23,7 @@ class CameraStream:
         self.lane_name = lane_name
         self.capture: Optional[cv2.VideoCapture] = None
         self.connected: bool = False
-        self.fps: float = 30.0
+        self.fps: Optional[float] = None
         self.resolution: Tuple[int, int] = (0, 0)
         self.frame: Optional[np.ndarray] = None
         self.frame_number: int = 0
@@ -44,7 +44,7 @@ class CameraStream:
                 
                 # Fetch FPS metadata
                 cam_fps = self.capture.get(cv2.CAP_PROP_FPS)
-                self.fps = cam_fps if (cam_fps is not None and cam_fps > 0) else 30.0
+                self.fps = cam_fps if (cam_fps is not None and cam_fps > 0) else None
                 
                 # Fetch Resolution metadata (width, height)
                 width = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -53,7 +53,8 @@ class CameraStream:
 
                 logger.info(
                     f"✅ Camera '{self.lane_name}' connected successfully. "
-                    f"Resolution: {width}x{height}, FPS: {self.fps:.1f}"
+                    f"Resolution: {width}x{height}, FPS: "
+                    f"{f'{self.fps:.1f}' if self.fps is not None else 'UNAVAILABLE'}"
                 )
                 return True
             else:
@@ -129,7 +130,7 @@ class CameraStream:
         return {
             "lane_name": self.lane_name,
             "connected": self.connected and success,
-            "fps": round(self.fps, 1),
+            "fps": round(self.fps, 1) if self.fps is not None else None,
             "resolution": self.resolution,
             "frame_number": self.frame_number,
             "timestamp": self.timestamp if success else time.time(),

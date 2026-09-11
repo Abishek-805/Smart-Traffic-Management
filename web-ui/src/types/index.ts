@@ -50,11 +50,11 @@ export interface SystemHealthData {
   uptime_seconds: number;
   liveness: boolean;
   readiness: boolean;
-  cpu_percent?: number;
-  memory_used_gb?: number;
-  memory_total_gb?: number;
+  cpu_percent?: number | null;
+  memory_used_gb?: number | null;
+  memory_total_gb?: number | null;
   frame_processing_errors?: number;
-  inference_latency_ms?: number;
+  inference_latency_ms?: number | null;
   stage_counters?: Record<string, number>;
   components: Record<string, ComponentHealth>;
 }
@@ -78,6 +78,7 @@ export interface LaneTelemetryItem {
   frameId?: string | null;
   latestFrameId?: string | null;
   lastDetectionFrameId?: string | null;
+  lastPredictionFrameId?: string | null;
   lastTrackedFrameId?: string | null;
   detectorRan?: boolean;
   detectorFps?: number;
@@ -246,8 +247,6 @@ export interface UserSettings {
   confidenceThreshold: number;
   minGreenTime: number;
   maxGreenTime: number;
-  comPort: string;
-  baudRate: number;
   autoRefreshRate: number;
   enableNotifications: boolean;
 }

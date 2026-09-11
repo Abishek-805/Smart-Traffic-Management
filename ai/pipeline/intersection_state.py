@@ -23,7 +23,7 @@ class LaneProcessingResult:
     detections: List[Detection] = field(default_factory=list)
     statistics: Optional[LaneStatistics] = None
     connected: bool = True
-    fps: float = 30.0
+    fps: Optional[float] = None
     timestamp: float = field(default_factory=time.time)
 
 

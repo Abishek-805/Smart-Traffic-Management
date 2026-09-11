@@ -98,6 +98,7 @@ class TrafficPipeline:
         self._last_detection_ts: Dict[str, float] = {}
         self._last_detection_frame: Dict[str, int] = {}
         self._last_tracked_frame: Dict[str, int] = {}
+        self._last_prediction_frame: Dict[str, int] = {}
         self._detector_runs: Dict[str, int] = {}
         self._tracker_runs: Dict[str, int] = {}
         self._temporal_started_at: Dict[str, float] = {}
@@ -163,7 +164,7 @@ class TrafficPipeline:
                 "connected": True,
                 "frame_number": getattr(self, "_frame_count", 0) + 1,
                 "timestamp": ts,
-                "fps": 30.0,
+                "fps": None,
                 "resolution": (frame.shape[1], frame.shape[0]) if frame is not None else (1280, 720),
             }
         }
@@ -208,7 +209,7 @@ class TrafficPipeline:
             connected = payload.get("connected", False)
             frame_num = payload.get("frame_number", 0)
             timestamp = payload.get("timestamp", time.time())
-            fps = payload.get("fps", 30.0)
+            fps = payload.get("fps")
 
             if not connected or frame is None:
                 # Provide fallback zero statistics for disconnected camera feed
@@ -261,6 +262,7 @@ class TrafficPipeline:
                 tracked_detections = self.trackers[lane_name].predict(
                     frame_number=frame_num, timestamp=timestamp
                 )
+                self._last_prediction_frame[lane_name] = frame_num
             max_tracking_ms = max(max_tracking_ms, (time.perf_counter() - tracking_start) * 1000.0)
             self._last_tracked_frame[lane_name] = frame_num
             self._tracker_runs[lane_name] = self._tracker_runs.get(lane_name, 0) + 1
@@ -534,6 +536,7 @@ class TrafficPipeline:
             "detector_fps_target": DETECTOR_FPS,
             "detector_ran": max_inference_ms > 0,
             "last_detection_frame": self._last_detection_frame.get(primary_lane),
+            "last_prediction_frame": self._last_prediction_frame.get(primary_lane),
             "last_tracked_frame": self._last_tracked_frame.get(primary_lane),
             "detector_fps": round(self._detector_runs.get(primary_lane, 0) / max(0.001, time.monotonic() - self._temporal_started_at.get(primary_lane, time.monotonic())), 2),
             "tracker_fps": round(self._tracker_runs.get(primary_lane, 0) / max(0.001, time.monotonic() - self._temporal_started_at.get(primary_lane, time.monotonic())), 2),

@@ -45,7 +45,7 @@ class CameraRegistrationPayload(BaseModel):
     node_id: Optional[str] = "CAM-001"
     camera_direction: Optional[str] = "north"
     resolution: Optional[str] = "1280x720"
-    fps: Optional[float] = 30.0
+    fps: Optional[float] = None
     device_info: Optional[str] = None
     session: Optional[str] = None
     device: Optional[Any] = None

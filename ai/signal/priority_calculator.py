@@ -99,7 +99,7 @@ class PriorityCalculator:
 
             lane_str = score_obj.lane.value if isinstance(score_obj.lane, Enum) else str(score_obj.lane)
             bd = score_obj.breakdown
-            logger.info(
+            logger.debug(
                 f"[Rank #{rank_idx}] Lane: {lane_str:<6} | PCE: {bd.pce:<5.2f} | "
                 f"Queue: {bd.queue:<5.2f} | Congestion: {bd.congestion:<5.2f} | Total: {score_obj.score:.2f}"
             )

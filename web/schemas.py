@@ -48,11 +48,11 @@ class SystemHealthData(BaseModel):
     uptime_seconds: float = 0.0
     liveness: bool = True
     readiness: bool = True
-    cpu_percent: Optional[float] = 0.0
-    memory_used_gb: Optional[float] = 0.0
-    memory_total_gb: Optional[float] = 8.0
+    cpu_percent: Optional[float] = None
+    memory_used_gb: Optional[float] = None
+    memory_total_gb: Optional[float] = None
     frame_processing_errors: Optional[int] = 0
-    inference_latency_ms: Optional[float] = 0.0
+    inference_latency_ms: Optional[float] = None
     stage_counters: Dict[str, int] = Field(default_factory=dict)
     components: Dict[str, Any] = Field(default_factory=dict)
 

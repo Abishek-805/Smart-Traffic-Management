@@ -42,6 +42,10 @@ class VehicleState:
     is_alive: bool = True
     is_confirmed: bool = False        # Phase 3.5: True once consecutive_seen_frames >= MIN_CONFIRMATION_FRAMES
     is_priority: bool = False
+    observation_type: ObservationState = ObservationState.OBSERVED
+    last_observation_frame_id: int = 0
+    last_prediction_frame_id: Optional[int] = None
+    last_observation_timestamp: float = 0.0
 
 
 class VehicleStateManager:
@@ -76,11 +80,13 @@ class VehicleStateManager:
                 continue
 
             tid = det.track_id
-            if det.observation_state == ObservationState.PREDICTED:
+            if det.observation_type == ObservationState.PREDICTED:
                 # Tracker projections are visualization continuity, not new
                 # evidence. Never confirm, refresh, or grow queues from them.
                 predicted_state = self.active_states.get(tid)
                 if predicted_state is not None:
+                    predicted_state.observation_type = ObservationState.PREDICTED
+                    predicted_state.last_prediction_frame_id = frame_number
                     det.motion_px_sec = predicted_state.motion_px_sec
                     det.time_in_lane_sec = predicted_state.time_in_lane_sec
                     det.queue_time_sec = predicted_state.queue_time_sec
@@ -104,6 +110,9 @@ class VehicleStateManager:
                     entered_frame=frame_number,
                     last_seen_frame=frame_number,
                     is_priority=det.is_priority,
+                    observation_type=ObservationState.OBSERVED,
+                    last_observation_frame_id=frame_number,
+                    last_observation_timestamp=timestamp,
                 )
                 self.active_states[tid] = state
             else:
@@ -151,6 +160,9 @@ class VehicleStateManager:
                 state.last_seen_timestamp = timestamp
                 state.last_seen_frame = frame_number
                 state.is_alive = True
+                state.observation_type = ObservationState.OBSERVED
+                state.last_observation_frame_id = frame_number
+                state.last_observation_timestamp = timestamp
 
             if state.is_confirmed:
                 self.historical_tracks_count.setdefault(lane_name, set()).add(tid)

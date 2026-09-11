@@ -70,7 +70,14 @@ class ControlManager:
             )
 
             # Non-blocking transmission to ESP32 hardware/simulation interface
-            self.esp32_interface.send_command(result.hardware_command)
+            transmitted = self.esp32_interface.send_command(result.hardware_command)
+            if not transmitted:
+                # A requested physical output that fails must never leave the
+                # software presenting an active green as successfully applied.
+                from core.application_context import ApplicationContext
+                ApplicationContext.get_instance().system_running = False
+                result.signal_state = "ALL_RED"
+                logger.error("Signal output failed; runtime paused in safe all-red state")
 
         if self.headless:
             return None

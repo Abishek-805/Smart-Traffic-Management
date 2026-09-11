@@ -281,6 +281,33 @@ class TestControlLoggingHardware(unittest.TestCase):
 
         control.release()
 
+    def test_hardware_transmission_failure_pauses_runtime_and_forces_all_red(self):
+        from core.application_context import ApplicationContext
+
+        previous = ApplicationContext._instance
+        ctx = ApplicationContext()
+        ApplicationContext._instance = ctx
+        control = ControlManager(simulation_mode=True, headless=True)
+        cmd = self._hardware_command()
+        decision = SignalDecision(
+            phase_id=3, green_lane=LaneName.SOUTH, green_duration_sec=15,
+            yellow_duration_sec=3, priority_score=9.0, reason=DecisionReason.NORMAL,
+            reason_details="Hardware lifecycle test",
+        )
+        result = PipelineResult(
+            has_frame=True, is_phase_change=True, signal_decision=decision,
+            hardware_command=cmd, intersection_state=IntersectionState(total_vehicles=1),
+            signal_state="GREEN",
+        )
+        try:
+            with patch.object(control.esp32_interface, "send_command", return_value=False):
+                control.process_result(result)
+            self.assertFalse(ctx.system_running)
+            self.assertEqual(result.signal_state, "ALL_RED")
+        finally:
+            control.release()
+            ApplicationContext._instance = previous
+
 
 if __name__ == "__main__":
     unittest.main()

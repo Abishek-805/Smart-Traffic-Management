@@ -11,8 +11,6 @@ const defaultSettings: UserSettings = {
   confidenceThreshold: 0.08,
   minGreenTime: 10,
   maxGreenTime: 60,
-  comPort: 'COM3',
-  baudRate: 115200,
   autoRefreshRate: 5,
   enableNotifications: true,
 };
