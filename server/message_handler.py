@@ -27,6 +27,7 @@ from server.protocol import (
 from server.session_manager import SessionManager
 from server.connection_manager import ConnectionManager
 from ai.utils.logger import get_logger
+from config.deployment import ACTIVE_PROFILE
 
 logger = get_logger("MessageHandler")
 _frame_worker_lock = threading.Lock()
@@ -245,7 +246,7 @@ class MessageHandler:
                 "message_type": "START_STREAM",
                 "timestamp": time.time(),
                 "payload": {
-                    "target_fps": 4,
+                    "target_fps": ACTIVE_PROFILE.capture_fps,
                     "resolution": "1280 max edge",
                     "quality": 75,
                     "session_start_count": count,
@@ -408,6 +409,7 @@ class MessageHandler:
 
             # Log receive timestamp
             raw_json["backend_receive_timestamp"] = int(time.time() * 1000)
+            raw_json["backend_receive_monotonic"] = time.monotonic()
 
             from core.application_context import ApplicationContext
             ctx = ApplicationContext.get_instance()
@@ -520,7 +522,7 @@ def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upl
         return _process_frame_locked(frame_b64, direction, capture_ts, upload_ts, rx_ts, frame_id, rotation)
 
 
-def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upload_ts: float, rx_ts: float, frame_id: str, rotation: int = 0, decoded=None, precomputed_detection=None):
+def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upload_ts: float, rx_ts: float, frame_id: str, rotation: int = 0, decoded=None, precomputed_detection=None, processing_timestamp=None):
     """
     Worker thread task executing CPU-bound base64/JPEG decoding, passing transport-agnostic np.ndarray
     frame into TrafficPipeline and ControlManager, and building immutable PipelineStateSnapshot.
@@ -578,7 +580,11 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
         "YOLO_START frame_id=%s direction=%s input_width=%s input_height=%s",
         frame_id, direction, img.shape[1], img.shape[0],
     )
-    pipeline_result = ctx.pipeline.process_single_frame(img, lane_name=direction, timestamp=capture_ts / 1000, precomputed_detection=precomputed_detection)
+    pipeline_result = ctx.pipeline.process_single_frame(
+        img, lane_name=direction,
+        timestamp=processing_timestamp if processing_timestamp is not None else time.monotonic(),
+        precomputed_detection=precomputed_detection,
+    )
     tracking_ts = time.time() * 1000.0
     detector_ran = bool(getattr(pipeline_result, "latency_metrics", {}).get("detector_ran", False))
     if detector_ran:

@@ -9,12 +9,15 @@ import os
 import threading
 import time
 import logging
+from config.deployment import ACTIVE_PROFILE, DeploymentProfile
 
 logger = logging.getLogger(__name__)
 
 class LocalCameraSources:
-    def __init__(self, handler):
+    def __init__(self, handler, profile: DeploymentProfile = ACTIVE_PROFILE):
         self.handler = handler
+        self.profile = profile
+        self.sample_interval = 1.0 / profile.capture_fps
         self.stop = threading.Event()
         self.latest = {}
         self.lock = threading.Lock()
@@ -88,7 +91,7 @@ class LocalCameraSources:
             for direction,(image,received) in frames.items():
                 node,token=self.nodes[direction]
                 await self.handler.submit_decoded_frame(image,direction,node,token,self,time.time_ns(),received)
-            await asyncio.sleep(.25)
+            await asyncio.sleep(self.sample_interval)
 
     async def shutdown(self):
         self.stop.set()

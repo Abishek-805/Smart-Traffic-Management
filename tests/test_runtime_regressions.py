@@ -67,6 +67,9 @@ def test_runtime_uses_configured_esp32_port_and_baudrate():
         assert status.port == "COM11"
         assert control.esp32_interface.baudrate == 57600
         assert ctx.system_running
+        effective = runtime_snapshot(ctx)["payload"]["deploymentProfile"]
+        assert effective["serial_port"] == "COM11"
+        assert effective["serial_baudrate"] == 57600
     finally:
         control.release()
 
@@ -130,6 +133,15 @@ def test_detector_cadence_is_time_based():
     assert not detector_is_due(100.0, 100.49, 2.0)
     assert detector_is_due(100.0, 100.5, 2.0)
     assert detector_is_due(100.0, 1.0, 2.0), "a restarted device clock must not stall detection"
+
+
+def test_detector_cadence_uses_trusted_server_clock_not_client_timestamp():
+    from server.frame_coordinator import frame_processing_timestamp
+
+    first = {"backend_receive_monotonic": 10.0, "payload": {"capture_timestamp": 999999}}
+    second = {"backend_receive_monotonic": 10.5, "payload": {"capture_timestamp": 1}}
+    assert frame_processing_timestamp(first) == 10.0
+    assert detector_is_due(frame_processing_timestamp(first), frame_processing_timestamp(second), 2.0)
 
 
 def test_model_is_warmed_before_camera_frames_are_accepted():

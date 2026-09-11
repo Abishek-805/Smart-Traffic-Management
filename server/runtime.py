@@ -25,6 +25,7 @@ def initialize_control_manager(
         simulation_mode=profile.hardware_mode == "simulation",
         headless=True,
     )
+    ctx.startup_config = profile
     ctx.control_manager = control
     if not hardware_is_safe_to_run(control.esp32_interface.get_status()):
         ctx.system_running = False
@@ -34,11 +35,12 @@ def initialize_control_manager(
 def _hardware_status(ctx: ApplicationContext) -> dict:
     if ctx.control_manager and getattr(ctx.control_manager, "esp32_interface", None):
         return ctx.control_manager.esp32_interface.get_status().to_dict()
+    profile = ctx.startup_config or ACTIVE_PROFILE
     return {
         "connected": False,
         "simulation_mode": False,
-        "port": ACTIVE_PROFILE.serial_port,
-        "baudrate": ACTIVE_PROFILE.serial_baudrate,
+        "port": profile.serial_port,
+        "baudrate": profile.serial_baudrate,
         "connection_state": HardwareConnectionState.DISCONNECTED.value,
         "last_ack_time": None,
         "last_ack": None,
@@ -76,6 +78,7 @@ def runtime_snapshot(ctx):
                     inferenceTimeMs=temporal.get("yolo_ms", 0))
     live_lanes = [v for v in lanes.values() if v["streamStatus"] == "LIVE"]
     hardware = _hardware_status(ctx)
+    profile = ctx.startup_config or ACTIVE_PROFILE
     payload.update(
         systemRunning=ctx.system_running, streamStatus="LIVE" if live_lanes else "STALE",
         pipelineHealthy=bool(ctx.system_running and live_lanes),
@@ -86,7 +89,7 @@ def runtime_snapshot(ctx):
         capabilities={"emergencyDetection": False, "reinforcementLearning": False,
                       "hardware": hardware["connection_state"]},
         hardwareStatus=hardware,
-        deploymentProfile=ACTIVE_PROFILE.to_telemetry(),
+        deploymentProfile=profile.to_telemetry(),
     )
     active_missing = payload.get("activePhase", "None").lower() not in {d for d, v in lanes.items() if v["streamStatus"] == "LIVE"}
     if not ctx.system_running or not live_lanes or active_missing:

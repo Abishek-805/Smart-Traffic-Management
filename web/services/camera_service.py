@@ -3,12 +3,15 @@ import asyncio
 import time
 from fastapi import HTTPException
 from core.application_context import ApplicationContext
+from config.deployment import ACTIVE_PROFILE, DeploymentProfile
 
 DIRECTIONS = ("north", "south", "east", "west")
 
 class CameraService:
-    def __init__(self, ctx=None):
+    def __init__(self, ctx=None, profile: DeploymentProfile = ACTIVE_PROFILE):
         self.ctx = ctx or ApplicationContext.get_instance()
+        self.profile = profile
+        self.preview_interval = 1.0 / profile.preview_fps
 
     def get_camera_configs(self):
         from web.services.node_service import NodeService
@@ -40,5 +43,5 @@ class CameraService:
                 header = f"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: {len(live)}\r\nX-Frame-Id: {frame_id}\r\nCache-Control: no-store\r\n\r\n"
                 yield header.encode() + live + b"\r\n"
                 previous = live
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(self.preview_interval)
 

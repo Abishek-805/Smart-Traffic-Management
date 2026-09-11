@@ -61,6 +61,28 @@ def test_unknown_deployment_profile_is_rejected():
         load_deployment_profile({"TRAFFIC_PROFILE": "cloud_magic"})
 
 
+def test_effective_profile_controls_all_frame_cadences():
+    from config.deployment import load_deployment_profile
+    from server.local_sources import LocalCameraSources
+    from server.message_handler import MessageHandler
+    from server.webrtc_ingest import WebRTCIngest
+    from web.services.camera_service import CameraService
+
+    profile = load_deployment_profile({
+        "TRAFFIC_PROFILE": "raspberry_pi",
+        "CAMERA_CAPTURE_FPS": "2.5",
+        "WEBRTC_SAMPLE_FPS": "1.25",
+        "PREVIEW_FPS": "5",
+    })
+    handler = MessageHandler()
+    try:
+        assert LocalCameraSources(handler, profile=profile).sample_interval == pytest.approx(0.4)
+        assert WebRTCIngest(handler, profile=profile).sample_interval == pytest.approx(0.8)
+        assert CameraService(profile=profile).preview_interval == pytest.approx(0.2)
+    finally:
+        handler.frame_executor.shutdown()
+
+
 def test_model_warmup_and_inference_share_configured_batch(monkeypatch):
     from ai.models import model_manager as model_module
 

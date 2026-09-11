@@ -7,6 +7,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def frame_processing_timestamp(packet):
+    """Use the server monotonic clock for cadence; client clocks are untrusted."""
+    return packet.get('backend_receive_monotonic', time.monotonic())
+
+
 def process_batch(packets):
     import cv2
     import numpy as np
@@ -42,7 +47,7 @@ def process_batch(packets):
             ctx.pipeline = TrafficPipeline(save_output=False, headless=True)
         due = [(packet, image) for packet, image, _, _ in ready
                if detector_is_due(ctx.pipeline._last_detection_ts.get(packet['payload']['direction']),
-                                  packet['payload']['capture_timestamp']/1000, DETECTOR_FPS)]
+                                  frame_processing_timestamp(packet), DETECTOR_FPS)]
         computed = {}
         # Warm-up and inference share the model manager's validated batch size.
         size = ctx.pipeline.model_manager.batch_size
@@ -51,19 +56,21 @@ def process_batch(packets):
             boxes, elapsed = ctx.pipeline.detector.detect_batch(
                 [image for _, image in group],
                 [getattr(ctx.pipeline, '_frame_count', 0)+i+1 for i in range(len(group))],
-                [packet['payload']['capture_timestamp']/1000 for packet, _ in group])
+                [frame_processing_timestamp(packet) for packet, _ in group])
             for (packet, _), detections in zip(group, boxes):
                 computed[packet['payload']['direction']] = (detections, elapsed)
+                packet['payload']['_inference_batch_size'] = len(group)
         results = []
         for packet, image, orientation, preprocess_done_ms in ready:
             p = packet['payload']
             result = _process_frame_locked('', p['direction'], p['capture_timestamp'],
                 p.get('upload_timestamp',p['capture_timestamp']), packet['backend_receive_timestamp'],
                 p['frame_id'], 0, decoded=(image,orientation),
-                precomputed_detection=computed.get(p['direction']))
+                precomputed_detection=computed.get(p['direction']),
+                processing_timestamp=frame_processing_timestamp(packet))
             if result:
                 result[3]['queue_wait_ms'] = round(max(0, preprocess_done_ms - packet['backend_receive_timestamp']), 2)
-                result[3]['batch_size'] = min(size, len(due))
+                result[3]['batch_size'] = p.get('_inference_batch_size', 0)
                 result[3]['source_kind'] = p.get('source_kind','jpeg')
                 results.append((packet,result))
         return results

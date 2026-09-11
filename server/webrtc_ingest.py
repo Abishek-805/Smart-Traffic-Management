@@ -9,6 +9,7 @@ from aiortc.mediastreams import MediaStreamError
 from aiortc.sdp import SessionDescription
 
 from core.application_context import ApplicationContext
+from config.deployment import ACTIVE_PROFILE, DeploymentProfile
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +29,10 @@ class _Peer:
 class WebRTCIngest:
     """Own one peer per registered node; signaling is full SDP, without STUN."""
 
-    def __init__(self, handler):
+    def __init__(self, handler, profile: DeploymentProfile = ACTIVE_PROFILE):
         self.handler = handler
+        self.profile = profile
+        self.sample_interval = 1.0 / profile.webrtc_sample_fps
         self.peers = {}
         self._cleanup_tasks = set()
         self._closed = False
@@ -136,7 +139,7 @@ class WebRTCIngest:
                 if latest is None or session is None:
                     continue
                 frame, frame_id, received_ms = latest
-                next_sample = time.monotonic() + .25
+                next_sample = time.monotonic() + self.sample_interval
                 # aiortc does not negotiate RTP video-orientation. The sender
                 # must encode upright pixels; never apply phone metadata twice.
                 image = await asyncio.to_thread(frame.to_ndarray, format='bgr24')
@@ -145,7 +148,7 @@ class WebRTCIngest:
                     await self.handler.submit_decoded_frame(
                         image, session.camera_direction, peer.node_id, peer.token,
                         peer.websocket, frame_id, received_ms)
-                    next_sample = time.monotonic() + .25
+                    next_sample = time.monotonic() + self.sample_interval
         except asyncio.CancelledError:
             pass
         except Exception:
