@@ -34,7 +34,15 @@ export interface ComponentHealth {
   model?: string;
   runtime?: string;
   input_size?: number;
+  connection_state?: HardwareConnectionState;
+  port?: string | null;
+  baudrate?: number | null;
+  last_ack_time?: number | null;
+  last_ack?: string | null;
+  last_error?: string | null;
 }
+
+export type HardwareConnectionState = 'SIMULATION' | 'CONNECTING' | 'CONNECTED' | 'DISCONNECTED' | 'ERROR';
 
 export interface SystemHealthData {
   system_status: 'RUNNING' | 'STOPPED' | 'ERROR';

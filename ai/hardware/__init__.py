@@ -3,6 +3,17 @@ Hardware interface package providing CommandEncoder, ESP32Interface, and Hardwar
 """
 
 from ai.hardware.command_encoder import CommandEncoder
-from ai.hardware.esp32_interface import ESP32Interface, HardwareStatus
+from ai.hardware.esp32_interface import (
+    ESP32Interface,
+    HardwareConnectionState,
+    HardwareStatus,
+    hardware_is_safe_to_run,
+)
 
-__all__ = ["CommandEncoder", "ESP32Interface", "HardwareStatus"]
+__all__ = [
+    "CommandEncoder",
+    "ESP32Interface",
+    "HardwareConnectionState",
+    "HardwareStatus",
+    "hardware_is_safe_to_run",
+]

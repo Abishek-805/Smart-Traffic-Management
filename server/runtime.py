@@ -6,8 +6,45 @@ from functools import partial
 from contextlib import suppress
 from fastapi import WebSocket
 from core.application_context import ApplicationContext
+from config.deployment import ACTIVE_PROFILE, DeploymentProfile
+from ai.hardware import HardwareConnectionState, hardware_is_safe_to_run
 
 DIRECTIONS = ("north", "east", "south", "west")
+
+
+def initialize_control_manager(
+    ctx: ApplicationContext,
+    profile: DeploymentProfile = ACTIVE_PROFILE,
+):
+    """Create the requested output mode and fail closed if hardware is unavailable."""
+    from ai.controller.control_manager import ControlManager
+
+    control = ControlManager(
+        esp32_port=profile.serial_port,
+        esp32_baudrate=profile.serial_baudrate,
+        simulation_mode=profile.hardware_mode == "simulation",
+        headless=True,
+    )
+    ctx.control_manager = control
+    if not hardware_is_safe_to_run(control.esp32_interface.get_status()):
+        ctx.system_running = False
+    return control
+
+
+def _hardware_status(ctx: ApplicationContext) -> dict:
+    if ctx.control_manager and getattr(ctx.control_manager, "esp32_interface", None):
+        return ctx.control_manager.esp32_interface.get_status().to_dict()
+    return {
+        "connected": False,
+        "simulation_mode": False,
+        "port": ACTIVE_PROFILE.serial_port,
+        "baudrate": ACTIVE_PROFILE.serial_baudrate,
+        "connection_state": HardwareConnectionState.DISCONNECTED.value,
+        "last_ack_time": None,
+        "last_ack": None,
+        "last_error": None,
+        "total_commands_sent": 0,
+    }
 
 
 def runtime_snapshot(ctx):
@@ -38,6 +75,7 @@ def runtime_snapshot(ctx):
                     fps=lane_telemetry.get("fps", 0) if live else 0,
                     inferenceTimeMs=temporal.get("yolo_ms", 0))
     live_lanes = [v for v in lanes.values() if v["streamStatus"] == "LIVE"]
+    hardware = _hardware_status(ctx)
     payload.update(
         systemRunning=ctx.system_running, streamStatus="LIVE" if live_lanes else "STALE",
         pipelineHealthy=bool(ctx.system_running and live_lanes),
@@ -45,7 +83,10 @@ def runtime_snapshot(ctx):
         frameAgeMs=round((now - ctx.last_frame_monotonic) * 1000, 1) if ctx.frame_updated_at else 0,
         totalVehicles=sum(v.get("vehicles", 0) for v in live_lanes),
         queueLength=sum(v.get("queue", 0) for v in live_lanes),
-        capabilities={"emergencyDetection": False, "reinforcementLearning": False, "hardware": "SIMULATION"},
+        capabilities={"emergencyDetection": False, "reinforcementLearning": False,
+                      "hardware": hardware["connection_state"]},
+        hardwareStatus=hardware,
+        deploymentProfile=ACTIVE_PROFILE.to_telemetry(),
     )
     active_missing = payload.get("activePhase", "None").lower() not in {d for d, v in lanes.items() if v["streamStatus"] == "LIVE"}
     if not ctx.system_running or not live_lanes or active_missing:
@@ -107,6 +148,15 @@ async def handle_command(command, payload=None):
         return {"status": "SUCCESS", "message": "Confidence applied; timing bounds apply from the next phase"}
     if command not in ("START", "STOP", "RESTART"):
         raise ValueError("Unsupported command")
+    if command in ("START", "RESTART") and ctx.control_manager:
+        hardware_status = ctx.control_manager.esp32_interface.get_status()
+        if not hardware_is_safe_to_run(hardware_status):
+            ctx.system_running = False
+            raise RuntimeError(
+                f"Cannot start while requested ESP32 hardware is "
+                f"{hardware_status.connection_state.value}: "
+                f"{hardware_status.last_error or 'serial connection unavailable'}"
+            )
     ctx.system_running = command != "STOP"
     if command in ("STOP", "RESTART") and ctx.pipeline:
         # Wait for current inference before changing phase state.
@@ -131,12 +181,11 @@ async def start_runtime(message_handler, publish=None):
     message_handler.session_manager = ctx.session_manager
     message_handler.connection_manager = ctx.connection_manager
     from ai.pipeline.traffic_pipeline import TrafficPipeline
-    from ai.controller.control_manager import ControlManager
     loop = asyncio.get_running_loop()
     message_handler.ensure_frame_executor()
     ctx.pipeline = await loop.run_in_executor(
         message_handler.frame_executor, partial(TrafficPipeline, save_output=False, headless=True))
-    ctx.control_manager = ControlManager(simulation_mode=True, headless=True)
+    initialize_control_manager(ctx)
     from server.local_sources import LocalCameraSources
     message_handler.local_sources = LocalCameraSources(message_handler)
     await message_handler.local_sources.start()

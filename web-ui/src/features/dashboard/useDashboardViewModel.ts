@@ -9,6 +9,7 @@ import { useTelemetry } from '../../contexts/TelemetryContext';
 import { useSystemHealth, useMobileNodes } from '../../shared/hooks/useSystemQueries';
 import { DIRECTIONS, DIRECTION_LABELS, DirectionType } from '../../constants/directions';
 import { cameraApi } from '../../services/api/camera';
+import { HardwareConnectionState } from '../../types';
 
 export interface LaneViewModel {
   direction: DirectionType;
@@ -46,6 +47,7 @@ export interface StatusBarViewModel {
   aiHealthy: boolean;
   backendHealthy: boolean;
   esp32Healthy: boolean;
+  esp32State: HardwareConnectionState;
   activeCameraCount: number;
   totalCameraSlots: number;
   fps: number;
@@ -146,6 +148,7 @@ export const useDashboardViewModel = (): DashboardViewModel => {
     // StatusBar ViewModel
     const isAiHealthy = pipelineHealthy;
     const isEspHealthy = health?.components?.esp32?.status === 'HEALTHY';
+    const esp32State = health?.components?.esp32?.connection_state ?? 'DISCONNECTED';
     const currentFps = Object.values(lanesList).reduce((sum, lane) => sum + lane.fps, 0);
     const connectedCamsCount = mobileNodes.filter((n) => n.status === 'CONNECTED').length;
 
@@ -154,6 +157,7 @@ export const useDashboardViewModel = (): DashboardViewModel => {
       aiHealthy: isAiHealthy,
       backendHealthy: isConnected,
       esp32Healthy: isEspHealthy,
+      esp32State,
       activeCameraCount: connectedCamsCount,
       totalCameraSlots: 4,
       fps: currentFps,

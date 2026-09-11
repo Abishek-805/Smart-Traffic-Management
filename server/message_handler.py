@@ -536,7 +536,6 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
     from server.frame_normalization import normalize_frame_orientation
     from core.application_context import ApplicationContext
     from ai.pipeline.traffic_pipeline import TrafficPipeline
-    from ai.controller.control_manager import ControlManager
 
     decode_start = time.time() * 1000.0
     frame_bytes = b''
@@ -570,7 +569,8 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
     if ctx.pipeline is None:
         ctx.pipeline = TrafficPipeline(save_output=False, headless=True)
     if ctx.control_manager is None:
-        ctx.control_manager = ControlManager(simulation_mode=True, headless=True)
+        from server.runtime import initialize_control_manager
+        initialize_control_manager(ctx)
 
     # 1. AI Perception, ByteTrack, Lane Assignment, Analytics & Signal Scheduler via TrafficPipeline
     yolo_start = time.time() * 1000.0

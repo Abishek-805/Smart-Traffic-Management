@@ -25,6 +25,7 @@ class ControlManager:
     def __init__(
         self,
         esp32_port: Optional[str] = None,
+        esp32_baudrate: int = 115200,
         simulation_mode: bool = True,
         csv_log_path: Optional[Path] = None,
         json_log_path: Optional[Path] = None,
@@ -37,6 +38,7 @@ class ControlManager:
         )
         self.esp32_interface = ESP32Interface(
             port=esp32_port,
+            baudrate=esp32_baudrate,
             simulation_mode=simulation_mode,
         )
         self.dashboard = MultiCameraDashboard(tile_width=640, tile_height=360)

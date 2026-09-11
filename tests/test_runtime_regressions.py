@@ -4,7 +4,7 @@ import socket
 import time
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import fakeredis.aioredis
 import numpy as np
@@ -16,7 +16,7 @@ from ai.detection.detection_types import Detection
 from ai.tracking.byte_tracker import ByteTracker
 from core.application_context import ApplicationContext
 from server.message_handler import MessageHandler
-from server.runtime import runtime_snapshot
+from server.runtime import initialize_control_manager, runtime_snapshot
 from server.session_manager import SessionManager
 from server.frame_normalization import normalize_frame_orientation
 from ai.state.count_stabilizer import CountStabilizer
@@ -25,6 +25,67 @@ from ai.pipeline.traffic_pipeline import detector_is_due
 from ai.models.model_manager import ModelManager
 from web.app import app
 from web.services import node_service
+from config.deployment import load_deployment_profile
+
+
+class _StartupSerial:
+    def __init__(self, port, baudrate, timeout):
+        self.port = port
+        self.baudrate = baudrate
+        self.timeout = timeout
+        self.is_open = True
+
+    def close(self):
+        self.is_open = False
+
+
+def test_runtime_uses_simulation_profile_truthfully():
+    ctx = ApplicationContext()
+    profile = load_deployment_profile({"HARDWARE": "simulation"})
+    control = initialize_control_manager(ctx, profile)
+    try:
+        status = control.esp32_interface.get_status()
+        assert status.connection_state == "SIMULATION"
+        assert status.port == "SIMULATION"
+        assert ctx.system_running
+        assert runtime_snapshot(ctx)["payload"]["hardwareStatus"]["connection_state"] == "SIMULATION"
+    finally:
+        control.release()
+
+
+def test_runtime_uses_configured_esp32_port_and_baudrate():
+    ctx = ApplicationContext()
+    profile = load_deployment_profile({
+        "HARDWARE": "esp32", "ESP32_PORT": "COM11", "ESP32_BAUDRATE": "57600",
+    })
+    with patch("ai.hardware.esp32_interface.serial.Serial", _StartupSerial), \
+         patch("ai.hardware.esp32_interface.time.sleep"):
+        control = initialize_control_manager(ctx, profile)
+    try:
+        status = control.esp32_interface.get_status()
+        assert status.connection_state == "CONNECTED"
+        assert status.port == "COM11"
+        assert control.esp32_interface.baudrate == 57600
+        assert ctx.system_running
+    finally:
+        control.release()
+
+
+def test_requested_esp32_failure_forces_safe_all_red_and_visible_error():
+    ctx = ApplicationContext()
+    profile = load_deployment_profile({"HARDWARE": "esp32", "ESP32_PORT": "COM404"})
+    with patch("ai.hardware.esp32_interface.serial.Serial", side_effect=OSError("port missing")), \
+         patch("ai.hardware.esp32_interface.time.sleep"):
+        control = initialize_control_manager(ctx, profile)
+    try:
+        payload = runtime_snapshot(ctx)["payload"]
+        assert not ctx.system_running
+        assert payload["signalState"] == "ALL_RED"
+        assert payload["hardwareStatus"]["connection_state"] == "ERROR"
+        assert payload["capabilities"]["hardware"] == "ERROR"
+        assert payload["healthComponents"]["esp32"]["status"] == "UNHEALTHY"
+    finally:
+        control.release()
 
 
 def test_tracker_instances_do_not_rewind_existing_ids():

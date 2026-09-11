@@ -30,18 +30,15 @@ export const Header: React.FC = () => {
   const detectorLabel = health?.components?.ai?.model || 'DETECTOR';
 
   const esp32Comp = health?.components?.esp32;
-  const isEsp32Connected = Boolean(esp32Comp?.connected);
-  const isEsp32Sim = Boolean(esp32Comp?.simulation);
-
-  let esp32StatusLabel = 'OFFLINE';
-  let esp32StatusColor = '#ef4444';
-  if (isEsp32Connected) {
-    esp32StatusLabel = 'ACTIVE';
-    esp32StatusColor = '#10b981';
-  } else if (isEsp32Sim) {
-    esp32StatusLabel = 'SIMULATION';
-    esp32StatusColor = '#06b6d4';
-  }
+  const esp32State = esp32Comp?.connection_state ?? 'DISCONNECTED';
+  const esp32StatusLabel = esp32State;
+  const esp32StatusColor = esp32State === 'CONNECTED'
+    ? '#10b981'
+    : esp32State === 'SIMULATION'
+      ? '#06b6d4'
+      : esp32State === 'CONNECTING'
+        ? '#f59e0b'
+        : '#ef4444';
 
   const handleStart = () => {
     startMutation.mutate(undefined, {

@@ -8,6 +8,8 @@ import tempfile
 import os
 import json
 import numpy as np
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from ai.signal import (
     SignalDecision,
@@ -70,6 +72,7 @@ class TestControlLoggingHardware(unittest.TestCase):
 
         self.assertTrue(status.simulation_mode)
         self.assertFalse(status.connected)
+        self.assertEqual(status.connection_state, "SIMULATION")
 
         cmd = HardwareCommand(
             phase_id=2,
@@ -87,6 +90,99 @@ class TestControlLoggingHardware(unittest.TestCase):
         self.assertEqual(esp32.get_status().total_commands_sent, 1)
 
         esp32.close()
+
+    @staticmethod
+    def _hardware_command():
+        return HardwareCommand(
+            phase_id=3,
+            green_lane=LaneName.SOUTH,
+            green_duration_sec=15,
+            yellow_duration_sec=3,
+            red_lanes=[LaneName.NORTH, LaneName.EAST, LaneName.WEST],
+            priority_score=9.0,
+            reason=DecisionReason.NORMAL,
+            reason_details="Hardware lifecycle test",
+        )
+
+    def test_esp32_hardware_mode_uses_configured_port_and_records_ack(self):
+        class FakeConnection:
+            is_open = True
+
+            def __init__(self):
+                self.writes = []
+
+            def write(self, value):
+                self.writes.append(value)
+
+            def flush(self):
+                return None
+
+            def readline(self):
+                return b"ACK:PHASE:3\n"
+
+            def close(self):
+                self.is_open = False
+
+        connection = FakeConnection()
+        serial_module = SimpleNamespace(Serial=lambda port, baudrate, timeout: connection)
+
+        with patch("ai.hardware.esp32_interface.serial", serial_module), patch("ai.hardware.esp32_interface.time.sleep"):
+            interface = ESP32Interface(port="TEST_PORT", baudrate=57600, simulation_mode=False)
+            sent = interface.send_command(self._hardware_command())
+
+        status = interface.get_status()
+        self.assertTrue(sent)
+        self.assertEqual(status.connection_state, "CONNECTED")
+        self.assertEqual(status.port, "TEST_PORT")
+        self.assertEqual(status.baudrate, 57600)
+        self.assertEqual(status.last_ack, "ACK:PHASE:3")
+        self.assertGreater(status.last_ack_time, 0)
+        self.assertEqual(len(connection.writes), 1)
+
+    def test_unavailable_requested_esp32_reports_error_not_simulation(self):
+        def unavailable(*_args, **_kwargs):
+            raise OSError("port unavailable")
+
+        serial_module = SimpleNamespace(Serial=unavailable)
+        with patch("ai.hardware.esp32_interface.serial", serial_module), patch("ai.hardware.esp32_interface.time.sleep"):
+            interface = ESP32Interface(port="MISSING_PORT", simulation_mode=False)
+
+        status = interface.get_status()
+        self.assertFalse(status.simulation_mode)
+        self.assertFalse(status.connected)
+        self.assertEqual(status.connection_state, "ERROR")
+        self.assertIn("port unavailable", status.last_error)
+        self.assertFalse(interface.send_command(self._hardware_command()))
+
+    def test_esp32_reconnect_recovers_after_initial_failure(self):
+        class FakeConnection:
+            is_open = True
+
+            def close(self):
+                self.is_open = False
+
+        attempts = iter([OSError("first failure"), FakeConnection()])
+
+        def open_serial(*_args, **_kwargs):
+            result = next(attempts)
+            if isinstance(result, Exception):
+                raise result
+            return result
+
+        serial_module = SimpleNamespace(Serial=open_serial)
+        with patch("ai.hardware.esp32_interface.serial", serial_module), patch("ai.hardware.esp32_interface.time.sleep"):
+            interface = ESP32Interface(port="TEST_PORT", simulation_mode=False)
+            recovered = interface.reconnect()
+
+        self.assertTrue(recovered)
+        self.assertEqual(interface.get_status().connection_state, "CONNECTED")
+
+    def test_requested_hardware_error_is_not_safe_to_run(self):
+        from ai.hardware.esp32_interface import hardware_is_safe_to_run
+
+        status = HardwareStatus(simulation_mode=False, connection_state="ERROR")
+
+        self.assertFalse(hardware_is_safe_to_run(status))
 
     def test_03_csv_and_json_loggers(self):
         """Test CSVLogger and JSONLogger file writing."""

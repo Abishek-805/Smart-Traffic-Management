@@ -128,6 +128,35 @@ class ApplicationContext:
         latest_pop = (self.latest_snapshot or {}).get("payload", {})
         inf_ms = (latest_pop.get("latencyMetrics") or {}).get("yolo_ms", 0.0)
 
+        hardware = None
+        if self.control_manager and getattr(self.control_manager, "esp32_interface", None):
+            hardware = self.control_manager.esp32_interface.get_status().to_dict()
+        if hardware is None:
+            hardware = {
+                "connected": False,
+                "simulation_mode": False,
+                "connection_state": "DISCONNECTED",
+                "port": None,
+                "baudrate": None,
+                "last_ack_time": None,
+                "last_ack": None,
+                "last_error": None,
+                "total_commands_sent": 0,
+            }
+        hardware_state = hardware["connection_state"]
+        hardware_health = (
+            "HEALTHY" if hardware_state == "CONNECTED" else
+            "DEGRADED" if hardware_state == "SIMULATION" else
+            "UNHEALTHY"
+        )
+        hardware_message = {
+            "CONNECTED": f"ESP32 connected on {hardware['port']}",
+            "SIMULATION": "Explicit simulation mode; no physical controller connected",
+            "CONNECTING": f"Connecting to ESP32 on {hardware['port']}",
+            "DISCONNECTED": "ESP32 controller is disconnected",
+            "ERROR": f"ESP32 error: {hardware.get('last_error') or 'unknown serial failure'}",
+        }.get(hardware_state, f"ESP32 state: {hardware_state}")
+
         return {
             "status": "RUNNING" if self.system_running else "PAUSED",
             "mode": "AUTOMATIC",
@@ -159,10 +188,16 @@ class ApplicationContext:
                     "active": active,
                 },
                 "esp32": {
-                    "status": "DEGRADED",
-                    "message": "Simulation only; no physical controller connected",
-                    "connected": False,
-                    "simulation": True,
+                    "status": hardware_health,
+                    "message": hardware_message,
+                    "connected": hardware["connected"],
+                    "simulation": hardware["simulation_mode"],
+                    "connection_state": hardware_state,
+                    "port": hardware["port"],
+                    "baudrate": hardware["baudrate"],
+                    "last_ack_time": hardware["last_ack_time"],
+                    "last_ack": hardware["last_ack"],
+                    "last_error": hardware["last_error"],
                 },
             },
         }

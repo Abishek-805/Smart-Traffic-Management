@@ -26,6 +26,9 @@ class SystemService:
         """Return detailed operational telemetry status dynamically from ApplicationContext latest snapshot."""
         snapshot = self.ctx.latest_snapshot or {}
         payload = snapshot.get("payload", {})
+        hardware = payload.get("hardwareStatus") or {}
+        if not hardware:
+            hardware = self.ctx.get_health_dict().get("components", {}).get("esp32", {})
         return {
             "ai_engine": f"{MODEL_DISPLAY_NAME} {MODEL_RUNTIME} + ByteTrack",
             "running": self.ctx.system_running,
@@ -37,7 +40,7 @@ class SystemService:
             "detected_vehicles": payload.get("detectedVehicles", 0),
             "assigned_vehicles": payload.get("assignedVehicles", 0),
             "frame_processing_errors": self.ctx.frame_processing_errors,
-            "esp32_mode": "SIMULATION",
+            "esp32_mode": hardware.get("connection_state", "DISCONNECTED"),
             "nodes_connected": len(self.ctx.remote_nodes) if self.ctx.remote_runtime else sum(not s.is_expired() for s in self.ctx.session_manager.sessions.values()),
             # Phase 3.5: Scheduler stability telemetry
             "stability_metrics": payload.get("stabilityMetrics", {}),

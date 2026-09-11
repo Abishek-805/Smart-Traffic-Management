@@ -22,6 +22,13 @@ export const FooterStatusBar: React.FC<FooterStatusBarProps> = ({ statusBar, met
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+  const esp32Color = statusBar.esp32State === 'CONNECTED'
+    ? '#10b981'
+    : statusBar.esp32State === 'SIMULATION'
+      ? '#06b6d4'
+      : statusBar.esp32State === 'CONNECTING'
+        ? '#f59e0b'
+        : '#ef4444';
 
   return (
     <footer
@@ -66,8 +73,8 @@ export const FooterStatusBar: React.FC<FooterStatusBarProps> = ({ statusBar, met
         <span style={{ color: 'var(--border-color)' }}>|</span>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <Server size={10} color={statusBar.esp32Healthy ? '#10b981' : '#06b6d4'} />
-          <span>ESP32: <strong style={{ color: statusBar.esp32Healthy ? '#10b981' : '#06b6d4' }}>{statusBar.esp32Healthy ? 'ACTIVE' : 'SIMULATION'}</strong></span>
+          <Server size={10} color={esp32Color} />
+          <span>ESP32: <strong style={{ color: esp32Color }}>{statusBar.esp32State}</strong></span>
         </div>
 
         <span style={{ color: 'var(--border-color)' }}>|</span>
