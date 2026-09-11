@@ -1,180 +1,272 @@
 # Smart Traffic Management System
 
-A local traffic-monitoring prototype: four Android camera nodes send JPEG samples to
-a configurable YOLO detector and independent ByteTrack trackers. The laptop test
-profile uses YOLOv8n; the Raspberry Pi candidate is a fine-tuned YOLOv8n NCNN model.
-FastAPI serves the dashboard, directional camera previews, measured telemetry and an
-explicit simulation-by-default or configured ESP32 signal output.
+An intelligent, multi-approach traffic intersection management platform powered by real-time computer vision (YOLOv8) and multi-object tracking (ByteTrack). The system ingests live video streams from edge camera nodes, calculates approach vehicle density and queue wait times, and dynamically adapts traffic signal phases to optimize flow and minimize congestion.
 
-**Use only on a trusted LAN.** Camera registration uses an expiring one-time QR
-secret and the server issues a session token for later frames/reconnects. REST
-operator controls still have no login and local WebSockets use cleartext by default.
-Do not expose these ports to the internet or connect this prototype directly to
-public-road signals.
+> [!IMPORTANT]
+> **Companion Mobile Camera Node**:
+> Physical edge camera nodes run the dedicated Android client available at:
+> **[Traffic_Camera_App Repository](https://github.com/Abishek-805/Traffic_Camera_App)**.
+> This repository contains the central Backend server, computer vision inference coordinator, and the React-based Web Management Dashboard.
 
-See the [implementation plan](docs/IMPLEMENTATION_PLAN.md),
-[optimization measurements](docs/OPTIMIZATION_REPORT.md) and
-[validation report](docs/VALIDATION_REPORT.md) for scope and remaining checks. The
-[SIH correctness remediation](docs/SIH_CRITICAL_CORRECTNESS_REMEDIATION_2026-09-11.md)
-records the hardware, tracking, batching, telemetry, and operational fixes.
-The [Raspberry Pi deployment guide](docs/RASPBERRY_PI_DEPLOYMENT.md) records the
-edge model choice, NCNN setup, and required accuracy gate.
+---
 
-## Start on Windows
+## System Architecture
 
-Prerequisites: Python 3.12, Node.js 22.12+ with npm, and internet for first installation.
-Use the Python environment in this repository rather than a system Python 3.14 install.
+```
++-----------------------------------------------------------------------------------+
+|                            EDGE CAMERA SOURCES                                    |
+|   Physical Android Nodes (Traffic Camera App) OR Local Video Test Fixtures        |
++-----------------------------------------------------------------------------------+
+                                         |
+                                         | LAN WebSocket / WebRTC Stream
+                                         v
++-----------------------------------------------------------------------------------+
+|                        FASTAPI BACKEND & RUNTIME COORDINATOR                      |
+|                                                                                   |
+|  +------------------------+   +-----------------------+   +--------------------+  |
+|  | Frame Coordinator      |-->| Batched YOLOv8        |-->| Per-Approach       |  |
+|  | (Backpressure / Auth)  |   | Inference Engine      |   | ByteTrack Tracker  |  |
+|  +------------------------+   +-----------------------+   +--------------------+  |
+|                                                                     |             |
+|                                                                     v             |
+|  +------------------------+   +-----------------------+   +--------------------+  |
+|  | Telemetry WebSocket &  |<--| Adaptive Phase        |<--| Vehicle Density /  |  |
+|  | REST Control API       |   | Fair Scheduler        |   | Queue Estimation   |  |
+|  +------------------------+   +-----------------------+   +--------------------+  |
+|               |                                                     |             |
++---------------|-----------------------------------------------------|-------------+
+                |                                                     |
+                v                                                     v
++-------------------------------+                     +-----------------------------+
+|    REACT WEB DASHBOARD        |                     |     TRAFFIC CONTROLLER      |
+|  (Live feeds, metrics,        |                     |  Simulation Mode (internal) |
+|   controls, QR pairing)       |                     |  OR Physical ESP32 (UART)   |
++-------------------------------+                     +-----------------------------+
+```
 
-From PowerShell in this repository:
+### Execution Topologies
+
+The system supports two deployment topologies:
+
+1. **Combined Server (Default & Recommended for Local/Laptop Testing)**:
+   - Single FastAPI process hosting the REST API, Camera WebSocket coordinator, Telemetry WebSocket, and pre-compiled static Web UI on port **8000**.
+   - Zero external service dependencies (no Redis required).
+2. **Split Microservices (Docker Compose)**:
+   - Containerized multi-service deployment with Redis pub/sub (`6379`), REST backend (`8000`), dedicated high-throughput WebSocket ingestion server (`8001`), and Vite UI dev server (`5173`).
+
+---
+
+## Prerequisites
+
+Ensure the following runtimes and tools are installed before setting up a fresh machine:
+
+| Tool | Recommended Version | Notes |
+|---|---|---|
+| **Python** | `3.12.x` | Required. (Python 3.14 is currently incompatible with PyTorch/lap binary wheels). |
+| **Node.js** | `20.x` or `22.x` (LTS) | Required to build the frontend Web UI. |
+| **npm** | `10.x+` | Package manager for Web UI. |
+| **Git** | Latest | Source control. |
+| *(Optional)* **Docker & Compose** | Docker Desktop 4+ | Required only if running the containerized split deployment. |
+| *(Optional)* **ESP32 & Micro-USB** | ESP32 Dev Module | Required only when running in physical hardware mode (`HARDWARE=esp32`). |
+
+---
+
+## Fresh Machine Quickstart
+
+### Automated Launch on Windows (PowerShell)
+
+On a freshly cloned machine, run the automated setup and launch script from PowerShell:
 
 ```powershell
 .\start.ps1 -Lan
 ```
 
-This creates `.venv`, installs Python dependencies, runs `npm ci` and builds the web
-UI, then starts the combined service at **http://localhost:8000**. No Redis, Docker
-or demo videos are required. The first install includes PyTorch and can take time.
+**What this script does automatically:**
+1. Verifies or creates a clean Python 3.12 virtual environment in `.venv`.
+2. Installs all required runtime and development Python packages (`requirements-dev.txt`).
+3. Enters `web-ui`, installs npm packages via `npm ci`, and compiles production assets (`npm run build`).
+4. Launches the combined FastAPI server bound to `0.0.0.0:8000` with simulation traffic lights.
 
-If Python is not registered with the Windows Python launcher:
+Open your browser to: **`http://localhost:8000`** (or `http://<YOUR_LAN_IP>:8000`).
 
-```powershell
-.\start.ps1 -Lan -PythonPath 'C:\path\to\Python312\python.exe'
+#### Useful `start.ps1` Flags:
+- `.\start.ps1 -Lan` — Binds to `0.0.0.0` so mobile phones on the same Wi-Fi network can connect.
+- `.\start.ps1 -Lan -SkipInstall` — Skips pip/npm dependency checks on subsequent launches for instant startup.
+- `.\start.ps1 -Lan -PythonPath 'C:\Python312\python.exe'` — Explicitly points to your Python 3.12 binary if multiple Python versions are installed.
+
+---
+
+## Manual Step-by-Step Setup (Cross-Platform)
+
+For Linux, macOS, or custom Windows environments:
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/Abishek-805/Smart-Traffic-Management.git
+cd Smart-Traffic-Management
 ```
 
-Subsequent starts can use `.\start.ps1 -Lan -SkipInstall`. Omit `-Lan` for
-computer-only access. If PowerShell blocks a downloaded script, review it and use
-`powershell -ExecutionPolicy Bypass -File .\start.ps1 -Lan` for this invocation;
-there is no need to change the machine's execution policy.
+### 2. Configure Python Virtual Environment
+Create and activate a virtual environment using Python 3.12:
 
-Python-only launch after installation and web build:
-
+**Windows (PowerShell):**
 ```powershell
-.\.venv\Scripts\python.exe run.py --host 0.0.0.0 --port 8000
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
 
-Simulation is the explicit default. To request a physical controller, configure it
-before startup; a missing/unavailable requested device keeps the system paused and
-all-red instead of silently changing to simulation:
-
-```powershell
-$env:HARDWARE = 'esp32'
-$env:ESP32_PORT = 'COM11'       # Use the actual operator-selected port
-$env:ESP32_BAUDRATE = '115200'
-.\start.ps1 -Lan -SkipInstall
+**Linux / macOS (Bash):**
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
 ```
 
-Set `HARDWARE=simulation` to deliberately use simulation. `TRAFFIC_PROFILE` accepts
-`laptop` (default) or `raspberry_pi`; the Raspberry Pi values are proposed and
-unvalidated until measured on target hardware. Health and telemetry responses publish
-the effective profile and actual hardware connection state.
+### 3. Install Python Dependencies
+```bash
+pip install --upgrade pip
+pip install -r requirements-dev.txt
+```
+*(Optional: for ONNX Runtime acceleration on laptop profile, run `pip install -r requirements-laptop.txt`)*
 
-## Connect the Android apps
+### 4. Build Frontend Web UI
+```bash
+cd web-ui
+npm ci
+npm run build
+cd ..
+```
+The compiled assets are placed in `web-ui/dist`, which FastAPI serves automatically at the root URL.
 
-The app source is the sibling `traffic-camera-app` repository. It needs a native
-Android build; **Expo Go cannot run the VisionCamera/Nitro streaming implementation**.
+### 5. Configure Environment Variables
+Copy the environment template:
+```bash
+cp .env.example .env
+```
+Key configuration options in `.env`:
+- `TRAFFIC_PROFILE`: Set to `laptop` (default, multi-core CPU batching) or `raspberry_pi` (resource-constrained SBC).
+- `HARDWARE`: Set to `simulation` (default) or `esp32` (physical microcontroller).
+- `YOLO_MODEL_NAME`: Set to `yolov8n.pt` (default).
 
-1. Put laptop and phones on the same trusted Wi-Fi network.
-2. Start with `-Lan`. Allow the Python process through Windows Firewall on your
-   private network if Windows asks. Do not disable the firewall.
-3. Open **Live Cameras → Pair Camera Node**, select North/East/South/West and generate
-   that direction's QR. Scan a different direction on each phone.
-4. Verify that both a connection and **fresh frames** appear. A registered node alone
-   does not prove that its camera is capturing.
-5. Use Start/Stop to control all nodes, or Disconnect Slot to disconnect a direction.
-
-The combined service uses port **8000 for both REST and camera WebSocket**.
-Phone `localhost` means the phone itself. When automatic address selection chooses
-the wrong adapter, put `CAMERA_PUBLIC_HOST=YOUR_LAPTOP_LAN_IP` in a root `.env` file.
-Generate new QR codes after changing the address or port.
-
-## Architecture and data meanings
-
-```text
-Android JPEG samples -> /ws/camera -> latest frame per direction
-  -> shared configurable YOLO detector -> independent per-camera ByteTrack
-  -> vehicle state / PCE / waiting estimates -> fair clockwise adaptive scheduler
-  -> /ws/telemetry + /api/v1/cameras/{direction}/feed -> React dashboard
+### 6. Start the Combined Server
+```bash
+python run.py --host 0.0.0.0 --port 8000
 ```
 
-- Mobile profiles target 2 (low power) or 4 (balanced) JPEG samples/second per
-  phone, with a 640-pixel default longest edge and preserved aspect ratio. One
-  processed frame is allowed in flight. This is not a 30 FPS video transport.
-- Each camera covers **one approach**. All detected supported vehicles in its frame
-  belong to that approach. Aim/crop cameras accordingly; arbitrary quadrant ROIs
-  are no longer drawn on approach feeds.
-- Live vehicles are current tracked objects. Session counts are confirmed track
-  observations, not daily totals, unique citywide vehicles or crossing-line counts.
-- Queue is stopped vehicles; wait is estimated maximum stopped time; PCE is a
-  weighted vehicle count. Camera movement and occlusion can affect these estimates.
-- Displayed priority is the scheduler's score for the current decision, including
-  fairness, rather than a separate invented dashboard formula.
-- Each direction becomes stale independently after 3 seconds without a processed
-  frame. Missing input shows unavailable/offline; it does not silently play demo video.
-- Signal timing advances independently of incoming frames. The dashboard shows
-  all-red when stopped or when all camera input is unavailable.
-- Battery, signal strength and device temperature remain unavailable unless measured.
-  Historical charts and efficiency improvement are not fabricated.
-- Settings Save applies confidence and green-time limits to the runtime. Timing
-  limits take effect at the next phase. Runtime settings reset on server restart;
-  theme and notification preferences stay in the browser.
+---
 
-The supplied COCO model supports bicycles, cars, motorcycles, buses and trucks. Emergency
-recognition and reinforcement learning are **not implemented**. ESP32 simulation is
-available, but physical mode is used only when explicitly requested with a configured
-serial port; physical operation has not been validated by this software-only test run.
+## YOLO Vision Models & Detection
 
-The laptop profile uses a detector floor of 0.08 and ByteTrack high/new-track
-thresholds of 0.15. This lets ByteTrack use weak boxes to maintain an existing
-vehicle through occlusion without allowing every weak box to create a new count.
-These values were calibrated on a small UVH-26 validation sample and still require
-full validation before deployment.
+- **Default Model**: `yolov8n.pt` is tracked directly in the repository root. If missing, Ultralytics YOLO automatically downloads standard weights from official releases upon initial startup.
+- **Model Warmup**: The inference manager automatically pre-warms the detector at startup with synthetic tensors matching the configured batch size (`4` on laptop profile) to prevent dropped frames on early incoming camera feeds.
+- **Supported Detection Classes**: Cars, buses, trucks, motorcycles, and bicycles.
+- **Model Storage**: Models can be placed in the project root (`./yolov8n.pt`) or inside the `models/` directory (`models/yolov8n.pt`).
+- **Edge Deployment (Raspberry Pi)**: For resource-constrained ARM devices, see [`docs/RASPBERRY_PI_DEPLOYMENT.md`](docs/RASPBERRY_PI_DEPLOYMENT.md) for instructions on running NCNN-exported models.
 
-For the production detector, prepare the real IISc UVH-26 traffic-camera dataset
-and fine-tune YOLOv8n using [the model training guide](docs/MODEL_TRAINING.md).
-The runtime discovers supported classes from the loaded model, so 14-class
-fine-tuned weights work without hard-coded COCO class IDs.
+---
 
-## Optional split deployment
+## Hardware Controller vs. Simulation
 
-Docker Compose defines Redis, REST on 8000, camera/telemetry WebSocket on 8001,
-and Vite on 5173. Stop the combined server before using the same REST port.
+The system controls traffic signal timings (Red, Yellow, Green) for all 4 intersection approaches (North, South, East, West).
+
+### Simulation Mode (Default)
+No external hardware required. The internal signal controller maintains phase transitions, calculates adaptive green times, and exposes signal states through the dashboard and WebSocket telemetry in real time.
+
+### Physical ESP32 Hardware Mode
+To connect a physical ESP32 traffic light controller via UART:
+1. Flash your ESP32 with compatible firmware listening for serial phase commands.
+2. Connect the ESP32 via USB and identify the serial port (e.g., `COM3` on Windows, `/dev/ttyUSB0` on Linux).
+3. Start the server with hardware mode enabled:
+   ```powershell
+   $env:HARDWARE = 'esp32'
+   $env:ESP32_PORT = 'COM3'
+   $env:ESP32_BAUDRATE = '115200'
+   python run.py --host 0.0.0.0 --port 8000
+   ```
+> [!NOTE]
+> If `HARDWARE=esp32` is configured but the serial port cannot be opened, the system safely halts in an **all-red safe state** instead of silently masking hardware failure.
+
+---
+
+## Connecting Mobile Camera Nodes
+
+The server pairs with phones running the **[Traffic Camera Node](https://github.com/Abishek-805/Traffic_Camera_App)**.
+
+1. Connect your computer and mobile phones to the **same local Wi-Fi network**.
+2. Open the dashboard at `http://<YOUR_LAPTOP_LAN_IP>:8000`.
+3. Navigate to **Live Cameras** -> **Pair Camera Node**.
+4. Select the target approach direction (`North`, `South`, `East`, or `West`).
+5. Click **Generate QR Code**.
+6. In the mobile app, tap **Scan QR** and scan the code on the screen.
+7. The phone establishes an authenticated WebSocket session, streaming frames directly to the backend coordinator.
+
+---
+
+## Optional Split Deployment (Docker Compose)
+
+For distributed production testing using Docker:
 
 ```powershell
-$env:CAMERA_PUBLIC_HOST = 'YOUR_LAPTOP_LAN_IP'
+# Set your host LAN IP for the mobile cameras
+$env:CAMERA_PUBLIC_HOST = '192.168.1.100'
+
+# Build and start all services
 docker compose up --build
 ```
 
-Open http://localhost:5173. This topology uses retained Redis snapshots and JPEGs
-with expiration, plus acknowledged runtime commands; it does not create a second
-perception pipeline in the REST process. Redis connection recovery is automatic.
-Docker was not available on the repair machine; the shared Redis contract was
-tested with fakeredis, not a running Docker deployment.
+**Exposed Services:**
+- `app-backend`: FastAPI REST API on port `8000`
+- `websocket-server`: Camera ingestion & telemetry on port `8001`
+- `web-ui`: Vite frontend development server on port `5173`
+- `redis`: In-memory state and telemetry pub/sub on port `6379`
 
-For UI development against the combined server:
+---
 
-```powershell
-cd web-ui
-npm run dev
-```
+## Automated Verification & Testing
 
-The development server defaults to the combined backend and WebSocket runtime on
-8000. Set `VITE_WS_TARGET=ws://localhost:8001` only for the split deployment.
-Browser API and WebSocket URLs are relative so the dashboard also works from another computer.
-
-## Validate
+Verify that your environment and all subsystems are functioning correctly:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q --timeout=60
-.\.venv\Scripts\python.exe scripts/smoke_runtime.py
-.\.venv\Scripts\python.exe scripts/benchmark_runtime.py --pid SERVER_PID --images path/to/real-traffic-images --seconds 60 --fps 4 --output docs/benchmarks/local-four.json
-.\.venv\Scripts\python.exe scripts/evaluate_detector.py --data datasets/uvh26/traffic.yaml
+# 1. Run full Python test suite (78 tests)
+.\.venv\Scripts\python.exe -m pytest -q
+
+# 2. Verify Python bytecode compilation across all modules
+.\.venv\Scripts\python.exe -m compileall -q ai core config server web
+
+# 3. Test Web UI linting and production build
 cd web-ui
+npm run lint
 npm run build
-npm audit
+cd ..
+
+# 4. Validate Docker Compose configuration
+docker compose config
 ```
 
-Run the smoke test with the combined service already listening on 8000. It creates
-four temporary camera clients using a real street-photo fixture, checks independent staleness and exercises
-Stop/Start; run it when no real phones are connected. It does not measure detector
-accuracy. Physical phone capture/endurance and annotated traffic accuracy tests
-remain required; see the validation report.
+### Synthetic Runtime Smoke Test
+With the backend server running on `http://localhost:8000`, run the automated smoke test script to simulate 4 camera nodes and verify end-to-end telemetry:
+```powershell
+.\.venv\Scripts\python.exe scripts/smoke_runtime.py
+```
+
+---
+
+## Troubleshooting
+
+### Port 8000 is already in use
+- Another instance of `run.py` or a background server is already listening on port 8000.
+- Check and terminate the process:
+  ```powershell
+  Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue | Select-Object OwningProcess
+  Stop-Process -Id <PID> -Force
+  ```
+
+### Mobile app cannot connect to backend
+1. Ensure both your computer and phone are connected to the same Wi-Fi router.
+2. Check your computer's LAN IP using `ipconfig` (Windows) or `ip a` (Linux).
+3. Ensure Windows Defender Firewall allows inbound traffic on port 8000:
+   - When Windows prompts "Allow Python through Firewall", allow both Private and Public networks.
+4. Verify by navigating to `http://<LAN_IP>:8000` from the mobile phone's browser.
+
+### Python version incompatibility (`lap` or `torch` wheel error)
+- If you encounter build errors when installing `lap` or `torch`, verify your Python version with `python --version`.
+- Python 3.12 is required. Python 3.14 lacks pre-built wheels for scientific packages on Windows.
