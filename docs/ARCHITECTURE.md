@@ -1,694 +1,125 @@
-# ARCHITECTURE.md
+# Smart Traffic Management System — Software Architecture (v2.0)
 
-# Smart Traffic Management System
-## Software Architecture Documentation
+## 1. Executive Architecture Summary
 
-Version: 1.0
+The Smart Traffic Management System is a distributed, real-time edge platform that continuously ingests video from four approaches (North, East, South, West), estimates vehicular demand using computer vision and kinematics, and dynamically calculates optimal traffic light timings to minimize congestion and prevent intersection starvation.
 
-Status: Architecture Frozen (Sprint 6)
-
----
-
-# 1. Project Goal
-
-The Smart Traffic Management System is a real-time AI-powered adaptive traffic signal controller.
-
-The objective is to analyse live traffic from **four independent cameras**, estimate congestion, compute signal priorities, and control a physical traffic light prototype using an ESP32.
-
-The project is **NOT** a traffic simulator.
-
-The software must always prioritise:
-
-- Live Cameras
-- Real AI Processing
-- Real ESP32 Hardware
-
-Video files and simulation mode exist only for development and testing.
+The system is deployed across two decoupled repositories:
+1. **Repository A (Mobile Camera Node — `traffic-camera-app`)**: Mobile edge client running on commodity Android/iOS devices providing video capture, hardware rotation compensation, and low-latency WebSocket/WebRTC streaming.
+2. **Repository B (Smart Traffic Management Backend — `smart-traffic-management`)**: Core perception, tracking, analytics, scheduling, SCADA web dashboard, and hardware actuation engine.
 
 ---
 
-# 2. High-Level Architecture
+## 2. End-to-End System Topology
 
 ```
-                 4 Mobile Cameras
-                        │
-                        ▼
-                CameraManager
-                        │
-                        ▼
-               TrafficPipeline
-                        │
-        ┌───────────────┴────────────────┐
-        ▼                                ▼
-LaneProcessingResult              IntersectionState
-                        │
-                        ▼
-              Signal Decision Engine
-                        │
-                        ▼
-                 PipelineResult
-                        │
-                        ▼
-                 ControlManager
-        ┌──────────┬──────────────┬──────────────┐
-        ▼          ▼              ▼              ▼
- Dashboard    DecisionLogger  DecisionHistory  ESP32Interface
-                                                │
-                                                ▼
-                                          Traffic Controller
-```
-
----
-
-# 3. System Layers
-
-## Layer 1 — Camera Layer
-
-Responsible for acquiring live video.
-
-Modules
-
-```
-ai/camera/
-```
-
-Components
-
-- CameraStream
-- CameraManager
-- StreamConfig
-
-Responsibilities
-
-- Connect cameras
-- Read frames
-- Monitor connection status
-- Provide timestamps
-- Calculate FPS
-- Recover disconnected streams
-
-Supports
-
-- Mobile IP Cameras
-- RTSP Cameras
-- USB Cameras
-- Webcam
-- Demo Videos (Development Only)
-
-The Camera Layer does NOT perform AI.
-
----
-
-## Layer 2 — Perception Layer
-
-Responsible for analysing frames.
-
-Modules
-
-```
-ai/detection/
-ai/tracking/
-ai/lane/
-ai/state/
-ai/analytics/
-```
-
-Pipeline
-
-```
-Frame
-    │
-YOLO11 Detection
-    │
-ByteTrack
-    │
-Lane Assignment
-    │
-Vehicle State Manager
-    │
-Traffic Analytics
-```
-
-Each camera owns its own
-
-- ByteTracker
-- LaneManager
-- VehicleStateManager
-- AnalyticsExporter
-
-YOLO Model is shared.
-
----
-
-## Layer 3 — Processing Layer
-
-Module
-
-```
-ai/pipeline/
-```
-
-Main class
-
-```
-TrafficPipeline
-```
-
-Responsibilities
-
-- Process camera frames
-- Run detection
-- Run tracking
-- Compute analytics
-- Build LaneProcessingResult
-- Build IntersectionState
-- Execute Decision Engine
-- Return PipelineResult
-
-TrafficPipeline NEVER
-
-- Displays UI
-- Writes logs
-- Communicates with hardware
-
----
-
-## Layer 4 — Decision Layer
-
-Modules
-
-```
-ai/decision/
-```
-
-Components
-
-- PriorityCalculator
-- FairnessManager
-- EmergencyOverride
-- SignalScheduler
-- SignalController
-
-Responsibilities
-
-Generate
-
-```
-SignalDecision
-```
-
-Then
-
-```
-HardwareCommand
-```
-
-The decision algorithms are architecture frozen.
-
-Do NOT modify these modules unless fixing bugs.
-
----
-
-## Layer 5 — Control Layer
-
-Module
-
-```
-ai/controller/
-```
-
-Main class
-
-```
-ControlManager
-```
-
-Responsibilities
-
-Receive
-
-```
-PipelineResult
-```
-
-Then
-
-- Log decisions
-- Update dashboard
-- Maintain history
-- Send commands to ESP32
-
-The Control Layer never performs AI.
-
----
-
-## Layer 6 — Hardware Layer
-
-Module
-
-```
-ai/hardware/
-```
-
-Components
-
-- CommandEncoder
-- ESP32Interface
-- HardwareStatus
-
-Responsibilities
-
-Convert
-
-```
-HardwareCommand
-```
-
-into
-
-- JSON
-- Serial Protocol
-
-Send to ESP32.
-
-If ESP32 is unavailable
-
-Switch to
-
-```
-Simulation Mode
-```
-
-without stopping the AI pipeline.
-
----
-
-## Layer 7 — Presentation Layer
-
-Module
-
-```
-dashboard/
-```
-
-Responsibilities
-
-Display
-
-- Four camera feeds
-- Detection overlays
-- Lane overlays
-- Vehicle count
-- Queue time
-- PCE
-- Current phase
-- Countdown
-- Decision reason
-- Pipeline health
-- Camera health
-- Hardware status
-- Decision history
-
-Dashboard NEVER executes AI.
-
-Dashboard only visualises PipelineResult.
-
----
-
-# 4. Data Flow
-
-```
-CameraManager
-        │
-        ▼
-TrafficPipeline
-        │
-        ▼
-LaneProcessingResult
-        │
-        ▼
-IntersectionState
-        │
-        ▼
-SignalDecision
-        │
-        ▼
-HardwareCommand
-        │
-        ▼
-PipelineResult
-        │
-        ▼
-ControlManager
-        │
- ┌──────┼────────────┐
- ▼      ▼            ▼
-HUD   Logger      ESP32
+   APPROACH 1 (North)     APPROACH 2 (East)      APPROACH 3 (South)     APPROACH 4 (West)
+  [ Mobile Camera Node ] [ Mobile Camera Node ] [ Mobile Camera Node ] [ Mobile Camera Node ]
+            │                      │                      │                      │
+   Dynamic QR Pairing     Dynamic QR Pairing     Dynamic QR Pairing     Dynamic QR Pairing
+   HMAC-SHA256 Token      HMAC-SHA256 Token      HMAC-SHA256 Token      HMAC-SHA256 Token
+            │                      │                      │                      │
+            └──────────────────────┼──────────────────────┴──────────────────────┘
+                                   ▼
+                   Local Wi-Fi Network (LAN / Private Subnet)
+                                   │
+                                   ▼
+             FastAPI Control Center & Ingestion Server (Port 8000)
+       ┌─────────────────────────────────────────────────────────────────┐
+       │ WebSocket Endpoint: /ws/camera (Token pinned to socket session) │
+       │ REST Endpoint: /api/v1/* (Optional OPERATOR_API_KEY security)   │
+       │ Static UI Mount: / (React/Vite Production Dashboard)            │
+       └─────────────────────────────────┬───────────────────────────────┘
+                                         ▼
+                     Multi-Camera Batch Frame Coordinator
+                     (Bounded Single-Worker Executor Queue)
+                         - Stale Frame Drop (> 2500 ms)
+                         - Dynamic Resolution Scaling
+                         - Batch Synchronization Barrier
+                                         │
+                                         ▼
+                        AI Vehicle Perception Engine
+                 ┌───────────────────────────────────────────────┐
+                 │ Model: YOLOv8n (PyTorch FP32, 6.5 MB)         │
+                 │ Classes: Car, Bus, Truck, Motorcycle, Bicycle │
+                 │ Warmup: 3 Batched Passes at Startup           │
+                 │ Input Resolution: 576px (Laptop) / 512px (Pi) │
+                 └───────────────────────┬───────────────────────┘
+                                         ▼
+                      Multi-Approach Kinematic Tracking
+                 ┌───────────────────────────────────────────────┐
+                 │ 4 Independent ByteTracker Instances           │
+                 │ Low Confidence Recovery (conf >= 0.08)        │
+                 │ Min Confirmation Frames: 2                    │
+                 │ Track Removal Grace: 1.8s, Timeout: 4.0s      │
+                 └───────────────────────┬───────────────────────┘
+                                         ▼
+                       Vehicle State & Observation Logic
+                 ┌───────────────────────────────────────────────┐
+                 │ OBSERVED vs PREDICTED Separation              │
+                 │ Motion Threshold: 15.0 px/s (10 frames)       │
+                 │ Metric Queue Homography ([u, v] -> [X, Y] m)  │
+                 │ Exponential Moving Average (EMA) Smoothing    │
+                 └───────────────────────┬───────────────────────┘
+                                         ▼
+                        Traffic Analytics & Priority Engine
+                 ┌───────────────────────────────────────────────┐
+                 │ Passenger Car Equivalent (PCE) Aggregation    │
+                 │ Congestion Scoring (PCE: 0.45, Queue: 0.35)   │
+                 │ Emergency Vehicle Override Detection          │
+                 └───────────────────────┬───────────────────────┘
+                                         ▼
+                        Adaptive Signal Decision Engine
+                 ┌───────────────────────────────────────────────┐
+                 │ Clockwise Round-Robin (Anti-Starvation)       │
+                 │ Demand Ratio Green Time (10s <= tg <= 60s)    │
+                 │ Mandatory Yellow (>= 3s) & All-Red (>= 2s)    │
+                 │ Mutual Exclusion Safety Invariant Enforced    │
+                 └───────────────────────┬───────────────────────┘
+                                         │
+                 ┌───────────────────────┴───────────────────────┐
+                 ▼                                               ▼
+     Hardware Actuation Layer                        Real-Time Telemetry & SCADA
+   ┌───────────────────────────┐                   ┌─────────────────────────────┐
+   │ Hardware Mode: Simulation │                   │ Telemetry WS: /ws/telemetry │
+   │ Mode ESP32: Serial 115200 │                   │ React Vite Web UI (Port 8000)│
+   │ Fail-Closed Safe Cycle    │                   │ MJPEG Video Streams         │
+   └───────────────────────────┘                   └─────────────────────────────┘
 ```
 
 ---
 
-# 5. Important Data Models
-
-## LaneProcessingResult
-
-Represents processing results for one camera.
-
-Contains
-
-- raw frame
-- annotated frame
-- detections
-- statistics
-- timestamp
-- fps
-- connection status
-
----
-
-## IntersectionState
-
-Represents the entire intersection.
-
-Contains
-
-- lane statistics
-- timestamp
-- total vehicles
-- active phase
-- active green lane
-- remaining time
-
----
-
-## SignalDecision
-
-Represents the selected traffic signal phase.
-
-Contains
-
-- selected lane
-- duration
-- reason
-- priority score
-
----
-
-## HardwareCommand
-
-Represents commands sent to ESP32.
-
-Contains
-
-- lane
-- green duration
-- yellow duration
-- phase id
-
----
-
-## PipelineResult
-
-Represents one complete AI cycle.
-
-Contains
-
-- lane processing results
-- intersection state
-- signal decision
-- hardware command
-- pipeline health
-
----
-
-# 6. Runtime Sequence
-
-```
-Application Starts
-
-↓
-
-Select Camera Mode
-
-↓
-
-Connect Cameras
-
-↓
-
-Select ESP32 Port
-
-↓
-
-Connect ESP32
-
-↓
-
-Load YOLO Model
-
-↓
-
-Start Processing
-
-↓
-
-Read Frames
-
-↓
-
-Detect Vehicles
-
-↓
-
-Track Vehicles
-
-↓
-
-Assign Lanes
-
-↓
-
-Update Vehicle State
-
-↓
-
-Compute Analytics
-
-↓
-
-Create IntersectionState
-
-↓
-
-Decision Engine
-
-↓
-
-HardwareCommand
-
-↓
-
-PipelineResult
-
-↓
-
-ControlManager
-
-↓
-
-Dashboard
-
-↓
-
-Logger
-
-↓
-
-ESP32
-
-↓
-
-Repeat
-```
-
----
-
-# 7. Project Folder Structure
-
-```
-smart-traffic-system/
-
-ai/
-│
-├── analytics/
-├── camera/
-├── controller/
-├── decision/
-├── detection/
-├── hardware/
-├── lane/
-├── logging/
-├── pipeline/
-├── state/
-├── tracking/
-└── visualization/
-
-dashboard/
-
-config/
-
-tests/
-
-datasets/ (local real traffic data; ignored by Git)
-
-logs/
-
-main.py
-```
-
----
-
-# 8. Supported Camera Modes
-
-The application must allow the user to choose the camera source.
-
-```
-1. Mobile IP Cameras
-
-2. USB Cameras
-
-3. RTSP Cameras
-
-4. Webcam
-
-5. Explicit real video files for offline replay
-```
-
-The system must NOT automatically use demo videos.
-
----
-
-# 9. Supported Hardware Modes
-
-```
-Normal Mode
-
-Laptop
-    │
-ESP32 Connected
-    │
-Traffic Controller
-```
-
-or
-
-```
-Simulation Mode
-
-Laptop
-    │
-No ESP32
-    │
-Virtual Hardware
-```
-
-Simulation mode is only a fallback.
-
----
-
-# 10. Architecture Rules
-
-The following architecture is frozen.
-
-Do NOT redesign.
-
-Maintain the following separation:
-
-```
-Camera Layer
-
-↓
-
-Perception Layer
-
-↓
-
-Processing Layer
-
-↓
-
-Decision Layer
-
-↓
-
-Control Layer
-
-↓
-
-Hardware Layer
-
-↓
-
-Presentation Layer
-```
-
-No layer should directly access another non-adjacent layer.
-
----
-
-# 11. Design Principles
-
-- Single Responsibility Principle
-- Modular Components
-- Strongly Typed Data Models
-- Dependency Separation
-- Non-Blocking Hardware Communication
-- Shared YOLO Model
-- Independent Tracker per Camera
-- Immutable Pipeline Outputs
-- Dashboard as Consumer Only
-- Hardware Layer Independent of AI
-
----
-
-# 12. Future Work
-
-Remaining implementation tasks
-
-- Live mobile camera discovery
-- Camera selection UI
-- ESP32 COM port selection
-- Automatic reconnection
-- Hardware ACK handling
-- Real intersection testing
-- Performance optimisation
-- Final documentation
-
-No architectural redesign is expected.
-
-Future work should extend the existing architecture rather than replacing it.
-
----
-
-# 13. Architecture Freeze Notice
-
-As of Sprint 6, the software architecture is considered stable.
-
-Future development should focus on:
-
-- Integration
-- Testing
-- Optimisation
-- Hardware Validation
-- Documentation
-
-Core modules such as:
-
-- TrafficPipeline
-- PriorityCalculator
-- FairnessManager
-- SignalScheduler
-- ControlManager
-- HardwareCommand
-
-should only be modified to fix defects or improve reliability—not to redesign their responsibilities.
+## 3. Core Architectural Subsystems
+
+### A. Mobile Camera Node (`traffic-camera-app`)
+- **Camera Lifecycle**: Implemented using React Native VisionCamera with orientation listeners ensuring vertical/horizontal upright normalization before JPEG compression.
+- **Backpressure Regulation**: Single-flight WebSocket architecture (`max_pending_frames=1`). The mobile node does not emit frame $N+1$ until receiving `FRAME_ACK` for frame $N$.
+- **Dual Pipeline**: Primary low-overhead JPEG-over-WebSocket lane capped at 8.0 FPS; optional WebRTC streaming lane for high-bandwidth previews.
+
+### B. Frame Coordinator & Concurrency Model (`server/frame_coordinator.py`)
+- Ingested frames from the 4 approaches are placed into an atomic dictionary (`handler.latest_frames`).
+- A single background worker dequeues up to 4 frames simultaneously into a batch tensor.
+- Synchronous PyTorch inference and tracking run within a bounded `ThreadPoolExecutor(max_workers=1)`.
+- If a frame's latency exceeds $2500\text{ ms}$, it is dropped immediately to prevent stale decision actuation.
+
+### C. Kinematic Tracking & Observation Semantics (`ai/tracking/`, `ai/state/`)
+- To prevent track ID collisions across independent cameras, each approach maintains an isolated `ByteTracker` instance.
+- **Observation Separation**: Detections produced by the YOLO detector are marked `ObservationState.OBSERVED`. Interpolated Kalman predictions are marked `ObservationState.PREDICTED`.
+- **Prediction Immunity**: `PREDICTED` tracks are strictly restricted to UI rendering continuity. They are mathematically blocked from incrementing vehicle counts, queue counts, or PCE density.
+
+### D. Ground-Plane Metric Queue Calibration (`ai/analytics/calibration.py`)
+- Real-world road perspective is modeled via a 4-point homography matrix ($H$):
+  $$\begin{bmatrix} X \\ Y \\ 1 \end{bmatrix} \sim H \begin{bmatrix} u \\ v \\ 1 \end{bmatrix}$$
+- Transforms pixel centroids into meters from the stop line, enabling physical queue length estimation (meters) alongside vehicle counts.
+
+### E. Signal Decision Engine (`ai/signal/`)
+- **Clockwise Fair Scheduling**: The scheduler services occupied approaches in a deterministic sequence (`North \to East \to South \to West`).
+- **Dynamic Green Duration**: Green time is calculated proportionally from approach demand:
+  $$t_{\text{green}} = \text{MIN\_GREEN} + \text{ratio} \cdot (\text{MAX\_GREEN} - \text{MIN\_GREEN})$$
+  Clamped strictly within $[10\text{s}, 60\text{s}]$.
+- **Clearance Invariants**: Yellow interval ($\ge 3\text{s}$) and All-Red clearance ($\ge 2\text{s}$) are enforced before green switches.
+
+### F. Security Architecture (`server/session_manager.py`, `web/routes/api_routes.py`)
+- **Camera Pairing**: Mobile nodes pair via dynamic QR codes with short-lived HMAC-SHA256 tokens pinned to unique node IDs.
+- **Session Pinning**: Ingested frames are rejected if the session token does not match the active socket ownership.
+- **Operator REST Authentication**: Production endpoints (`/system/*`, `/cameras/{direction}`) require `X-Operator-Token` when `OPERATOR_API_KEY` is configured.

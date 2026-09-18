@@ -183,3 +183,21 @@ def test_websocket_register_unauthorized_pairing(client):
         })
         err = ws.receive_json()
         assert err["payload"]["error_code"] == "UNAUTHORIZED_PAIRING"
+
+
+def test_operator_auth_enforcement(client, monkeypatch):
+    # When OPERATOR_API_KEY is configured, unauthenticated requests are rejected with 401
+    monkeypatch.setenv("OPERATOR_API_KEY", "prod-secure-token-1234")
+
+    # Missing header
+    res_missing = client.post("/api/v1/system/start")
+    assert res_missing.status_code == 401
+    assert "Unauthorized" in res_missing.json().get("detail", "")
+
+    # Wrong header
+    res_wrong = client.post("/api/v1/system/start", headers={"X-Operator-Token": "wrong-key"})
+    assert res_wrong.status_code == 401
+
+    # Correct header -> passes authentication (proceeds to handler or service)
+    res_correct = client.post("/api/v1/system/start", headers={"X-Operator-Token": "prod-secure-token-1234"})
+    assert res_correct.status_code != 401
