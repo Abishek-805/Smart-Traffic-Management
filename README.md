@@ -200,7 +200,7 @@ The production assets are generated in `web-ui/dist`. When running the combined 
 - **Default Model**: `yolov8n.pt` (YOLOv8 Nano, PyTorch, 6.5 MB) is tracked in the repository root.
 - **Weight Resolution**: `ai/models/model_manager.py` checks `./yolov8n.pt` first, followed by `models/yolov8n.pt`. If absent, Ultralytics YOLO automatically downloads official weights from GitHub releases.
 - **Model Warmup**: During server startup, `ModelManager` feeds synthetic empty tensors matching `YOLO_BATCH_SIZE` (`4` on laptop profile) through the model to compile kernels and eliminate latency spikes on early incoming camera frames.
-- **Edge Deployment (Raspberry Pi)**: For ARM devices, NCNN-exported models can be loaded by setting `YOLO_MODEL_NAME=models/yolo26n_ncnn_model` (see `docs/RASPBERRY_PI_DEPLOYMENT.md`).
+- **Edge Deployment (Raspberry Pi)**: For ARM devices, NCNN-exported models can be loaded by setting `YOLO_MODEL_NAME=models/yolov8n_ncnn_model` (see `docs/RASPBERRY_PI_DEPLOYMENT.md`).
 
 ---
 

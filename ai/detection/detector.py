@@ -1,12 +1,12 @@
 """
 VehicleDetector runs vehicle detection and produces structured Detection objects.
 
-Architecture note (Phase 3):
-  - detect()           → calls model.predict()  (no track IDs) — kept for backward compat
-  - detect_and_track() → calls model.track()    (single YOLO forward pass, includes ByteTrack IDs)
-
-TrafficPipeline must use detect_and_track() exclusively. ByteTracker.update() then receives
-the pre-computed tracked results and skips inference entirely.
+Architecture note:
+  - detect_batch()     → Batched model.predict() for multi-camera frame coordinator.
+  - detect()           → Single-frame model.predict() for backward compatibility & testing.
+  - detect_and_track() → Single-stream model.track() helper (unused in 4-camera pipeline
+                         to avoid global track ID collisions across independent approaches;
+                         TrafficPipeline maintains dedicated ByteTracker instances per lane).
 """
 
 import time
@@ -48,7 +48,7 @@ class VehicleDetector:
         """
         Detect vehicles in frame using model.predict() (no track IDs).
         Preserved for backward compatibility, audit scripts, and unit tests.
-        TrafficPipeline should use detect_and_track() instead.
+        Multi-camera pipelines use detect_batch() with independent ByteTrackers per approach.
 
         Returns:
             Tuple[List[Detection], float]: Detections and inference time in milliseconds.
