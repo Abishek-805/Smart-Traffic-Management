@@ -127,21 +127,26 @@ Ensure the following runtimes and tools are installed before setting up a fresh 
 
 ## Fresh Machine Setup
 
-### Automated Launch on Windows (PowerShell)
+### Reproducible Setup & Launch Workflow (PowerShell)
 
-On a freshly cloned machine, run the automated bootstrap script:
+On a freshly cloned machine, run the automated setup and run scripts:
 
 ```powershell
+# 1. Clone repository
 git clone https://github.com/Abishek-805/Smart-Traffic-Management.git
 cd Smart-Traffic-Management
-.\start.ps1 -Lan
+
+# 2. Run automated idempotent setup (verifies Python 3.12, Node 20+, .venv, deps, web-ui build, .env, model weights)
+powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
+
+# 3. Launch the combined server & dashboard
+powershell -ExecutionPolicy Bypass -File .\scripts\run.ps1 -Lan
+
+# 4. In a separate terminal, verify operational health
+powershell -ExecutionPolicy Bypass -File .\scripts\health-check.ps1
 ```
 
-**What `start.ps1` executes automatically:**
-1. Checks for an existing virtual environment in `.venv`; creates one using Python 3.12 if missing.
-2. Installs all required runtime and development Python packages (`requirements-dev.txt`).
-3. Enters `web-ui`, installs npm packages (`npm ci`), and builds production assets (`npm run build`).
-4. Launches the combined server bound to `0.0.0.0:8000` with simulation traffic lights.
+*(Alternatively, run `powershell -ExecutionPolicy Bypass -File .\start.ps1 -Lan` to execute setup and launch in one command.)*
 
 Open your browser to: **`http://localhost:8000`** (or `http://<YOUR_LAN_IP>:8000`).
 
@@ -229,6 +234,8 @@ cp .env.example .env
 | `YOLO_CPU_THREADS` | Inference CPU thread count | `4` | Vision |
 | `YOLO_BATCH_SIZE` | Batched frames per model forward pass | `4` (laptop) / `1` (Pi) | Vision |
 | `YOLO_DEVICE` | Execution device (`auto`, `cpu`, `cuda`) | `auto` | Vision |
+| `OPERATOR_AUTH_MODE` | Operator API auth mode (`optional` or `enforced`) | `optional` | Security |
+| `OPERATOR_API_KEY` | Secret API key required if auth is enforced | None | Security |
 | `TRACK_HIGH_THRESHOLD` | ByteTrack track initiation threshold | `0.15` | Tracking |
 | `TRACK_LOW_THRESHOLD` | ByteTrack track continuation threshold | `0.08` | Tracking |
 | `TRACK_MATCH_THRESHOLD` | ByteTrack IoU matching threshold | `0.80` | Tracking |
@@ -376,13 +383,16 @@ FastAPI exposes REST endpoints under `/api/v1`:
 Execute the automated test and verification commands:
 
 ```powershell
-# 1. Run Python test suite (101 unit/integration tests)
+# 1. Run Python test suite (153 unit/integration tests)
 .\.venv\Scripts\python.exe -m pytest -q
 
-# 2. Verify Python bytecode compilation
+# 2. Verify operational health check against running server
+powershell -ExecutionPolicy Bypass -File .\scripts\health-check.ps1
+
+# 3. Verify Python bytecode compilation
 .\.venv\Scripts\python.exe -m compileall -q ai core config server web
 
-# 3. Web UI static type checking and production build
+# 4. Web UI static type checking and production build
 cd web-ui
 npm run lint
 npm run build
@@ -393,6 +403,16 @@ cd ..
 
 ## Troubleshooting
 
+### PowerShell script execution disabled (`PSSecurityException`)
+Windows may restrict running unsigned PowerShell scripts by default. Execute:
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+Or launch scripts passing `-ExecutionPolicy Bypass`:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
+```
+
 ### Port 8000 is already in use
 ```powershell
 Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue | Select-Object OwningProcess
@@ -400,7 +420,13 @@ Stop-Process -Id <PID> -Force
 ```
 
 ### Python package installation errors (`lap` or `torch`)
-Ensure you are using **Python 3.12**. Python 3.14 lacks pre-compiled wheels for scientific packages on Windows.
+Ensure you are using **Python 3.12**. Python 3.14 lacks pre-compiled wheels for scientific packages on Windows. You can pass your Python 3.12 path explicitly to setup:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1 -PythonPath "C:\Python312\python.exe"
+```
+
+### Missing YOLOv8 weights (`yolov8n.pt`)
+`yolov8n.pt` is tracked in the repository root. If deleted or missing, `scripts/setup.ps1` downloads it automatically via Ultralytics, or you can place it in the root manually from [Ultralytics GitHub Releases](https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt).
 
 ### Mobile app cannot connect to backend
 1. Confirm both laptop and smartphone are on the same Wi-Fi subnet.
