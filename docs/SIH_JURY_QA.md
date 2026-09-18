@@ -5,7 +5,7 @@
 **Audited Repositories:**  
 - `Smart-Traffic-Management` (`https://github.com/Abishek-805/Smart-Traffic-Management.git`)  
 - `Traffic_Camera_App` (`https://github.com/Abishek-805/Traffic_Camera_App.git`)  
-**Purpose:** Technical jury defense guide for Smart India Hackathon (SIH) evaluators, technical reviewers, and academic judges.
+**Purpose:** Technical jury defense guide for Smart India Hackathon (SIH) evaluators, technical reviewers, and academic judges. All numeric values match the current source code exactly.
 
 ---
 
@@ -13,24 +13,32 @@
 
 ### Q1: "You claim to use YOLOv8n. Is this trained on Indian traffic datasets (e.g., IDD), or are you using generic COCO weights?"
 **Answer:**
-> "We use standard YOLOv8n weights pre-trained on COCO-80, filtered strictly at inference to 5 vehicle classes: `car`, `bus`, `truck`, `motorcycle`, and `bicycle`. We have **not** yet fine-tuned on the India Driving Dataset (IDD) or local junction data. We openly document this in `docs/MODEL_AUDIT.md`. Our immediate contribution is the end-to-end perception, tracking, and closed-loop scheduling pipeline. Training on a dedicated Indian traffic dataset is the next milestone in our roadmap."
+> "We use standard YOLOv8n weights (`yolov8n.pt`, 6.5 MB) pre-trained on COCO-80, filtered strictly at inference to 5 vehicle classes: `bicycle` (1), `car` (2), `motorcycle` (3), `bus` (5), and `truck` (7).
+> 
+> We explicitly state: **Formal detection accuracy is not yet quantitatively validated** because no labelled traffic dataset is currently checked into the repository. We do not make unsubstantiated mAP, precision, or recall claims. Our contribution is the end-to-end perception, tracking, and closed-loop scheduling pipeline. Fine-tuning on Indian datasets (such as IDD or IISc UVH-26) is the immediate next step in our roadmap."
 
 ### Q2: "How does your system handle emergency vehicles (ambulances, fire engines)? Can it distinguish an ambulance from a commercial white delivery van?"
 **Answer:**
-> "In the current software codebase, emergency vehicle detection is **partially implemented**:
-> 1. The **scheduling pre-emption engine** is fully implemented and mathematically verified: when an emergency vehicle is flagged on an approach, the scheduler immediately pre-empts normal round-robin cycles to grant immediate green clearance (`test_emergency_preempts_starvation_only_when_fresh`).
-> 2. However, because standard COCO weights lack an `ambulance` or `emergency_vehicle` class, the current visual model cannot reliably distinguish an ambulance from a van. In production, `is_priority` defaults to `False`. We refuse to fabricate visual accuracy claims; real-world deployment requires either fine-tuning on emergency vehicle imagery or integrating an acoustic siren detection model on the edge node."
+> "In the current codebase, emergency vehicle detection is **partially implemented**:
+> 1. The **scheduling pre-emption logic** is fully implemented and mathematically verified: when an approach flags emergency demand, the scheduler pre-empts normal round-robin cycles to grant immediate green clearance (`test_emergency_preempts_starvation_only_when_fresh`).
+> 2. However, standard COCO weights do **not** contain an `ambulance` or `fire_truck` class. In production, `is_priority` defaults to `False`. Standard YOLOv8n classifies an ambulance as a `car` or `bus`. Real-world visual emergency distinction requires fine-tuning on a labelled emergency dataset or deploying an acoustic siren detection model on the edge node."
 
-### Q3: "What happens when vehicles occlude each other in heavy bumper-to-bumper traffic?"
+### Q3: "What exact thresholds govern your ByteTrack tracker? How does it handle occlusions?"
 **Answer:**
-> "We implement **ByteTrack** with four independent tracking instances (one per camera approach). ByteTrack differs from simple SORT by utilizing a two-stage association strategy:
-> - High-confidence detections ($>0.5$) are matched first using Kalman filter projections and Hungarian linear assignment.
-> - Low-confidence detections ($0.1 \le \text{conf} < 0.5$) are matched against unmatched tracks in a second pass, recovering occluded vehicles as they emerge.
-> - Furthermore, between detector cycles (which run at 3 FPS), Kalman filters project vehicle trajectories. Crucially, as enforced by our P0-2 correctness fix, these projected boxes (`ObservationState.PREDICTED`) are **display-only** and strictly barred from inflating vehicle counts or triggering signal changes until confirmed by real detector evidence."
+> "Our tracking layer in `ai/tracking/byte_tracker.py` configures the following exact parameters from `config/model.py`:
+> - `TRACK_HIGH_THRESHOLD = 0.15`: First association pass matches high-confidence detections to existing tracks.
+> - `TRACK_LOW_THRESHOLD = 0.08`: Second association pass matches weak detections ($0.08 \le \text{conf} < 0.15$) against unmatched tracks, recovering occluded vehicles.
+> - `NEW_TRACK_THRESHOLD = 0.15`: Weak boxes below 0.15 can **never** initiate a new track.
+> - `TRACK_MATCH_THRESHOLD = 0.80`: Spatial matching cost threshold.
+> - `TRACK_BUFFER_FRAMES = 12`: Number of frames a lost track is retained during total occlusion.
+> - `MIN_CONFIRMATION_FRAMES = 2`: Consecutive observed frames required before a track enters confirmed vehicle counts.
+> - `TRACK_REMOVAL_GRACE_SEC = 1.8s` and `TRACK_EXPIRATION_TIMEOUT_SEC = 4.0s`: Inactivity timeouts for cleaning up stale tracks.
+> 
+> Crucially, intermediate Kalman projections (`ObservationState.PREDICTED`) are **display-only** and strictly barred from updating counts or queues."
 
 ### Q4: "Why don't you use cross-camera vehicle re-identification (Re-ID)?"
 **Answer:**
-> "Each camera in our architecture monitors an incoming approach to a single four-way junction. Vehicles enter from the outside and exit away from the cameras. Tracking a vehicle across approaches is unnecessary for local signal control and would introduce high computational overhead ($O(N^2)$ feature embedding comparison). Isolating `ByteTracker` per approach completely eliminates global ID collision and guarantees deterministic $O(1)$ tracking per lane."
+> "Each camera monitors an incoming approach to a single four-way junction. Vehicles enter from the perimeter and clear through the intersection. Tracking a vehicle across approaches is unnecessary for localized junction control and would introduce prohibitive computational overhead ($O(N^2)$ feature embedding comparisons). Isolating independent `ByteTracker` instances per approach completely eliminates global ID collisions and guarantees deterministic $O(1)$ tracking per lane."
 
 ---
 
@@ -38,80 +46,98 @@
 
 ### Q5: "How do you prevent starvation? If North has 50 vehicles and East has only 1, won't North keep the green light forever?"
 **Answer:**
-> "No. Starvation is **mathematically impossible** in our scheduling algorithm. We enforce a **clockwise round-robin cycle** (`NORTH -> EAST -> SOUTH -> WEST`):
-> 1. Traffic demand dictates the **duration** of the green phase (clamped between `min_green_sec=5s` and `max_green_sec=60s`), **not** who gets the next turn.
-> 2. Even if North has overwhelming demand, once its green timer reaches `max_green_sec`, the cursor advances to the next occupied approach in clockwise order.
-> 3. Approaches with zero demand or disconnected cameras are skipped in $O(1)$ time without wasting minimum green time. Therefore, Lane East is guaranteed service within at most one full cycle."
+> "No. Starvation is **mathematically impossible** in our scheduling algorithm. In `ai/signal/signal_scheduler.py`, we enforce a **clockwise round-robin cycle** (`NORTH -> EAST -> SOUTH -> WEST`):
+> 1. Traffic demand dictates the **duration** of the green phase (bounded between `min_green_sec = 10s` and `max_green_sec = 60s` by default, tunable via REST API within $[5\text{s}, 120\text{s}]$), **not** the turn order.
+> 2. Even if North has overwhelming demand, once its green timer reaches `max_green_sec`, the cursor advances clockwise to the next occupied approach.
+> 3. Approaches with zero demand or disconnected cameras are skipped in $O(1)$ time without wasting minimum green time. Lane East is guaranteed service within at most one full cycle."
 
 ### Q6: "If North has only 1 light scooter and all other lanes are empty, will it receive the maximum 60 seconds of green?"
 **Answer:**
 > "No. We calculate green duration using **absolute approach demand**, rather than a relative ratio against other lanes:
 > $$\text{ratio} = 0.75 \times \min\left(1.0, \frac{\text{PCE}}{\text{FULL\_GREEN\_PCE}}\right) + 0.25 \times \min\left(1.0, \frac{\text{QueueSec}}{\text{FULL\_GREEN\_QUEUE\_SEC}}\right)$$
-> A single scooter has a PCE of only $0.5$ (per Indian IRC:106 standards). The resulting ratio is $<0.05$, which evaluates to the minimum bound of $\mathbf{5\text{ seconds}}$. The system never wastes green time on negligible traffic."
+> where `FULL_GREEN_PCE = 20.0` and `FULL_GREEN_QUEUE_SEC = 120.0s`.
+> 
+> In `config/traffic.py`, a motorcycle has a PCE weight of $0.5$. The resulting demand ratio is $< 0.02$, which evaluates to the minimum bound of $\mathbf{10\text{ seconds}}$ (or 5s if configured). The system never allocates maximum green to negligible traffic."
 
-### Q7: "What happens during phase transitions? How do you prevent intersection collisions?"
+### Q7: "What are your exact transition intervals between phases?"
 **Answer:**
-> "The signal controller enforces two mandatory safety clearance phases:
-> 1. A fixed **3.0-second Yellow phase** on the terminating lane to allow clearing vehicles to exit the junction safely.
-> 2. A configurable **All-Red clearance interval** where all 4 approaches display red simultaneously before the next approach receives the green signal. This guarantees mutual exclusion and physical safety."
+> "The signal controller enforces two mandatory safety intervals configured in `config/signal.py`:
+> 1. A fixed **3.0-second Yellow phase** (`YELLOW_SEC = 3`) on the terminating approach to permit vehicles in the dilemma zone to clear safely.
+> 2. A fixed **2.0-second All-Red clearance interval** (`ALL_RED_SEC = 2`) where all 4 approaches display red simultaneously before the green phase activates on the winning approach. This guarantees mutual exclusion and physical junction clearance."
+
+### Q8: "What are your exact PCE weights and queue detection thresholds?"
+**Answer:**
+> "From `config/traffic.py`:
+> - **PCE Weights:** `car`: 1.0, `bus`: 1.5, `truck`: 2.0, `motorcycle`: 0.5, `bicycle`: 0.5, `three-wheeler`: 0.8, `two-wheeler`: 0.5, `van`/`suv`: 1.2.
+> - **Queue Motion Threshold:** `QUEUE_MOTION_THRESHOLD_PX_SEC = 15.0 px/s`.
+> - **Consecutive Queue Frames:** `CONSECUTIVE_QUEUE_FRAMES = 10`. A vehicle must remain below 15 px/s for 10 consecutive frames before being marked queued.
+> - **Count Stabilization:** Exponential Moving Average smoothing with `EMA_ALPHA = 0.4` over a 10-frame window (`COUNT_HISTORY_SIZE = 10`)."
 
 ---
 
 ## Category 3: Edge Computing, Hardware & Embedded Actuation
 
-### Q8: "Can a Raspberry Pi 4 actually run this system in real time with 4 camera feeds?"
+### Q9: "Can a Raspberry Pi actually run this system in real time with 4 camera feeds? What is your target board?"
 **Answer:**
-> "On a Raspberry Pi 4 running stock PyTorch with a batch-4 tensor, real-time performance is not achievable. That is why we architected an explicit `RASPBERRY_PI` deployment profile (`config/deployment.py`):
-> - Switches runtime from PyTorch to **NCNN** with ARM NEON SIMD vectorization.
-> - Enforces **batch size = 1** (processing frames sequentially across cameras).
-> - Drops input resolution from $576 \times 576$ to $320 \times 320$.
-> - Reduces detector cadence to 2 FPS, bridging frames with Kalman projection.
+> "Our designated edge target is the **Raspberry Pi 5** (64-bit Raspberry Pi OS, Quad-core Cortex-A76, active cooling).
 > 
-> However, to maintain scientific honesty: in our audit, the Raspberry Pi profile is classified as **`PROPOSED_UNVALIDATED`** because while the software configuration and batch-1 constraints are fully verified in regression tests (`test_deployment_profile.py`), we have not yet benchmarked thermal throttling on physical Raspberry Pi 4 silicon."
+> On a Pi 5 running stock PyTorch with batch-4, real-time operation is unfeasible. We architected an explicit `RASPBERRY_PI` profile in `config/deployment.py`:
+> - Switches runtime to **NCNN** with ARM NEON SIMD optimizations.
+> - Enforces **batch size = 1** (sequential single-frame processing).
+> - Drops input resolution to $512 \times 512$ (`YOLO_INPUT_SIZE = 512`).
+> - Configures camera capture to 2.0 FPS (`capture_fps = 2.0`) and detector cadence to 1.0 FPS (`detector_fps = 1.0`), bridging intermediate frames with Kalman prediction.
+> 
+> However, to maintain scientific honesty: in our audit, the Raspberry Pi profile is classified as **`PROPOSED_UNVALIDATED`**. While configuration and batch-1 constraints are fully verified in regression tests (`test_deployment_profile.py`), we have not yet benchmarked thermal throttling on physical Raspberry Pi 5 silicon."
 
-### Q9: "How does the physical traffic light interface with your software? What if the serial cable is disconnected?"
+### Q10: "How does the physical traffic light interface with your software? What if the serial cable is disconnected?"
 **Answer:**
-> "The software interfaces with an ESP32 microcontroller via PySerial at 115200 baud, transmitting deterministic ASCII commands (e.g. `PHASE:NORTH:GREEN:30\n`) and reading ACK responses.
+> "The software interfaces with an ESP32 microcontroller via PySerial at 115200 baud (`ESP32_BAUDRATE = 115200`), transmitting ASCII command packets (`PHASE:NORTH:GREEN:30\n`) and reading ACK responses.
 > 
 > If the serial cable is disconnected or communication fails:
-> 1. PySerial raises an I/O exception which is caught and logged.
-> 2. The hardware state immediately transitions to `HardwareConnectionState.ERROR`.
-> 3. The runtime **fails closed**: it halts automatic cycling and forces an `ALL_RED` state on the intersection.
-> 4. The system **never** silently falls back to simulation mode when hardware was explicitly requested."
+> 1. PySerial raises an I/O exception which is caught and recorded in `HardwareStatus`.
+> 2. The hardware connection state transitions to `HardwareConnectionState.ERROR`.
+> 3. The runtime **fails closed in software**: it halts automated phase cycling and commands an `ALL_RED` state.
+> 4. It never silently pretends to be in simulation mode when hardware was explicitly requested. Physical hardware safety itself remains unvalidated."
 
 ---
 
-## Category 4: Mobile Node, Networking & WebRTC
+## Category 4: Networking, Ports & Mobile Node
 
-### Q10: "Can your mobile app run in Expo Go?"
+### Q11: "Which ports are used? Does the camera connect to 8000 or 8001?"
 **Answer:**
-> "No. Expo Go is strictly unsupported. Our mobile app utilizes `react-native-webrtc` and `react-native-vision-camera`, both of which require custom native C++ code and Android Camera2 JSI bindings. The app is compiled as a custom development client (`npx expo run:android` / EAS Build). Attempting to run it in standard Expo Go will fail immediately due to missing native modules."
+> "This depends strictly on the deployment mode:
+> - **Combined Mode (`run.py` / `web/app.py`):** Single-process deployment. Port **8000** serves REST API (`/api/v1`), Static Web UI, Camera WebSocket (`/ws/camera`), and Telemetry WebSocket (`/ws/telemetry`).
+> - **Split Microservice Mode (`docker-compose.yml`):**
+>   - Port **8000**: `app-backend` (REST API).
+>   - Port **8001**: `websocket-server` (Camera WebSocket `/ws/camera`).
+>   - Port **6379**: Redis Pub/Sub.
+>   - Port **5173**: Vite development server.
+> 
+> When an operator generates a pairing QR code, the backend automatically embeds the correct active port (`CAMERA_WS_PORT`), so the mobile app always connects to the right port without manual configuration."
 
-### Q11: "Why do you support both WebRTC and WebSocket JPEG streaming?"
+### Q12: "Can your mobile app run in Expo Go?"
 **Answer:**
-> "We employ a **dual-transport strategy**:
-> 1. **WebRTC (Primary):** Provides hardware-accelerated H.264 video encoding directly from the Android camera surface at 8 FPS, transmitting over UDP RTP with sub-50ms glass-to-glass latency and minimal battery consumption.
-> 2. **WebSocket JPEG (Fallback):** In real-world field environments, municipal Wi-Fi networks or cellular carrier NATs frequently block UDP traffic or symmetric NAT traversal. If WebRTC ICE negotiation fails, the app automatically falls back to serialized JPEG snapshot streaming over standard TCP WebSocket."
+> "No. Expo Go is strictly unsupported. Our mobile app utilizes `react-native-webrtc` and `react-native-vision-camera`, both of which require custom native C++ code and Android Camera2 JSI bindings. The app is compiled as an Expo custom development client (`npx expo run:android` / EAS Build)."
 
-### Q12: "How do you handle clock synchronization between 4 phones and the laptop? What if a phone's clock is 5 minutes fast?"
+### Q13: "What is your measured system latency?"
 **Answer:**
-> "We **do not trust client clocks**. All scheduling decisions, detector cadence intervals, and staleness evaluations rely solely on the server's monotonic clock (`time.monotonic()`), recorded as `backend_receive_monotonic` upon packet arrival. Phone timestamps are strictly echoed back in `FRAME_ACK` so the mobile node can compute its own round-trip time (RTT) using its internal clock."
+> "We do not claim a blanket 'latency guarantee.' On a standard laptop CPU host with 4 camera feeds:
+> - **Server pipeline latency:** Measured at p50 of 310.9 ms and p95 of 371.6 ms across 4 simultaneous streams.
+> - **End-to-end transport ACK latency:** Measured at p50 of 324 ms and p95 of 527 ms under localhost WebSocket load.
+> - **Coordinator queue wait time:** Typically 20–85 ms (p50), rising to ~260 ms under peak batch alignment.
+> - **Frame age at decision:** Ranging between 350 ms and 650 ms."
 
 ---
 
-## Category 5: Security & Field Reliability
+## Category 5: Security & Practical Limitations
 
-### Q13: "What prevents someone on the same Wi-Fi network from hijacking the camera stream or sending fake traffic data?"
+### Q14: "Is your system secure? Can someone inject fake frames to force a green light?"
 **Answer:**
-> "Pairing is secured through a **zero-trust handshake**:
-> 1. The operator generates a direction-specific QR code on the dashboard. This QR code embeds a cryptographically random UUIDv4 pairing token with a strict 5-minute time-to-live (TTL).
-> 2. The phone scans the QR code and presents the token over WebSocket. Once verified, the pairing token is **immediately destroyed** (single-use).
-> 3. The server issues a new session UUID and **pins that session to the physical TCP socket handle**. An attacker cannot inject frames using a stolen token from another connection, nor can an authorized camera send frames for a direction other than the one it registered for."
-
-### Q14: "What happens if one of the four phones runs out of battery or disconnects during peak traffic?"
-**Answer:**
-> "The system handles this through a multi-tiered resilience protocol:
-> 1. **Reconnect Grace Period:** If the socket drops, the session is held open for 5.0 seconds so transient network hiccups do not force re-pairing.
-> 2. **Staleness Transition:** If no frames arrive for $>3.0$ seconds, the lane transitions from `LIVE` to `STALE`.
-> 3. **Scheduler Self-Healing:** The signal scheduler immediately excludes stale approaches from green-time allocation. The remaining three approaches continue operating dynamically in round-robin sequence without human intervention.
-> 4. **All-Camera Loss:** If all four cameras disconnect, the system enters a safe `ALL_RED` state until streams recover."
+> "Our current security model is designed for a local demonstration network:
+> 1. **Dynamic Pairing:** Pairing requires scanning a dynamic QR code containing a UUIDv4 token with a 5-minute TTL. Upon registration, the token is destroyed immediately.
+> 2. **Socket Pinning:** The server pins the session token to the specific TCP connection handle, rejecting frame injection from other sockets.
+> 
+> **Explicit Limitations:**
+> - Operator REST endpoints (`/api/v1/system/start`, `/stop`, `/config`) are **currently unauthenticated** on the local LAN.
+> - Traffic is cleartext HTTP/WS by default.
+> - Municipal road deployment will require JWT/RBAC authorization, TLS (HTTPS/WSS), and physical tamper-proofing. The current prototype is not certified for public roads."

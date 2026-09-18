@@ -288,7 +288,16 @@ Approach Feeds:  [North Frame]   [South Frame]   [East Frame]   [West Frame]
 
 ---
 
-## 11. Analytics Safety & Decision Integrity
+## 11. Detection Accuracy Truth
+
+- **Formal Detection Accuracy**: **Formal detection accuracy is not yet quantitatively validated.**
+- No annotated ground-truth traffic dataset is checked into the repository.
+- Replay tests and unit test suites verify runtime dataflow, orientation transforms, batch grouping, and Kalman tracking logic, but do **not** constitute a quantitative precision, recall, or mAP evaluation.
+- Quantitative accuracy gates must be evaluated against an annotated traffic dataset (such as IISc UVH-26 or IDD) before any physical road deployment.
+
+---
+
+## 12. Analytics Safety & Decision Integrity
 
 - **Observation vs. Prediction Boundary**:
   - `VehicleStateManager.update()` processes `OBSERVED` detections to update vehicle states, motion vectors, and consecutive seen counters [VERIFIED].
@@ -302,7 +311,7 @@ Approach Feeds:  [North Frame]   [South Frame]   [East Frame]   [West Frame]
 
 ---
 
-## 12. Hardware Target Audit
+## 13. Hardware Target Audit
 
 | Target Dimension | Windows Laptop (Current Host) | Raspberry Pi 5 (Target SBC) |
 |---|---|---|
@@ -319,7 +328,7 @@ Approach Feeds:  [North Frame]   [South Frame]   [East Frame]   [West Frame]
 
 ---
 
-## 13. Model Optimization Opportunities
+## 14. Model Optimization Opportunities
 
 | Change | Expected Benefit | Technical Risk | Validation Required |
 |---|---|---|---|
@@ -330,7 +339,7 @@ Approach Feeds:  [North Frame]   [South Frame]   [East Frame]   [West Frame]
 
 ---
 
-## 14. Known Flaws & Architectural Cleanup Completed
+## 15. Known Flaws & Architectural Cleanup Completed
 
 1. **Dead Code in `ai/detection/detector.py`**:
    - `detect_and_track()` invoked `model.track()`, which maintains a single global tracking state and would cause cross-camera ID collisions across 4 approaches.
@@ -347,7 +356,7 @@ Approach Feeds:  [North Frame]   [South Frame]   [East Frame]   [West Frame]
 
 ---
 
-## 15. Recommended Next Tests
+## 16. Recommended Next Tests
 
 1. **Annotated Traffic Accuracy Benchmark**:
    - Run `scripts/evaluate_detector.py` against the IISc UVH-26 dataset or local intersection video frames to establish ground-truth precision and recall (mAP50 / mAP50-95).

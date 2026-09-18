@@ -5,24 +5,51 @@
 1. `Smart-Traffic-Management` (Backend & Web Control Center, FastAPI v2.0.0)  
 2. `Traffic_Camera_App` (Mobile Camera Node, React Native 0.81.5 / Expo SDK 54)  
 **Protocol Version:** `1.0`  
-**Audit Scope:** REST Routes, WebSocket Message Types, Pydantic Schema Validation, Negative Testing, Rate-Limiting, Security, and Cross-Repo Handshake Verification.
+**Audit Scope:** REST Routes, WebSocket Message Types, Pydantic Schema Validation, Negative Testing, Port Truth, Rate-Limiting, Security, and Cross-Repo Handshake Verification.
 
 ---
 
-## 1. Architectural Overview
+## 1. Architectural Overview & Port Truth
 
-The Smart Traffic Management System exposes two operational communication surfaces:
-1. **REST API (`/api/v1/...`)**: Served via FastAPI on port 8000 (combined mode) or port 8000/8001 (split microservice mode). Provides health inspection, system telemetry, configuration mutation, camera controls, and QR pairing generation.
-2. **Real-Time Bidirectional WebSockets**:
-   - `/ws/camera`: High-throughput camera ingest supporting both WebRTC signaling and serialized JPEG snapshot streaming with backpressure control.
-   - `/ws/telemetry`: Low-frequency (2 Hz) broadcast of immutable intersection snapshots to the React Operations Dashboard.
+The Smart Traffic Management System operates in two distinct runtime deployment modes, and the network port assignments are strictly defined by source code:
+
+```mermaid
+graph TD
+    subgraph Combined Local Mode [run.py / web/app.py]
+        direction TB
+        C_Port[Single Port: 8000]
+        C_Port --> C_REST["REST API (/api/v1/...)"]
+        C_Port --> C_UI["Static Web UI (/web-ui/dist)"]
+        C_Port --> C_CamWS["Camera WebSocket (/ws/camera)"]
+        C_Port --> C_TelWS["Telemetry WebSocket (/ws/telemetry)"]
+    end
+
+    subgraph Split Microservices Mode [docker-compose.yml]
+        direction TB
+        S_8000["Port 8000: app-backend (FastAPI REST)"]
+        S_8001["Port 8001: websocket-server (/ws/camera)"]
+        S_6379["Port 6379: Redis Cache (Pub/Sub)"]
+        S_5173["Port 5173: web-ui (Vite Dev Server)"]
+    end
+```
+
+### Connection & Port Trace:
+1. **QR Generation:** When an operator generates a pairing QR code via `GET /api/v1/qr/generate?direction=north`, `NodeService` inspects `os.getenv("CAMERA_WS_PORT", "8000")`.
+   - In **Combined Mode**, `CAMERA_WS_PORT` defaults to `8000`. The QR code contains `port: 8000`.
+   - In **Split Docker Mode**, `CAMERA_WS_PORT` is set to `8001` on the `app-backend` container. The QR code contains `port: 8001`.
+2. **Mobile Ingestion:** The mobile camera scans the QR code, extracts `{server, port, session, token, camera_direction}`, and initiates its WebSocket connection directly to `ws://<server>:<port>/ws/camera`.
+3. **No Port Ambiguity:** There is zero ambiguity across runtimes: combined mode serves all services on 8000; split mode routes video ingress to 8001.
+
+---
+
+## 2. Handshake & WebRTC Signaling Flow
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Mobile as Mobile Camera (React Native)
     participant REST as FastAPI REST API (:8000)
-    participant WS as WebSocket /ws/camera (:8000)
+    participant WS as WebSocket /ws/camera (:8000 or :8001)
     participant SM as SessionManager
     participant Coord as FrameCoordinator
     participant Pipe as TrafficPipeline
@@ -32,18 +59,18 @@ sequenceDiagram
     Note over Mobile: Parses {session, token, expires, server, port, camera_direction}
 
     Note over Mobile,WS: Phase 2: Handshake & Registration
-    Mobile->>WS: Connect WebSocket (ws://server:8000/ws/camera)
+    Mobile->>WS: Connect WebSocket (ws://server:<port>/ws/camera)
     Mobile->>WS: REGISTER_CAMERA {node_id, camera_direction, token}
     WS->>SM: validate_pairing_session(direction, node_id, token)
     SM-->>WS: Authorized (clears single-use pairing token)
     WS-->>Mobile: REGISTRATION_ACK {node_id, session_token, status: "CONNECTED"}
-    WS-->>Mobile: START_STREAM {target_fps: 8, resolution: "1280 max edge"}
+    WS-->>Mobile: START_STREAM {target_fps: 4.0, resolution: "1280 max edge"}
 
-    alt Video Transport: WebRTC
+    alt Video Transport: WebRTC (Primary)
         Mobile->>WS: WEBRTC_OFFER {sdp: "..."}
-        WS->>Pipe: aiortc setup
+        WS->>Pipe: aiortc peer setup
         WS-->>Mobile: WEBRTC_ANSWER {sdp: "..."}
-        Mobile->>WS: RTP Media Track (H.264 / VP8 @ 8 FPS)
+        Mobile->>WS: RTP Media Track (H.264 / VP8 @ 8 FPS cap)
     else Fallback Video Transport: JPEG/Base64
         Mobile->>WS: VIDEO_FRAME {frame_id, frame_data, capture_timestamp}
         WS->>Coord: Enqueue in direction slot
@@ -60,28 +87,28 @@ sequenceDiagram
 
 ---
 
-## 2. REST API Specification & Endpoint Audit
+## 3. REST API Specification & Endpoint Audit
 
-All canonical endpoints are prefixed with `/api/v1`. A legacy compatibility middleware redirects `/api/{path}` to `/api/v1/{path}` via HTTP 308, preventing nested `/api/v1/v1` loops.
+All canonical endpoints are prefixed with `/api/v1`. A legacy compatibility handler redirects `/api/{path}` to `/api/v1/{path}` via HTTP 308, preventing nested `/api/v1/v1` loops.
 
 | Endpoint | Method | Request Payload / Params | Response Model | Auth / Access | Status |
 |---|---|---|---|---|---|
-| `/api/v1/version` | `GET` | None | `ApiResponse[SystemVersionInfo]` | Public | `VERIFIED` |
-| `/api/v1/build` | `GET` | None | `dict` (Build info) | Public | `VERIFIED` |
-| `/api/v1/system/health` | `GET` | None | `ApiResponse[SystemHealthData]` | Public | `VERIFIED` |
-| `/api/v1/system/status` | `GET` | None | `ApiResponse[dict]` | Public | `VERIFIED` |
-| `/api/v1/cameras` | `GET` | None | `ApiResponse[dict]` | Public | `VERIFIED` |
-| `/api/v1/cameras/{direction}/feed` | `GET` | Path: `direction` (`north`, `south`, `east`, `west`) | `StreamingResponse` (`multipart/x-mixed-replace`) | Public | `VERIFIED` |
-| `/api/v1/cameras/{direction}` | `DELETE` | Path: `direction` | `ApiResponse[dict]` | Public | `VERIFIED` |
-| `/api/v1/cameras/{direction}` | `POST` | Path: `direction`, Body: `dict` | HTTP 422 Rejection | Public | `VERIFIED` |
-| `/api/v1/mobile-nodes` | `GET` | None | `ApiResponse[MobileNodesData]` | Public | `VERIFIED` |
-| `/api/v1/analytics` | `GET` | None | `ApiResponse[dict]` | Public | `VERIFIED` |
-| `/api/v1/logs` | `GET` | Query: `category`, `level`, `search`, `limit` (1..1000) | `ApiResponse[LogsResponseData]` | Public | `VERIFIED` |
-| `/api/v1/qr/generate` | `GET` | Query: `direction` (default: `north`) | `ApiResponse[dict]` (Payload + base64 PNG) | Public | `VERIFIED` |
-| `/api/v1/system/start` | `POST` | None | `ApiResponse[dict]` | Public | `VERIFIED` |
-| `/api/v1/system/stop` | `POST` | None | `ApiResponse[dict]` | Public | `VERIFIED` |
-| `/api/v1/system/restart` | `POST` | None | `ApiResponse[dict]` | Public | `VERIFIED` |
-| `/api/v1/system/config` | `POST` | Body: `{confidenceThreshold, minGreenTime, maxGreenTime}` | `ApiResponse[dict]` | Public | `VERIFIED` |
+| `/api/v1/version` | `GET` | None | `ApiResponse[SystemVersionInfo]` | Public (LAN) | `VERIFIED` |
+| `/api/v1/build` | `GET` | None | `dict` (Build info) | Public (LAN) | `VERIFIED` |
+| `/api/v1/system/health` | `GET` | None | `ApiResponse[SystemHealthData]` | Public (LAN) | `VERIFIED` |
+| `/api/v1/system/status` | `GET` | None | `ApiResponse[dict]` | Public (LAN) | `VERIFIED` |
+| `/api/v1/cameras` | `GET` | None | `ApiResponse[dict]` | Public (LAN) | `VERIFIED` |
+| `/api/v1/cameras/{direction}/feed` | `GET` | Path: `direction` (`north`, `south`, `east`, `west`) | `StreamingResponse` (`multipart/x-mixed-replace`) | Public (LAN) | `VERIFIED` |
+| `/api/v1/cameras/{direction}` | `DELETE` | Path: `direction` | `ApiResponse[dict]` | Public (LAN) | `VERIFIED` |
+| `/api/v1/cameras/{direction}` | `POST` | Path: `direction`, Body: `dict` | HTTP 422 Rejection | Public (LAN) | `VERIFIED` |
+| `/api/v1/mobile-nodes` | `GET` | None | `ApiResponse[MobileNodesData]` | Public (LAN) | `VERIFIED` |
+| `/api/v1/analytics` | `GET` | None | `ApiResponse[dict]` | Public (LAN) | `VERIFIED` |
+| `/api/v1/logs` | `GET` | Query: `category`, `level`, `search`, `limit` (1..1000) | `ApiResponse[LogsResponseData]` | Public (LAN) | `VERIFIED` |
+| `/api/v1/qr/generate` | `GET` | Query: `direction` (default: `north`) | `ApiResponse[dict]` (Payload + base64 PNG) | Public (LAN) | `VERIFIED` |
+| `/api/v1/system/start` | `POST` | None | `ApiResponse[dict]` | Public (LAN) | `VERIFIED` |
+| `/api/v1/system/stop` | `POST` | None | `ApiResponse[dict]` | Public (LAN) | `VERIFIED` |
+| `/api/v1/system/restart` | `POST` | None | `ApiResponse[dict]` | Public (LAN) | `VERIFIED` |
+| `/api/v1/system/config` | `POST` | Body: `{confidenceThreshold, minGreenTime, maxGreenTime}` | `ApiResponse[dict]` | Public (LAN) | `VERIFIED` |
 
 ### Endpoint Boundary Rules & Validation
 - **Direction Parameter**: Canonical helper `direction_value(direction)` strictly permits `north`, `south`, `east`, `west`. Any other input immediately raises `HTTPException(422, "Choose north, south, east or west")`.
@@ -89,16 +116,14 @@ All canonical endpoints are prefixed with `/api/v1`. A legacy compatibility midd
   - `confidenceThreshold`: Validated `0.05 <= confidence <= 0.95`.
   - `minGreenTime` & `maxGreenTime`: Validated `5 <= minGreenTime <= maxGreenTime <= 120`.
   - Violations raise `HTTPException(422, "Confidence must be 0.05–0.95; green bounds must be 5 ≤ min ≤ max ≤ 120")`.
-- **Log Query Limits**: FastAPI `Query(100, ge=1, le=1000)` enforces strictly bounded query limits, preventing memory exhaustion attacks.
+- **Log Query Limits**: FastAPI `Query(100, ge=1, le=1000)` enforces strictly bounded query limits, preventing memory exhaustion.
 - **Envelope Standard**: All endpoints wrap payloads in `{"success": true, "timestamp": "<ISO-8601>", "data": ...}`.
 
 ---
 
-## 3. WebSocket Protocol Specification (`/ws/camera`)
+## 4. WebSocket Protocol Specification (`/ws/camera`)
 
 The camera WebSocket protocol uses strict JSON messaging with mandatory `protocol_version: "1.0"`.
-
-### Message Types & Schemas
 
 | Message Type | Direction | Initiator | Payload Schema | Description |
 |---|---|---|---|---|
@@ -118,9 +143,9 @@ The camera WebSocket protocol uses strict JSON messaging with mandatory `protoco
 
 ---
 
-## 4. Automated Negative & Boundary Test Verification
+## 5. Automated Negative & Boundary Test Verification
 
-A dedicated automated negative test suite was added in `tests/test_api_negative.py` and executed against the live FastAPI application:
+Automated API route, schema validation, and negative boundary tests pass (13/13 negative tests in `tests/test_api_negative.py`):
 
 ```text
 ============================= test session starts =============================
@@ -141,32 +166,21 @@ tests/test_api_negative.py::test_websocket_register_unauthorized_pairing PASSED 
 ======================== 13 passed, 1 warning in 2.33s ========================
 ```
 
-### Verified Negative Failure Codes:
-1. **`MISSING_MESSAGE_TYPE`**: Handled when JSON lacks `message_type` or `type`.
-2. **`PROTOCOL_VERSION_MISMATCH`**: Rejecting clients requesting non-1.0 protocols.
-3. **`UNKNOWN_MESSAGE_TYPE`**: Rejection of unsupported verbs.
-4. **`UNAUTHORIZED_SESSION`**: Frames or commands sent with unauthenticated node tokens.
-5. **`INVALID_DIRECTION`**: Invalid direction string rejected across REST and WebSocket.
-6. **`UNAUTHORIZED_PAIRING`**: Rejection of registrations without valid one-time QR tokens.
-7. **`DIRECTION_OCCUPIED`**: Prevents two active camera streams from colliding on the same direction.
-8. **`HTTP 422 (Unprocessable Entity)`**: Rejection of configuration parameters outside safety bounds (`0.05 <= conf <= 0.95`, `5 <= min <= max <= 120`).
+---
+
+## 6. Rate Limiting & Security Assessment
+
+| Property | Status | Technical Reality |
+|---|---|---|
+| **IP-Based Rate Limiting** | **ABSENT** | The REST API does not have an IP-level token bucket or leaky bucket rate limiter (e.g., `slowapi`). Rate control is achieved at the application protocol layer via closed-loop `FRAME_ACK` pacing and coordinator latest-frame-wins dropping. Dedicated IP-based rate limiting is required for production. |
+| **Operator Authentication** | **ABSENT** | Endpoints `/api/v1/system/start`, `/stop`, `/restart`, `/config` are unauthenticated on the LAN. Acceptable for isolated evaluation networks; JWT/RBAC mandatory for city infrastructure. |
+| **Transport Security** | **CLEAR TEXT (Default)** | Default transport is HTTP/WS over local Wi-Fi. WSS/HTTPS supported via `CAMERA_WS_SECURE=true` behind a TLS reverse proxy. |
+| **Input Buffer Bounds** | **VERIFIED** | 2 MB hard frame size ceiling; 1000 item log pagination bound; numeric configuration boundaries strictly enforced. |
 
 ---
 
-## 5. Security & Rate-Limiting Observations
+## 7. Audit Verdict
 
-| Surface | Finding | Mitigation In Code | Remaining Risk / Note |
-|---|---|---|---|
-| QR Pairing Token | Dynamic UUIDv4 with 5-minute TTL | Invalidated immediately upon first successful camera registration. | Single-use prevents replay attacks. |
-| Session Token | UUIDv4 issued on registration | Required in all subsequent WebSocket frames; checked against memory session map. | Plaintext in LAN WebSocket frames. |
-| Operator Endpoints | `/api/v1/system/start`, `/stop`, `/config` have no auth header requirement | Bound to localhost/LAN operations. | Acceptable for SIH isolated demo network; production requires RBAC. |
-| Frame Flooding | Malicious or runaway mobile clients streaming 60 FPS | Server enforces `latest-frame-wins` drop policy and single thread inference executor. | Memory remains bounded; CPU protected. |
-| CORS | FastAPI middleware | Default allows local web UI origins. | Ensure production restricts origins. |
-
----
-
-## 6. Audit Verdict
-
-- **REST API Correctness:** `VERIFIED` (100% compliant with OpenAPI specifications; envelope responses consistent; input boundaries strictly guarded with HTTP 422).
-- **WebSocket Protocol Robustness:** `VERIFIED` (Strict Pydantic models; protocol version checking; graceful error encapsulation; correlation ID pass-through).
-- **Backpressure & Synchronization:** `VERIFIED` (`FRAME_ACK` closed loop enables client-side adaptive throttling; server monotonic time prevents clock-drift corruption).
+- **API Route & Negative Validation:** `VERIFIED` — Automated API route, schema validation, and negative boundary tests pass without failure.
+- **Port Mapping & Ingestion Protocol:** `VERIFIED` — Combined (8000) and Split (8000/8001) modes agree with configuration and QR generation.
+- **Rate-Limiting Reality:** `ABSENT` at HTTP level; handled via protocol-level backpressure.
