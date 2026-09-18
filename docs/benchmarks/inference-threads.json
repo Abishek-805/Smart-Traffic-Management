@@ -3,39 +3,39 @@
   "results": [
     {
       "threads": 8,
-      "p50_ms": 279.47,
-      "p95_ms": 380.64,
-      "cpu_seconds_per_frame": 0.6391,
+      "p50_ms": 68.77,
+      "p95_ms": 87.38,
+      "cpu_seconds_per_frame": 0.1943,
       "same_reference_boxes": true,
       "detections": 1,
-      "rss_mb": 336.7
+      "rss_mb": 351.4
     },
     {
       "threads": 4,
-      "p50_ms": 280.84,
-      "p95_ms": 413.77,
-      "cpu_seconds_per_frame": 0.4568,
+      "p50_ms": 47.55,
+      "p95_ms": 50.43,
+      "cpu_seconds_per_frame": 0.1078,
       "same_reference_boxes": true,
       "detections": 1,
-      "rss_mb": 358.2
+      "rss_mb": 358.6
     },
     {
       "threads": 2,
-      "p50_ms": 84.64,
-      "p95_ms": 113.44,
-      "cpu_seconds_per_frame": 0.1323,
+      "p50_ms": 72.4,
+      "p95_ms": 76.81,
+      "cpu_seconds_per_frame": 0.1182,
       "same_reference_boxes": true,
       "detections": 1,
-      "rss_mb": 362.4
+      "rss_mb": 347.6
     },
     {
       "threads": 1,
-      "p50_ms": 150.67,
-      "p95_ms": 229.14,
-      "cpu_seconds_per_frame": 0.1599,
+      "p50_ms": 139.19,
+      "p95_ms": 193.53,
+      "cpu_seconds_per_frame": 0.1339,
       "same_reference_boxes": true,
       "detections": 1,
-      "rss_mb": 351.9
+      "rss_mb": 351.7
     }
   ]
 }

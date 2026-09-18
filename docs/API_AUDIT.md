@@ -97,18 +97,60 @@ All canonical endpoints are prefixed with `/api/v1`. A legacy compatibility hand
 | `/api/v1/build` | `GET` | None | `dict` (Build info) | Public (LAN) | `VERIFIED` |
 | `/api/v1/system/health` | `GET` | None | `ApiResponse[SystemHealthData]` | Public (LAN) | `VERIFIED` |
 | `/api/v1/system/status` | `GET` | None | `ApiResponse[dict]` | Public (LAN) | `VERIFIED` |
+| `/api/v1/system/digital-intersection` | `GET` | None | `ApiResponse[dict]` (Junction snapshot) | Public (LAN) | `VERIFIED` |
 | `/api/v1/cameras` | `GET` | None | `ApiResponse[dict]` | Public (LAN) | `VERIFIED` |
 | `/api/v1/cameras/{direction}/feed` | `GET` | Path: `direction` (`north`, `south`, `east`, `west`) | `StreamingResponse` (`multipart/x-mixed-replace`) | Public (LAN) | `VERIFIED` |
-| `/api/v1/cameras/{direction}` | `DELETE` | Path: `direction` | `ApiResponse[dict]` | Public (LAN) | `VERIFIED` |
+| `/api/v1/cameras/{direction}` | `DELETE` | Path: `direction` | `ApiResponse[dict]` | Operator Auth | `VERIFIED` |
 | `/api/v1/cameras/{direction}` | `POST` | Path: `direction`, Body: `dict` | HTTP 422 Rejection | Public (LAN) | `VERIFIED` |
 | `/api/v1/mobile-nodes` | `GET` | None | `ApiResponse[MobileNodesData]` | Public (LAN) | `VERIFIED` |
 | `/api/v1/analytics` | `GET` | None | `ApiResponse[dict]` | Public (LAN) | `VERIFIED` |
 | `/api/v1/logs` | `GET` | Query: `category`, `level`, `search`, `limit` (1..1000) | `ApiResponse[LogsResponseData]` | Public (LAN) | `VERIFIED` |
 | `/api/v1/qr/generate` | `GET` | Query: `direction` (default: `north`) | `ApiResponse[dict]` (Payload + base64 PNG) | Public (LAN) | `VERIFIED` |
-| `/api/v1/system/start` | `POST` | None | `ApiResponse[dict]` | Public (LAN) | `VERIFIED` |
-| `/api/v1/system/stop` | `POST` | None | `ApiResponse[dict]` | Public (LAN) | `VERIFIED` |
-| `/api/v1/system/restart` | `POST` | None | `ApiResponse[dict]` | Public (LAN) | `VERIFIED` |
-| `/api/v1/system/config` | `POST` | Body: `{confidenceThreshold, minGreenTime, maxGreenTime}` | `ApiResponse[dict]` | Public (LAN) | `VERIFIED` |
+| `/api/v1/system/start` | `POST` | None | `ApiResponse[dict]` | Operator Auth | `VERIFIED` |
+| `/api/v1/system/stop` | `POST` | None | `ApiResponse[dict]` | Operator Auth | `VERIFIED` |
+| `/api/v1/system/restart` | `POST` | None | `ApiResponse[dict]` | Operator Auth | `VERIFIED` |
+| `/api/v1/system/override` | `POST` | Body: `{lane, duration}` | `ApiResponse[dict]` | Operator Auth | `VERIFIED` |
+| `/api/v1/system/emergency-clear` | `POST` | None | `ApiResponse[dict]` | Operator Auth | `VERIFIED` |
+| `/api/v1/system/config` | `POST` | Body: `{confidenceThreshold, minGreenTime, maxGreenTime}` | `ApiResponse[dict]` | Operator Auth | `VERIFIED` |
+
+### Operator Authentication Model (`OPERATOR_AUTH_MODE`)
+- **Configuration Modes**:
+  - `OPERATOR_AUTH_MODE=required`: Enforces that `OPERATOR_API_KEY` is non-empty. Startup fails with `RuntimeError` if missing or empty. All modifying endpoints require `X-Operator-Token` header. Mismatches or missing tokens return `HTTP 401 Unauthorized`.
+  - `OPERATOR_AUTH_MODE=optional` (default): Emits a single security warning at startup. If `OPERATOR_API_KEY` is provided, requests with `X-Operator-Token` are verified using constant-time `hmac.compare_digest`. Requests without tokens are permitted for local demonstration environments.
+- **Protected Endpoints**:
+  - `POST /api/v1/system/start`
+  - `POST /api/v1/system/stop`
+  - `POST /api/v1/system/restart`
+  - `POST /api/v1/system/override`
+  - `POST /api/v1/system/emergency-clear`
+  - `POST /api/v1/system/config`
+  - `POST /api/v1/config/thresholds`
+  - `POST /api/v1/logs/export`
+  - `DELETE /api/v1/cameras/{direction}`
+- **Public / Read-Only Endpoints**:
+  - `GET /api/v1/system/health`
+  - `GET /api/v1/system/status`
+  - `GET /api/v1/system/digital-intersection`
+  - `GET /api/v1/cameras`
+  - `GET /api/v1/telemetry`
+  - `GET /api/v1/pipeline/health`
+
+### Digital Intersection Snapshot Endpoint (`GET /api/v1/system/digital-intersection`)
+Returns complete 4-approach junction state driven by the real scheduler and pipeline context:
+- `timestamp`: Float epoch seconds.
+- `active_phase`: String e.g. `"north_green"`, `"north_yellow"`, `"all_red"`.
+- `current_green_lane`: String e.g. `"north"` or `null`.
+- `current_yellow_lane`: String e.g. `"north"` or `null`.
+- `remaining_time_seconds`: Integer countdown for active signal clearance/green duration.
+- `approaches`: Dictionary keyed by approach direction (`"north"`, `"east"`, `"south"`, `"west"`):
+  - `vehicles`: Integer total vehicle count.
+  - `queue`: Integer stopped vehicle queue count.
+  - `pce`: Float passenger car equivalent score.
+  - `priority`: Float computed priority score.
+  - `camera_status`: String (`"HEALTHY"` | `"DEGRADED"` | `"OFFLINE"`).
+  - `signal`: String (`"RED"` | `"YELLOW"` | `"GREEN"`).
+- `safety_status`: String (`"NORMAL"` | `"ALL_RED_HOLD"` | `"DEGRADED"`).
+- `cycle_count`: Integer completed signal cycle count.
 
 ### Endpoint Boundary Rules & Validation
 - **Direction Parameter**: Canonical helper `direction_value(direction)` strictly permits `north`, `south`, `east`, `west`. Any other input immediately raises `HTTPException(422, "Choose north, south, east or west")`.

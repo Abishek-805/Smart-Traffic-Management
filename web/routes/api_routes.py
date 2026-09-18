@@ -11,9 +11,11 @@ from web.services.system_service import SystemService
 from web.services.camera_service import CameraService
 from web.services.node_service import NodeService
 from web.services.log_service import LogService
+from ai.pipeline.digital_intersection import DigitalIntersection
 
 router = APIRouter(prefix="/api/v1", tags=["REST API v1"])
 system_svc, camera_svc, node_svc, log_svc = SystemService(), CameraService(), NodeService(), LogService()
+digital_intersection = DigitalIntersection()
 
 
 def wrap_response(data):
@@ -27,14 +29,70 @@ def direction_value(direction):
     return direction
 
 
-def verify_operator_auth(x_operator_token: Optional[str] = Header(None, alias="X-Operator-Token")) -> bool:
-    """Verify operator credentials for control endpoints when OPERATOR_API_KEY is configured."""
-    required_key = os.getenv("OPERATOR_API_KEY", "").strip()
-    if not required_key:
+import hmac
+import logging
+
+logger = logging.getLogger("web.routes.api_routes")
+
+
+class OperatorAuthManager:
+    """Manages configurable operator authentication state, startup checks, and token verification."""
+
+    def __init__(self):
+        self._warned = False
+
+    def validate_startup_configuration(self) -> None:
+        """Enforce that OPERATOR_AUTH_MODE=required has a valid key configured on startup."""
+        mode = os.getenv("OPERATOR_AUTH_MODE", "optional").strip().lower()
+        key = os.getenv("OPERATOR_API_KEY", "").strip()
+        if mode == "required" and not key:
+            raise RuntimeError(
+                "CRITICAL SECURITY CONFIGURATION ERROR: OPERATOR_AUTH_MODE is set to 'required', "
+                "but OPERATOR_API_KEY is empty or unset. System will refuse to start without a valid operator secret."
+            )
+        if mode != "required" and not self._warned:
+            logger.warning(
+                "[SECURITY NOTICE] OPERATOR AUTHENTICATION IS DISABLED (MODE=OPTIONAL). "
+                "Operator control endpoints are accepting unauthenticated requests. "
+                "This mode is intended strictly for trusted/demo local LAN environments. "
+                "Production municipal and public deployments MUST configure OPERATOR_AUTH_MODE=required "
+                "and set a strong OPERATOR_API_KEY."
+            )
+            self._warned = True
+
+    def verify(self, token: Optional[str]) -> bool:
+        """Verify operator credentials using constant-time comparison without logging secrets."""
+        mode = os.getenv("OPERATOR_AUTH_MODE", "optional").strip().lower()
+        key = os.getenv("OPERATOR_API_KEY", "").strip()
+
+        if mode == "required":
+            if not key:
+                logger.error("[SECURITY ERROR] OPERATOR_AUTH_MODE=required but OPERATOR_API_KEY is unset")
+                raise HTTPException(500, "Server security misconfiguration: OPERATOR_API_KEY required")
+            if not token or not token.strip() or not hmac.compare_digest(token.strip().encode("utf-8"), key.encode("utf-8")):
+                raise HTTPException(401, "Unauthorized: invalid or missing operator API key")
+            return True
+
+        # Mode is optional
+        if key and token:
+            if not hmac.compare_digest(token.strip().encode("utf-8"), key.encode("utf-8")):
+                raise HTTPException(401, "Unauthorized: invalid operator API key")
+            return True
+
+        if not self._warned:
+            logger.warning(
+                "[SECURITY NOTICE] Operator endpoint accessed without authentication in optional mode. "
+                "Intended for trusted/demo LAN use. Configure OPERATOR_AUTH_MODE=required for production."
+            )
+            self._warned = True
         return True
-    if not x_operator_token or x_operator_token != required_key:
-        raise HTTPException(401, "Unauthorized: invalid or missing operator API key")
-    return True
+
+
+auth_manager = OperatorAuthManager()
+
+
+def verify_operator_auth(x_operator_token: Optional[str] = Header(None, alias="X-Operator-Token")) -> bool:
+    return auth_manager.verify(x_operator_token)
 
 
 async def command(name, payload=None):
@@ -77,6 +135,15 @@ async def get_system_health():
 @router.get("/system/status")
 async def get_system_status():
     return wrap_response(system_svc.get_status())
+
+
+@router.get("/system/digital-intersection")
+async def get_digital_intersection():
+    """Return complete digital intersection snapshot (4 approaches, phases, safety)."""
+    snapshot = digital_intersection.get_snapshot()
+    resp = wrap_response(snapshot)
+    resp.update(snapshot)
+    return resp
 
 
 @router.get("/cameras")

@@ -119,7 +119,48 @@ The system is deployed across two decoupled repositories:
   Clamped strictly within $[10\text{s}, 60\text{s}]$.
 - **Clearance Invariants**: Yellow interval ($\ge 3\text{s}$) and All-Red clearance ($\ge 2\text{s}$) are enforced before green switches.
 
-### F. Security Architecture (`server/session_manager.py`, `web/routes/api_routes.py`)
+### F. Security & Authentication Architecture (`server/session_manager.py`, `web/routes/api_routes.py`)
 - **Camera Pairing**: Mobile nodes pair via dynamic QR codes with short-lived HMAC-SHA256 tokens pinned to unique node IDs.
 - **Session Pinning**: Ingested frames are rejected if the session token does not match the active socket ownership.
-- **Operator REST Authentication**: Production endpoints (`/system/*`, `/cameras/{direction}`) require `X-Operator-Token` when `OPERATOR_API_KEY` is configured.
+- **Configurable Operator Authentication**:
+  - Controlled by environment variables: `OPERATOR_AUTH_MODE=required|optional` (default: `optional`) and `OPERATOR_API_KEY`.
+  - When `OPERATOR_AUTH_MODE=required`: All sensitive control endpoints (`/system/start`, `/system/stop`, `/system/restart`, `/system/override`, `/system/emergency-clear`, `/config/thresholds`, `/logs/export`, `DELETE /cameras/{direction}`) require `X-Operator-Token` validated using constant-time `hmac.compare_digest`.
+  - Missing or empty `OPERATOR_API_KEY` in required mode causes startup validation failure (`RuntimeError`), preventing insecure boot.
+  - In `optional` mode, a visible security notice is logged once to alert administrators, allowing trusted local LAN operation.
+  - Public/read-only endpoints (`/system/health`, `/system/status`, `/system/digital-intersection`, `/cameras`, `/telemetry`) remain accessible without tokens for dashboard viewing.
+
+### G. Cross-Repository Protocol Contract Testing (`tests/test_system_contract.py`)
+- Programmatically inspects the sibling mobile repository (`traffic-camera-app`) on the local filesystem.
+- Validates bidirectional contract invariants without adding mobile code as a runtime Python package:
+  - **Protocol Version**: Asserts both repositories declare identical protocol version (`"1.0"`).
+  - **Approach Directions**: Asserts identical four-way canonical sets (`{"north", "east", "south", "west"}`).
+  - **Message Types**: Validates full 17-type message coverage between TypeScript constants and Python handlers.
+  - **QR Code Payload**: Validates schema roundtrip compatibility for dynamic pairing.
+  - **Port Topology**: Verifies network ports 8000 (combined) and 8001 (split WebSocket) align across mobile and backend configurations.
+
+### H. Golden-Model Regression Testing (`tests/test_model_regression.py`)
+- Employs an immutable, committed reference test asset (`tests/assets/model_regression/traffic_reference.jpg`) ensuring offline execution anywhere.
+- Enforces structural invariants on the active YOLOv8n detector:
+  - Valid detection counts ($\ge 1$, $\le 20$).
+  - Classes belong strictly to traffic domain target classes (`bus`, `car`, etc.).
+  - Coordinates reside strictly within frame bounds ($0 \le x_1 < x_2 \le W$, $0 \le y_1 < y_2 \le H$).
+  - Confidence scores strictly bounded in $[0.0, 1.0]$.
+  - Reasonable CPU inference latency.
+- Numerical stability invariants:
+  - Repeated inferences on the same static image yield identical detection counts and class labels.
+  - Coordinate drift is bounded within $\le 3\text{ px}$ tolerance without fragile bit-exact floating point equality across different BLAS backends.
+
+### I. Digital Intersection State View & Simulation Engine (`ai/pipeline/digital_intersection.py`)
+- Provides a unified real-time 4-approach junction model (`North`, `East`, `South`, `West`).
+- Exposes complete intersection snapshot via `GET /api/v1/system/digital-intersection`:
+  - Active signal phase (`north_green`, `north_yellow`, `all_red`, etc.).
+  - Per-approach traffic statistics (vehicles, queues, PCE, priority, camera health).
+  - Countdown timer for active phase clearance.
+  - Safety status (`NORMAL`, `DEGRADED`, `ALL_RED_HOLD`).
+  - Cycle count tracker.
+- Enforces critical safety invariants:
+  - **Mutual Exclusion**: Never two conflicting greens simultaneously.
+  - **Yellow Clearance**: Always precedes red transition ($\ge 3\text{s}$).
+  - **All-Red Interval**: Clearance buffer ($\ge 2\text{s}$) between phase switches.
+  - **Fail-Safe Fallbacks**: Active camera dropout initiates yellow clearance to safe red; AI stall immediately triggers `ALL_RED_HOLD`.
+

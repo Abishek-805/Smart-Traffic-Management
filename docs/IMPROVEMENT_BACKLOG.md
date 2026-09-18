@@ -16,14 +16,50 @@ This backlog records prioritized engineering improvements, technical debt remedi
 
 ## Item Inventory
 
-### [P0-1] Operator REST Endpoint Authentication
-- **Problem**: REST modifying endpoints (`/system/config`, `/system/start`, `/system/stop`, `/system/restart`, `DELETE /cameras/{direction}`) were previously open to any client on the local network.
-- **Evidence**: [`web/routes/api_routes.py`](file:///C:/Users/ashek/Desktop/smart-traffic-management/web/routes/api_routes.py#L70-L131) executed commands without verifying bearer or header tokens.
-- **Impact**: Rogue LAN devices could disconnect cameras or alter signal green durations maliciously.
-- **Proposed Solution**: Introduce optional `OPERATOR_API_KEY` environment configuration with `X-Operator-Token` header verification. Permissive fallback for demo mode with warning log.
-- **Implementation**: Created `verify_operator_auth` dependency in [`web/routes/api_routes.py`](file:///C:/Users/ashek/Desktop/smart-traffic-management/web/routes/api_routes.py#L30-L38).
-- **Test**: Automated tests in [`tests/test_api_negative.py:test_operator_auth_enforcement`](file:///C:/Users/ashek/Desktop/smart-traffic-management/tests/test_api_negative.py) verifying 401 rejections.
-- **Measurement**: 100% rejection of unauthorized requests when key is configured; 0 overhead when unset.
+### [P0-1] Configurable Operator REST Endpoint Authentication & Startup Integrity
+- **Problem**: REST modifying endpoints (`/system/config`, `/system/start`, `/system/stop`, `/system/restart`, `/system/override`, `/system/emergency-clear`, `DELETE /cameras/{direction}`) were previously open to unauthenticated LAN clients or lacked fail-safe configuration checks.
+- **Evidence**: [`web/routes/api_routes.py`](file:///C:/Users/ashek/Desktop/smart-traffic-management/web/routes/api_routes.py) previously executed control commands without enforcing constant-time token comparison or checking configuration integrity at startup.
+- **Impact**: Rogue LAN devices could disconnect cameras or manipulate signal timings. Insecure deployments could run with `OPERATOR_AUTH_MODE=required` while omitting the secret.
+- **Proposed Solution**: Introduce `OPERATOR_AUTH_MODE=required|optional` with `OPERATOR_API_KEY`. Enforce fail-closed startup validation (`RuntimeError` on empty key in required mode). Enforce constant-time `hmac.compare_digest` verification without leaking credentials. Keep read-only endpoints accessible.
+- **Implementation**: Created `OperatorAuthManager` and `verify_operator_auth` dependency in [`web/routes/api_routes.py`](file:///C:/Users/ashek/Desktop/smart-traffic-management/web/routes/api_routes.py), verified during startup in [`web/app.py`](file:///C:/Users/ashek/Desktop/smart-traffic-management/web/app.py).
+- **Test**: Automated tests in [`tests/test_api_negative.py`](file:///C:/Users/ashek/Desktop/smart-traffic-management/tests/test_api_negative.py) (20 negative/security tests passing).
+- **Measurement**: 100% rejection of unauthorized requests when key is configured; startup blocks if required key is unset; zero credentials leaked in logs/responses.
+- **Status**: `IMPLEMENTED & VERIFIED`.
+
+---
+
+### [P0-3] Cross-Repository Protocol Contract Verification Suite
+- **Problem**: Decoupled mobile client (`traffic-camera-app`) and backend (`smart-traffic-management`) evolve across independent repositories without monorepo dependencies, risking silent schema drift or port misalignment.
+- **Evidence**: Protocol constants (`PROTOCOL_VERSION`, message types, camera directions, QR payload keys, ports 8000/8001) were duplicated across TypeScript and Python files without automated contract gating.
+- **Impact**: Breaking protocol changes could go undetected until physical on-device integration testing.
+- **Proposed Solution**: Implement an automated cross-repository contract test suite that dynamically reads and parses mobile TypeScript protocol definitions on disk and verifies exact bidirectional compatibility with Python backend schemas.
+- **Implementation**: Implemented [`tests/test_system_contract.py`](file:///C:/Users/ashek/Desktop/smart-traffic-management/tests/test_system_contract.py).
+- **Test**: 5 automated contract tests covering version (`"1.0"`), 4 canonical directions, 17 WebSocket message types, QR payload roundtrip, and network port bindings.
+- **Measurement**: 100% contract alignment across both repositories verified in CI/test suites.
+- **Status**: `IMPLEMENTED & VERIFIED`.
+
+---
+
+### [P1-3] 4-Approach Digital Intersection State View & Simulation Engine
+- **Problem**: Observing the complete 4-approach junction state (signals, countdown timers, vehicle queues, PCE, safety status) required parsing disparate WebSocket telemetry and lacked a standalone deterministic simulation interface.
+- **Evidence**: SCADA dashboards lacked a unified single-endpoint read-only junction model with explicit safety status transitions (`NORMAL`, `DEGRADED`, `ALL_RED_HOLD`).
+- **Impact**: High cognitive overhead for operators and lack of deterministic offline stepping for safety invariant regression testing.
+- **Proposed Solution**: Create a dedicated `DigitalIntersection` engine providing 4-approach junction modeling, signal phase state machine (Green -> Yellow -> All-Red), fail-safe fallback on camera dropout or AI stall, and expose read-only `GET /api/v1/system/digital-intersection`.
+- **Implementation**: Implemented [`ai/pipeline/digital_intersection.py`](file:///C:/Users/ashek/Desktop/smart-traffic-management/ai/pipeline/digital_intersection.py) and exposed route in [`web/routes/api_routes.py`](file:///C:/Users/ashek/Desktop/smart-traffic-management/web/routes/api_routes.py).
+- **Test**: Automated unit and invariant tests in [`tests/test_digital_intersection.py`](file:///C:/Users/ashek/Desktop/smart-traffic-management/tests/test_digital_intersection.py) (6 tests passing).
+- **Measurement**: 100% mutual exclusion verified over simulated traffic cycles; instant clearance to safe red on camera dropout and AI stall.
+- **Status**: `IMPLEMENTED & VERIFIED`.
+
+---
+
+### [P2-3] Golden-Model Structural & Numerical Stability Regression Suite
+- **Problem**: Vision model inference lacked an immutable offline regression gate to detect structural drifts, bounding box regressions, class mapping errors, or numerical instability across package upgrades.
+- **Evidence**: Prior tests either mocked detector outputs or relied on dynamic camera feeds, without tracking repeatable bounding box tolerances on fixed traffic imagery.
+- **Impact**: Upgrading dependencies or altering model weights could silently degrade detection coordinates or class mappings.
+- **Proposed Solution**: Bundle an immutable reference test image (`tests/assets/model_regression/traffic_reference.jpg`) into Git and assert structural invariants (detection counts, valid classes, valid coordinates, bounded confidences, reasonable latency) and multi-run numerical stability (drift $\le 3\text{ px}$) without fragile bit-exact float equality.
+- **Implementation**: Created reference asset and implemented [`tests/test_model_regression.py`](file:///C:/Users/ashek/Desktop/smart-traffic-management/tests/test_model_regression.py).
+- **Test**: Automated tests in [`tests/test_model_regression.py`](file:///C:/Users/ashek/Desktop/smart-traffic-management/tests/test_model_regression.py) (2 tests passing).
+- **Measurement**: Zero class drift, coordinate stability verified within 3px, execution completed in under 5s offline.
 - **Status**: `IMPLEMENTED & VERIFIED`.
 
 ---
@@ -117,3 +153,22 @@ This backlog records prioritized engineering improvements, technical debt remedi
 - **Proposed Solution**: Design relay interlock circuit where Green relays physically cut power to conflicting Green coils.
 - **Test**: Physical circuit continuity and fault injection.
 - **Status**: `BACKLOG — P4 (HARDWARE DEPENDENCY)`.
+
+---
+
+### [P3-2] Dynamic WebSocket Session Rotation & Mutual TLS Hardware Enforcement
+- **Problem**: Session tokens remain static for the duration of a camera stream session once authenticated via dynamic QR handshake.
+- **Evidence**: `SessionManager` validates expiration on connect but does not force mid-session token re-keying.
+- **Impact**: In highly adversarial physical network environments, a hijacked session could persist until socket disconnection.
+- **Proposed Solution**: Introduce rolling challenge-response session renewal every 30 minutes over active WebSocket connections, with client cert (mTLS) enforcement for fixed infrastructure cameras.
+- **Status**: `BACKLOG — P3`.
+
+---
+
+### [P4-3] Automated TensorRT / INT8 Post-Training Quantization Pipeline
+- **Problem**: Edge server deployments with NVIDIA Jetson or dedicated GPUs currently execute PyTorch FP32 models.
+- **Evidence**: `ModelManager` defaults to PyTorch weights (`yolov8n.pt`).
+- **Impact**: Inference latency on edge accelerators can be reduced by 3-5x using TensorRT INT8 quantization with calibration cache.
+- **Proposed Solution**: Script an automated ONNX -> TensorRT engine builder using dynamic batching and INT8 calibration files.
+- **Status**: `BACKLOG — P4`.
+
