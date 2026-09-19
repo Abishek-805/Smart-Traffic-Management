@@ -84,6 +84,9 @@ class WebRTCIngest:
             if track.kind != 'video' or peer.tasks:
                 self._schedule_close(peer)
                 return
+            session = self._session(peer)
+            if session:
+                session.media_connected = True
             peer.tasks.add(asyncio.create_task(self._receive(peer, track)))
             peer.tasks.add(asyncio.create_task(self._sample(peer)))
 
@@ -156,6 +159,7 @@ class WebRTCIngest:
             self._schedule_close(peer)
 
     async def _close_peer(self, peer):
+        session = self._session(peer)
         if self.peers.get(peer.node_id) is peer:
             self.peers.pop(peer.node_id)
         tasks = [task for task in peer.tasks if task is not asyncio.current_task()]
@@ -165,6 +169,8 @@ class WebRTCIngest:
             await asyncio.gather(*tasks, return_exceptions=True)
         peer.tasks.clear()
         peer.latest = None
+        if session:
+            session.media_connected = False
         await peer.pc.close()
 
     async def close(self, node_id, websocket=None):

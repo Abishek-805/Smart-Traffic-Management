@@ -79,7 +79,7 @@ class NodeService:
                           "battery_pct": None, "signal_dbm": None, "latency_ms": None,
                           "last_heartbeat": "Awaiting registration",
                           "expires_at": int(pairing["expires_at"] * 1000) if pairing else None})
-        return {"connected_count": sum(n["status"] == "CONNECTED" for n in nodes), "nodes": nodes}
+        return {"connected_count": sum(n["status"] == "LIVE" for n in nodes), "nodes": nodes}
 
     def generate_qr_payload_and_image(self, direction: str = "north") -> Dict[str, Any]:
         """

@@ -21,8 +21,12 @@ async def camera_websocket_endpoint(websocket: WebSocket):
             await message_handler.rtc.close(node_id, websocket)
         # An older socket must never remove a newly registered replacement.
         if node_id and message_handler.connection_manager.get_connection(node_id) is websocket:
-            message_handler.handle_connection_loss(node_id)
-            await message_handler.connection_manager.disconnect(node_id)
+            session = message_handler.session_manager.get_session(node_id)
+            generation = session.generation if session else None
+            message_handler.handle_connection_loss(node_id, websocket=websocket)
+            await message_handler.connection_manager.disconnect(
+                node_id, generation=generation, websocket=websocket
+            )
 
 app = FastAPI(title="Traffic camera protocol server")
 app.add_api_websocket_route("/ws/camera", camera_websocket_endpoint)

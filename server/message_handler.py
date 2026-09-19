@@ -48,9 +48,13 @@ class MessageHandler:
         self,
         session_manager: Optional[SessionManager] = None,
         connection_manager: Optional[ConnectionManager] = None,
+        clock=None,
+        takeover_grace_sec: float = 1.0,
     ):
         self.session_manager = session_manager if session_manager else SessionManager()
         self.connection_manager = connection_manager if connection_manager else ConnectionManager()
+        self.clock = clock or time.monotonic
+        self.takeover_grace_sec = max(0.0, float(takeover_grace_sec))
         self._in_flight_directions = set()
         # Perception is serialized already; one long-lived worker keeps native
         # OpenCV/PyTorch workspaces on one thread instead of multiplying them
@@ -200,7 +204,45 @@ class MessageHandler:
             )
         previous = self.session_manager.get_session_by_direction(direction)
         if previous and previous.node_id != node_id:
-            return self._build_error("DIRECTION_OCCUPIED", "Disconnect the existing camera for this direction first")
+            from server.camera_lifecycle import CameraStatusSnapshot
+
+            owner_state = CameraStatusSnapshot.from_session(previous).derive_state(
+                self.clock()
+            ).value
+            disconnected_at = previous.disconnected_at
+            elapsed = (
+                self.clock() - disconnected_at
+                if disconnected_at is not None
+                else 0.0
+            )
+            reclaimable = (
+                not previous.transport_alive
+                and disconnected_at is not None
+                and elapsed >= self.takeover_grace_sec
+            )
+            if not reclaimable:
+                retry_after_ms = max(
+                    1,
+                    int(max(0.0, self.takeover_grace_sec - elapsed) * 1000),
+                )
+                return self._build_error(
+                    "DIRECTION_OCCUPIED",
+                    "An active or reconnecting camera owns this direction",
+                    direction=direction,
+                    owner_state=owner_state,
+                    retry_after_ms=retry_after_ms,
+                )
+            previous_socket = self.connection_manager.get_connection(previous.node_id)
+            if hasattr(self, "rtc"):
+                await self.rtc.close(previous.node_id, previous_socket)
+            await self.connection_manager.disconnect(
+                previous.node_id,
+                generation=previous.generation,
+                websocket=previous_socket,
+            )
+            self.session_manager.remove_session(
+                previous.node_id, generation=previous.generation
+            )
         payload_raw["node_id"] = node_id
         payload_raw["camera_direction"] = direction
         raw_json["payload"] = payload_raw
@@ -211,8 +253,18 @@ class MessageHandler:
             return self._build_error("INVALID_REGISTRATION_PAYLOAD", f"Schema validation error: {e}")
 
         payload = msg.payload
-        await self.connection_manager.connect(node_id, websocket)
-        session = self.session_manager.create_session(node_id, direction)
+        if is_reconnect:
+            session = self.session_manager.replace_session(
+                node_id, direction, reconnect_token=registration_token
+            )
+        else:
+            session = self.session_manager.create_session(node_id, direction)
+        await self.connection_manager.connect(
+            node_id, websocket, generation=session.generation
+        )
+        session.transport_alive = True
+        session.reconnecting = False
+        session.disconnected_at = None
         from core.application_context import ApplicationContext
         session.streaming = ApplicationContext.get_instance().system_running
         if is_pairing_authorized:
@@ -234,6 +286,7 @@ class MessageHandler:
         d = ack.model_dump()
         d["type"] = "REGISTRATION_ACK"
         d["payload"]["transports"] = ["webrtc", "jpeg-json"]
+        d["payload"]["lifecycle_state"] = "CONNECTING"
         logger.info(f"[PAIRING] REGISTER â†’ ACK | node={node_id} | direction={direction} | token={session.session_token[:8]}...")
 
         # Schedule single authoritative START_STREAM signal to camera node so mobile app switches to STREAMING state
@@ -422,6 +475,11 @@ class MessageHandler:
             if not ctx.system_running:
                 return self._build_error("SYSTEM_PAUSED", "System is paused")
             ctx.increment_stage_counter("received")
+            node_id = payload_raw.get("node_id")
+            session = self.session_manager.get_session(node_id) if node_id else None
+            if session and session.camera_direction == direction:
+                session.media_connected = True
+                session.last_frame_at = self.clock()
 
             # Latest Frame Wins Policy: check if there's already an unprocessed frame in the slot
             if direction in self.latest_frames:
@@ -458,6 +516,7 @@ class MessageHandler:
         if not session.streaming or session.camera_direction != direction:
             return
         session.last_heartbeat = time.time()
+        session.last_frame_at = self.clock()
         await self._handle_video_frame({'owner_socket':websocket, 'payload':{
             'decoded_image':image, 'direction':direction, 'node_id':node_id,
             'session_token':token, 'frame_id':f'{node_id}-{frame_id}',
@@ -479,8 +538,13 @@ class MessageHandler:
             payload = msg.payload
             node_id = payload.node_id
             if self.session_manager.validate_session(node_id, payload.session_token):
-                self.session_manager.remove_session(node_id)
-                await self.connection_manager.disconnect(node_id)
+                session = self.session_manager.get_session(node_id)
+                generation = session.generation
+                owner_socket = raw_json.get("owner_socket")
+                self.session_manager.remove_session(node_id, generation=generation)
+                await self.connection_manager.disconnect(
+                    node_id, generation=generation, websocket=owner_socket
+                )
                 logger.info(f"Node '{node_id}' disconnected gracefully: {payload.reason}")
         except Exception as e:
             logger.warning(f"Error parsing disconnect message: {e}")
@@ -501,23 +565,38 @@ class MessageHandler:
         self.latest_frames = {}
         self.frame_executor.shutdown(wait=True, cancel_futures=True)
 
-    def handle_connection_loss(self, node_id: str) -> None:
+    def handle_connection_loss(self, node_id: str, websocket=None) -> bool:
         """Keep the authenticated session briefly so the same node can reconnect."""
         session = self.session_manager.get_session(node_id)
-        if session:
+        if session and (
+            websocket is None
+            or self.connection_manager.get_connection(node_id) is websocket
+        ):
+            session.transport_alive = False
+            session.media_connected = False
+            session.reconnecting = True
+            session.disconnected_at = self.clock()
             logger.info(
                 "Socket lost for node '%s'; preserving session until heartbeat expiry.",
                 node_id,
             )
+            return True
+        return False
 
     @staticmethod
-    def _build_error(code: str, message: str, node_id: Optional[str] = None) -> dict:
+    def _build_error(
+        code: str,
+        message: str,
+        node_id: Optional[str] = None,
+        **details,
+    ) -> dict:
         """Construct a strongly-typed ErrorMessage dict."""
         err = ErrorMessage(
             payload=ErrorPayload(
                 node_id=node_id,
                 error_code=code,
                 message=message,
+                **details,
             )
         )
         return err.model_dump()

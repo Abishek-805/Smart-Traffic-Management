@@ -98,6 +98,9 @@ class ErrorPayload(BaseModel):
     node_id: Optional[str] = None
     error_code: str
     message: str
+    direction: Optional[str] = None
+    owner_state: Optional[str] = None
+    retry_after_ms: Optional[int] = None
 
 
 # --- Full Message Models ---

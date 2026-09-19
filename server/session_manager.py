@@ -23,6 +23,12 @@ class NodeSession:
     camera_direction: str
     generation: str = field(default_factory=lambda: uuid.uuid4().hex)
     transport_alive: bool = False
+    media_connected: bool = False
+    last_frame_at: Optional[float] = None
+    last_inference_at: Optional[float] = None
+    disconnected_at: Optional[float] = None
+    reconnecting: bool = False
+    error_code: Optional[str] = None
     connected_at: float = field(default_factory=time.time)
     last_heartbeat: float = field(default_factory=time.time)
     heartbeat_timeout_sec: float = HEARTBEAT_TIMEOUT_SEC

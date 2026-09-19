@@ -101,10 +101,18 @@ def runtime_snapshot(ctx):
     payload.setdefault("activePhase", "None")
     payload.setdefault("greenDuration", 0)
     payload.setdefault("timeRemaining", 0)
+    from server.camera_lifecycle import CameraStatusSnapshot
+
+    def node_status(session):
+        status = CameraStatusSnapshot.from_session(session)
+        status.last_inference_at = ctx.frame_updated_at.get(session.camera_direction)
+        return status.derive_state(now).value
+
     payload["nodes"] = [{
         "node_id": session.node_id, "camera_direction": session.camera_direction,
         "assigned_lane": session.camera_direction.capitalize() + " Approach",
-        "device_name": "Mobile camera", "status": "CONNECTED",
+        "device_name": "Mobile camera",
+        "status": node_status(session),
         "last_heartbeat": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(session.last_heartbeat)),
         "fps": lanes[session.camera_direction]["fps"],
         "latency_ms": None, "battery_pct": None, "signal_dbm": None,
