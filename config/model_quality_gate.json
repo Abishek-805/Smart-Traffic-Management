@@ -1,0 +1,7 @@
+{
+  "maximum_map50_95_drop": 0.0,
+  "maximum_per_class_recall_drop": 0.0,
+  "maximum_count_mae_increase": 0.0,
+  "maximum_id_switch_increase": 0,
+  "required_latency_improvement_fraction": 0.0
+}

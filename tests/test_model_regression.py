@@ -15,6 +15,8 @@ import pytest
 
 from ai.detection.detector import VehicleDetector
 from config.traffic import TARGET_CLASS_NAMES
+from ai.evaluation.regression_gate import QualityGatePolicy
+import json
 
 REFERENCE_IMAGE_PATH = (
     Path(__file__).parent / "assets" / "model_regression" / "traffic_reference.jpg"
@@ -110,3 +112,13 @@ def test_inference_stability_and_repeatability(detector, reference_image):
             assert np.all(box_diff <= 3.0), (
                 f"Bbox coordinate drift > 3px: {det_base.bbox} vs {det_other.bbox} (diff={box_diff})"
             )
+
+
+def test_repository_model_quality_policy_is_strict_and_parseable():
+    policy_path = Path(__file__).parents[1] / "config" / "model_quality_gate.json"
+    policy = QualityGatePolicy.from_dict(json.loads(policy_path.read_text(encoding="utf-8")))
+
+    assert policy.maximum_map50_95_drop == 0
+    assert policy.maximum_per_class_recall_drop == 0
+    assert policy.maximum_count_mae_increase == 0
+    assert policy.maximum_id_switch_increase == 0
