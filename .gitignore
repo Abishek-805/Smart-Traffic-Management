@@ -23,6 +23,8 @@ outputs/*.mp4
 outputs/training/
 outputs/evaluations/
 datasets/
+!tests/fixtures/evaluation/
+!tests/fixtures/evaluation/**
 logs/
 *.log
 .venv*

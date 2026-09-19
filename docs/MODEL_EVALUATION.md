@@ -56,6 +56,15 @@ Because the core repository does not bundle raw traffic video annotations, **for
 
 ## 4. Supported Annotation Formats
 
+Before evaluation, datasets must be registered in the versioned manifest contract at
+`schemas/evaluation-manifest.schema.json`. The manifest pins annotation checksums,
+license/source metadata, split identity, provenance (`external` or `project_owned`),
+and scene tags. Results from external datasets and project-owned intersection data
+must remain separate; they must never be combined into a single headline metric.
+
+The repository may contain small synthetic fixtures, but raw datasets, recordings,
+and trained experiment outputs remain excluded by `.gitignore`.
+
 ### A. COCO JSON Format
 Standard format used by Roboflow, CVAT, and academic benchmarks:
 ```json

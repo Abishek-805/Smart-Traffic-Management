@@ -1,0 +1,29 @@
+{
+  "frames": [
+    {
+      "frame_id": "external-day-001",
+      "dataset_id": "bdd-sample",
+      "image_path": "images/external-day-001.jpg",
+      "width": 1280,
+      "height": 720,
+      "scene_tags": ["day", "clear"],
+      "annotations": [
+        {"class_id": 2, "class_name": "car", "bbox": [100, 200, 260, 340], "track_id": "ext-1"}
+      ],
+      "ignore_regions": []
+    },
+    {
+      "frame_id": "project-night-001",
+      "dataset_id": "project-intersection",
+      "image_path": "images/project-night-001.jpg",
+      "width": 1920,
+      "height": 1080,
+      "scene_tags": ["night", "occluded"],
+      "annotations": [
+        {"class_id": 5, "class_name": "three-wheeler", "bbox": [600, 400, 760, 650], "track_id": "project-1"}
+      ],
+      "queue_region": [[400, 350], [1100, 350], [1400, 1000], [200, 1000]],
+      "ignore_regions": [[[0, 0], [100, 0], [100, 100], [0, 100]]]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "../../../schemas/evaluation-manifest.schema.json",
+  "schema_version": 1,
+  "annotation_file": "annotations.json",
+  "datasets": [
+    {
+      "dataset_id": "bdd-sample",
+      "split": "test",
+      "provenance": "external",
+      "source": "BDD100K fixture",
+      "license": "BDD100K academic-use terms",
+      "annotation_revision": "fixture-v1",
+      "sha256": "d40635209beb25553a13e016d754069d37540f559762cbce8a29c20e49d9b800",
+      "scene_tags": ["day", "clear"]
+    },
+    {
+      "dataset_id": "project-intersection",
+      "split": "test",
+      "provenance": "project_owned",
+      "source": "Project-owned fixture",
+      "license": "Project-owned",
+      "annotation_revision": "fixture-v1",
+      "sha256": "d40635209beb25553a13e016d754069d37540f559762cbce8a29c20e49d9b800",
+      "scene_tags": ["night", "occluded"]
+    }
+  ]
+}
