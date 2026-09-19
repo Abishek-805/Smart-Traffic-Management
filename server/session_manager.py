@@ -21,6 +21,8 @@ class NodeSession:
     node_id: str
     session_token: str
     camera_direction: str
+    generation: str = field(default_factory=lambda: uuid.uuid4().hex)
+    transport_alive: bool = False
     connected_at: float = field(default_factory=time.time)
     last_heartbeat: float = field(default_factory=time.time)
     heartbeat_timeout_sec: float = HEARTBEAT_TIMEOUT_SEC
@@ -52,7 +54,7 @@ class SessionManager:
         existing = self.get_session_by_direction(dir_clean)
         if existing and existing.node_id != node_id:
             logger.warning(f"Direction slot '{dir_clean}' claimed by new node '{node_id}'. Evicting previous node '{existing.node_id}'.")
-            self.remove_session(existing.node_id)
+            self.remove_session(existing.node_id, generation=existing.generation)
 
         if node_id in self.sessions:
             logger.warning(f"Node '{node_id}' re-registered. Overwriting existing session.")
@@ -70,6 +72,36 @@ class SessionManager:
         self.sessions[node_id] = session
         logger.info(f"Created session for node '{node_id}' ({dir_clean.upper()}).")
         return session
+
+    def replace_session(
+        self,
+        node_id: str,
+        camera_direction: str,
+        reconnect_token: str,
+    ) -> NodeSession:
+        """Replace one node generation while preserving its reconnect identity."""
+        current = self.sessions.get(node_id)
+        dir_clean = (camera_direction or "north").lower()
+        if (
+            current is None
+            or current.is_expired()
+            or current.camera_direction != dir_clean
+            or current.session_token != reconnect_token
+        ):
+            raise ValueError("Reconnect identity is invalid or expired")
+
+        now = time.time()
+        replacement = NodeSession(
+            node_id=node_id,
+            session_token=current.session_token,
+            camera_direction=dir_clean,
+            connected_at=now,
+            last_heartbeat=now,
+            heartbeat_timeout_sec=self.timeout_sec,
+        )
+        self.sessions[node_id] = replacement
+        logger.info("Replaced session generation for node '%s'.", node_id)
+        return replacement
 
     def get_session_by_direction(self, camera_direction: str) -> Optional[NodeSession]:
         """Find active unexpired session for a given camera direction."""
@@ -94,9 +126,16 @@ class SessionManager:
         self.sessions[node_id].last_heartbeat = time.time()
         return True
 
-    def remove_session(self, node_id: str) -> Optional[NodeSession]:
-        """Remove and return session for node_id."""
-        session = self.sessions.pop(node_id, None)
+    def remove_session(
+        self, node_id: str, generation: Optional[str] = None
+    ) -> Optional[NodeSession]:
+        """Remove a session only when its optional ownership generation matches."""
+        session = self.sessions.get(node_id)
+        if session is None or (
+            generation is not None and session.generation != generation
+        ):
+            return None
+        self.sessions.pop(node_id, None)
         if session:
             logger.info(f"Removed session for node '{node_id}'.")
         return session
@@ -112,10 +151,17 @@ class SessionManager:
 
     def cleanup_expired_sessions(self) -> List[str]:
         """Remove all expired sessions and return their node_ids."""
-        expired = self.get_expired_sessions()
-        for nid in expired:
-            self.remove_session(nid)
-        return expired
+        now = time.time()
+        expired = [
+            (nid, session.generation)
+            for nid, session in list(self.sessions.items())
+            if session.is_expired(now=now)
+        ]
+        removed = []
+        for node_id, generation in expired:
+            if self.remove_session(node_id, generation=generation):
+                removed.append(node_id)
+        return removed
 
     def register_pairing_session(self, direction: str, session_id: str, token: str, expires_at: float):
         """Register a pairing session for a camera direction."""
