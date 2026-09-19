@@ -95,7 +95,7 @@ def process_batch(packets, frame_slots=None):
             if result:
                 result[3]['queue_wait_ms'] = round(max(0, preprocess_done_ms - packet['backend_receive_timestamp']), 2)
                 result[3]['batch_size'] = p.get('_inference_batch_size', 0)
-                result[3]['source_kind'] = p.get('source_kind','jpeg')
+                result[3]['source_kind'] = p.get('source_kind','jpeg-json')
                 results.append((packet,result))
         return results
 

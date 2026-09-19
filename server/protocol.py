@@ -5,7 +5,7 @@ Protocol schema definitions using Pydantic models and MessageType enum.
 from enum import Enum
 import time
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from server.config import PROTOCOL_VERSION
 
 
@@ -20,6 +20,7 @@ class MessageType(str, Enum):
     VIDEO_FRAME = "VIDEO_FRAME"
     WEBRTC_OFFER = "WEBRTC_OFFER"
     WEBRTC_STOP = "WEBRTC_STOP"
+    WEBRTC_STATS = "WEBRTC_STATS"
     START_STREAM = "START_STREAM"
     STOP_STREAM = "STOP_STREAM"
 
@@ -73,6 +74,18 @@ class StartStreamPayload(BaseModel):
     target_fps: Optional[int] = 15
     resolution: Optional[str] = "640x480"
     quality: Optional[int] = 50
+
+
+class WebRTCStatsPayload(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    sent_fps: Optional[float] = Field(None, ge=0, le=240, validation_alias=AliasChoices("sent_fps", "sentFps"))
+    packet_loss: Optional[int] = Field(None, ge=0, validation_alias=AliasChoices("packet_loss", "packetsLost"))
+    jitter_ms: Optional[float] = Field(None, ge=0, le=60_000, validation_alias=AliasChoices("jitter_ms", "jitterMs"))
+    frame_width: Optional[int] = Field(None, ge=1, le=16_384, validation_alias=AliasChoices("frame_width", "frameWidth"))
+    frame_height: Optional[int] = Field(None, ge=1, le=16_384, validation_alias=AliasChoices("frame_height", "frameHeight"))
+    encode_ms_per_frame: Optional[float] = Field(None, ge=0, le=60_000, validation_alias=AliasChoices("encode_ms_per_frame", "encodeMsPerFrame"))
+    jitter_buffer_delay_ms: Optional[float] = Field(None, ge=0, le=60_000, validation_alias=AliasChoices("jitter_buffer_delay_ms", "jitterBufferDelayMs"))
 
 
 class HeartbeatPayload(BaseModel):

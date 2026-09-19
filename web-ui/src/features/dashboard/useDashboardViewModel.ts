@@ -33,6 +33,7 @@ export interface LaneViewModel {
   inferenceTimeMs: number;
   serverProcessingMs: number;
   queueWaitMs: number;
+  transport: 'webrtc' | 'jpeg-json' | 'local' | null;
 }
 
 export interface PhaseViewModel {
@@ -141,6 +142,7 @@ export const useDashboardViewModel = (): DashboardViewModel => {
         inferenceTimeMs: laneData?.inferenceTimeMs ?? 0,
         serverProcessingMs: laneData?.serverProcessingMs ?? 0,
         queueWaitMs: laneData?.queueWaitMs ?? 0,
+        transport: laneData?.transport ?? null,
       };
 
       return acc;

@@ -65,6 +65,7 @@ def runtime_snapshot(ctx):
         lane_telemetry = ctx.live_telemetry.get(direction, {})
         temporal = lane_telemetry.get("latency_metrics", {})
         stage = lane_telemetry.get("stage_latency", {})
+        transport = lane_telemetry.get("source_kind") or (session.transport if session else None)
         lane.update(frameId=lane_telemetry.get("frame_id"),
                     latestFrameId=lane_telemetry.get("latest_frame_id"),
                     lastDetectionFrameId=lane_telemetry.get("last_detection_frame_id"),
@@ -88,6 +89,8 @@ def runtime_snapshot(ctx):
                         "totalMs": stage.get("server_total_ms"),
                         "frameAgeMs": stage.get("frame_age_ms"),
                     } if stage else None,
+                    transport=transport,
+                    transportStats=dict(session.transport_stats) if session and session.transport_stats else None,
                     frameAgeMs=round(age, 1) if age is not None else None,
                     streamStatus="LIVE" if live else "STALE" if session and seen else "CONNECTING" if session else "OFFLINE",
                     fps=lane_telemetry.get("fps", 0) if live else 0,

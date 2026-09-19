@@ -10,12 +10,15 @@ interface Props {
   selectedDirection: DirectionType;
   setSelectedDirection: (dir: DirectionType) => void;
 }
-export const SCADADashboardLayout: React.FC<Props> = ({ vm, onSelectLane, selectedDirection, setSelectedDirection }) => (
+export const SCADADashboardLayout: React.FC<Props> = ({ vm, onSelectLane, selectedDirection, setSelectedDirection }) => {
+  const transports = Array.from(new Set(Object.values(vm.lanes).map(lane => lane.transport).filter(Boolean)));
+  const transportLabel = transports.length ? transports.join(' + ') : 'awaiting media';
+  return (
   <section style={{ display: 'flex', flexDirection: 'column', gap: 12, minHeight: '100%' }}>
     <div className="phase-bar scada-card" role="status">
       <div><span className="phase-label">Current signal</span><strong>{vm.activePhase.activeDirection === 'None' ? 'Waiting for fresh camera data' : vm.activePhase.activeDirection + ' approach'}</strong></div>
       <div><strong className="font-mono-num">{vm.activePhase.remainingSeconds}s</strong><span className="phase-label">{vm.activePhase.phaseReason}</span></div>
-      <div><strong>{vm.statusBar.activeCameraCount} / 4 cameras</strong><span className="phase-label">Hardware {vm.statusBar.esp32State.toLowerCase()} · JPEG samples</span></div>
+      <div><strong>{vm.statusBar.activeCameraCount} / 4 cameras</strong><span className="phase-label">Hardware {vm.statusBar.esp32State.toLowerCase()} · {transportLabel}</span></div>
     </div>
     <div className="dashboard-workspace">
       <aside className="pairing-sidebar" aria-label="Connect mobile camera">
@@ -31,4 +34,5 @@ export const SCADADashboardLayout: React.FC<Props> = ({ vm, onSelectLane, select
       <DashboardGrid vm={vm} onSelectLane={onSelectLane} selectedDirection={selectedDirection} />
     </div>
   </section>
-);
+  );
+};

@@ -29,6 +29,8 @@ class NodeSession:
     disconnected_at: Optional[float] = None
     reconnecting: bool = False
     error_code: Optional[str] = None
+    transport: Optional[str] = None
+    transport_stats: Dict[str, Any] = field(default_factory=dict)
     connected_at: float = field(default_factory=time.time)
     last_heartbeat: float = field(default_factory=time.time)
     heartbeat_timeout_sec: float = HEARTBEAT_TIMEOUT_SEC

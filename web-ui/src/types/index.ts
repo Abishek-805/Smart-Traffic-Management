@@ -89,6 +89,16 @@ export interface LaneTelemetryItem {
   serverProcessingMs?: number;
   queueWaitMs?: number;
   stageLatency?: PipelineStageLatency | null;
+  transport?: 'webrtc' | 'jpeg-json' | 'local' | null;
+  transportStats?: {
+    sent_fps?: number | null;
+    packet_loss?: number | null;
+    jitter_ms?: number | null;
+    frame_width?: number | null;
+    frame_height?: number | null;
+    encode_ms_per_frame?: number | null;
+    jitter_buffer_delay_ms?: number | null;
+  } | null;
   frameId?: string | null;
   latestFrameId?: string | null;
   lastDetectionFrameId?: string | null;

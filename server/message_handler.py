@@ -10,6 +10,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any, Optional
 from fastapi import WebSocket
+from pydantic import ValidationError
 
 from server.config import PROTOCOL_VERSION
 from server.protocol import (
@@ -23,6 +24,7 @@ from server.protocol import (
     DisconnectMessage,
     ErrorMessage,
     ErrorPayload,
+    WebRTCStatsPayload,
 )
 from server.session_manager import SessionManager
 from server.connection_manager import ConnectionManager
@@ -138,6 +140,14 @@ class MessageHandler:
                     return {"type": "WEBRTC_ANSWER", "timestamp": time.time(), "payload": answer}
                 except Exception as exc:
                     return self._build_error("WEBRTC_FAILED", str(exc))
+            if msg_type == MessageType.WEBRTC_STATS:
+                try:
+                    stats = WebRTCStatsPayload.model_validate(payload)
+                except ValidationError:
+                    return self._build_error("INVALID_WEBRTC_STATS", "WebRTC statistics are outside accepted bounds")
+                session.transport = "webrtc"
+                session.transport_stats = stats.model_dump()
+                return {"type": "WEBRTC_STATS", "timestamp": time.time(), "payload": {"status": "OK"}}
             if msg_type in (MessageType.START_STREAM, MessageType.STOP_STREAM):
                 from core.application_context import ApplicationContext
                 if msg_type == MessageType.START_STREAM and not ApplicationContext.get_instance().system_running:
@@ -527,7 +537,7 @@ class MessageHandler:
             'decoded_image':image, 'direction':direction, 'node_id':node_id,
             'session_token':token, 'frame_id':f'{node_id}-{frame_id}',
             'capture_timestamp':received_ms,'upload_timestamp':received_ms,
-            'source_kind':'video'}})
+            'source_kind':'webrtc'}})
 
     async def _handle_disconnect(self, raw_json: dict) -> Optional[dict]:
         """Handle DISCONNECT message and clean up node session & connection."""
