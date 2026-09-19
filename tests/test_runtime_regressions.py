@@ -154,11 +154,8 @@ def test_model_is_warmed_before_camera_frames_are_accepted():
 @pytest.mark.asyncio
 async def test_latest_frame_slots_are_bounded_and_isolated_per_camera():
     handler = MessageHandler()
-    handler.latest_frames = {}
-    handler.frame_events = {}
-    handler.dropped_frames_count = 0
     # Sentinels prevent consumers from draining the slots during this unit test.
-    handler.worker_tasks = {direction: object() for direction in ('north', 'south')}
+    handler.worker_tasks = {"batch": object()}
     ctx = ApplicationContext.get_instance()
     previous_running = ctx.system_running
     ctx.system_running = True
@@ -168,9 +165,11 @@ async def test_latest_frame_slots_are_bounded_and_isolated_per_camera():
         await handler._handle_video_frame(packet('north', 'NORTH-1'))
         await handler._handle_video_frame(packet('north', 'NORTH-2'))
         await handler._handle_video_frame(packet('south', 'SOUTH-1'))
-        assert set(handler.latest_frames) == {'north', 'south'}
-        assert handler.latest_frames['north']['payload']['frame_id'] == 'NORTH-2'
-        assert handler.latest_frames['south']['payload']['frame_id'] == 'SOUTH-1'
+        selected = handler.frame_slots.select_due(time.monotonic(), max_items=4)
+        by_direction = {item['payload']['direction']: item for item in selected}
+        assert set(by_direction) == {'north', 'south'}
+        assert by_direction['north']['payload']['frame_id'] == 'NORTH-2'
+        assert by_direction['south']['payload']['frame_id'] == 'SOUTH-1'
         assert handler.dropped_frames_count == 1
     finally:
         ctx.system_running = previous_running

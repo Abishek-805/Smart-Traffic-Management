@@ -12,7 +12,7 @@ def frame_processing_timestamp(packet):
     return packet.get('backend_receive_monotonic', time.monotonic())
 
 
-def process_batch(packets):
+def process_batch(packets, frame_slots=None):
     import cv2
     import numpy as np
     from core.application_context import ApplicationContext
@@ -27,6 +27,8 @@ def process_batch(packets):
             p = packet['payload']
             if not ctx.system_running or time.time()*1000 - packet['backend_receive_timestamp'] > 2500:
                 ctx.increment_stage_counter('dropped')
+                if frame_slots is not None:
+                    frame_slots.mark_stale(p['direction'])
                 continue
             try:
                 image = p.get('decoded_image')
@@ -40,6 +42,8 @@ def process_batch(packets):
                 ready.append((packet, image, orientation, time.time() * 1000))
             except (ValueError, TypeError, cv2.error):
                 ctx.increment_stage_counter('decode_failed')
+                if frame_slots is not None:
+                    frame_slots.mark_failure(p['direction'], 'decode')
         if not ready:
             return []
         if ctx.pipeline is None:
@@ -51,15 +55,21 @@ def process_batch(packets):
         computed = {}
         # Warm-up and inference share the model manager's validated batch size.
         size = ctx.pipeline.model_manager.batch_size
-        for start in range(0, len(due), size):
-            group = due[start:start+size]
-            boxes, elapsed = ctx.pipeline.detector.detect_batch(
-                [image for _, image in group],
-                [getattr(ctx.pipeline, '_frame_count', 0)+i+1 for i in range(len(group))],
-                [frame_processing_timestamp(packet) for packet, _ in group])
-            for (packet, _), detections in zip(group, boxes):
-                computed[packet['payload']['direction']] = (detections, elapsed)
-                packet['payload']['_inference_batch_size'] = len(group)
+        try:
+            for start in range(0, len(due), size):
+                group = due[start:start+size]
+                boxes, elapsed = ctx.pipeline.detector.detect_batch(
+                    [image for _, image in group],
+                    [getattr(ctx.pipeline, '_frame_count', 0)+i+1 for i in range(len(group))],
+                    [frame_processing_timestamp(packet) for packet, _ in group])
+                for (packet, _), detections in zip(group, boxes):
+                    computed[packet['payload']['direction']] = (detections, elapsed)
+                    packet['payload']['_inference_batch_size'] = len(group)
+        except Exception:
+            if frame_slots is not None:
+                for packet, _ in due:
+                    frame_slots.mark_failure(packet['payload']['direction'], 'inference')
+            raise
         results = []
         for packet, image, orientation, preprocess_done_ms in ready:
             p = packet['payload']
@@ -82,11 +92,17 @@ async def run_coordinator(handler):
     while True:
         await handler.batch_ready.wait()
         await asyncio.sleep(.02)
-        packets = list(handler.latest_frames.values())
-        handler.latest_frames.clear()
         handler.batch_ready.clear()
+        packets = handler.frame_slots.select_due(
+            time.monotonic(), max_items=handler.frame_slots.pending_count
+        )
+        ctx.publish_frame_counters(handler.frame_slots.snapshot())
+        if not packets:
+            continue
         try:
-            results = await asyncio.get_running_loop().run_in_executor(handler.frame_executor, process_batch, packets)
+            results = await asyncio.get_running_loop().run_in_executor(
+                handler.frame_executor, process_batch, packets, handler.frame_slots
+            )
             for packet, result in results:
                 p = packet['payload']
                 node = p.get('node_id')
@@ -104,6 +120,8 @@ async def run_coordinator(handler):
                 ctx.last_frame_monotonic = time.monotonic()
                 ctx.last_telemetry_frame_id = p['frame_id']
                 ctx.increment_stage_counter('processed')
+                handler.frame_slots.mark_processed(direction)
+                ctx.publish_frame_counters(handler.frame_slots.snapshot())
                 await ctx.update_snapshot(snapshot)
                 await handler.connection_manager.send_to_node(node, {'type':'FRAME_ACK','payload':{
                     'frame_id':p['frame_id'],'direction':direction,

@@ -86,6 +86,7 @@ def runtime_snapshot(ctx):
         systemRunning=ctx.system_running, streamStatus="LIVE" if live_lanes else "STALE",
         pipelineHealthy=bool(ctx.system_running and live_lanes),
         stageCounters=ctx.get_stage_counters(), processingErrors=ctx.frame_processing_errors,
+        frameCounters=ctx.get_frame_counters(),
         frameAgeMs=round((now - ctx.last_frame_monotonic) * 1000, 1) if ctx.frame_updated_at else None,
         totalVehicles=sum(v.get("vehicles", 0) for v in live_lanes),
         queueLength=sum(v.get("queue", 0) for v in live_lanes),

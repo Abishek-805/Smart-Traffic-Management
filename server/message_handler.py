@@ -26,6 +26,7 @@ from server.protocol import (
 )
 from server.session_manager import SessionManager
 from server.connection_manager import ConnectionManager
+from server.frame_slots import LatestFrameSlots
 from ai.utils.logger import get_logger
 from config.deployment import ACTIVE_PROFILE
 
@@ -56,6 +57,10 @@ class MessageHandler:
         self.clock = clock or time.monotonic
         self.takeover_grace_sec = max(0.0, float(takeover_grace_sec))
         self._in_flight_directions = set()
+        self.frame_slots = LatestFrameSlots(("north", "east", "south", "west"))
+        self.batch_ready = None
+        self.worker_tasks = {}
+        self.dropped_frames_count = 0
         # Perception is serialized already; one long-lived worker keeps native
         # OpenCV/PyTorch workspaces on one thread instead of multiplying them
         # across asyncio's large default pool.
@@ -459,13 +464,6 @@ class MessageHandler:
                 or "north"
             ).lower()
 
-            # Lazy initialize worker states
-            if not hasattr(self, "latest_frames"):
-                self.latest_frames = {}
-                self.frame_events = {}
-                self.dropped_frames_count = 0
-                self.worker_tasks = {}
-
             # Log receive timestamp
             raw_json["backend_receive_timestamp"] = int(time.time() * 1000)
             raw_json["backend_receive_monotonic"] = time.monotonic()
@@ -481,8 +479,9 @@ class MessageHandler:
                 session.media_connected = True
                 session.last_frame_at = self.clock()
 
-            # Latest Frame Wins Policy: check if there's already an unprocessed frame in the slot
-            if direction in self.latest_frames:
+            # Latest-frame wins: replacement is bounded and never becomes a zero observation.
+            replaced = self.frame_slots.offer(direction, raw_json)
+            if replaced is not None:
                 self.dropped_frames_count += 1
                 ctx.increment_stage_counter("dropped")
                 logger.debug(f"[LATENCY-CONTROL] Dropping stale frame for '{direction}' (Total dropped: {self.dropped_frames_count})")
@@ -494,10 +493,8 @@ class MessageHandler:
             upload = payload_raw.get("upload_timestamp", cap)
             payload_raw["upload_timestamp"] = upload if isinstance(upload,(float,int)) and math.isfinite(upload) else cap
             payload_raw.setdefault("frame_id", f"{direction}-{time.time_ns()}")
-            self.latest_frames[direction] = raw_json
-            self.frame_events.setdefault(direction, asyncio.Event()).set()
-
-            if not hasattr(self, "batch_ready"):
+            ctx.publish_frame_counters(self.frame_slots.snapshot())
+            if self.batch_ready is None:
                 self.batch_ready = asyncio.Event()
             self.batch_ready.set()
             if not self.worker_tasks:
@@ -562,7 +559,8 @@ class MessageHandler:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         self.worker_tasks = {}
-        self.latest_frames = {}
+        self.frame_slots.clear()
+        self.batch_ready = None
         self.frame_executor.shutdown(wait=True, cancel_futures=True)
 
     def handle_connection_loss(self, node_id: str, websocket=None) -> bool:
@@ -781,6 +779,7 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
             "trackingTimestamp": int(tracking_ts),
             "schedulerTimestamp": int(scheduler_time),
             "stageCounters": ctx.get_stage_counters(),
+            "frameCounters": ctx.get_frame_counters(),
             "frameOrientation": orientation_info,
         },
     }

@@ -55,6 +55,7 @@ class ApplicationContext:
             "processed": 0,
             "dropped": 0,
         }
+        self.frame_counters: Dict[str, Dict[str, int]] = {}
 
         self.camera_manager: Optional[Any] = None
         self.pipeline: Optional[Any] = None  # TrafficPipeline instance
@@ -73,6 +74,17 @@ class ApplicationContext:
     def get_stage_counters(self) -> Dict[str, int]:
         """Return shallow copy of current pipeline stage counters."""
         return dict(self.stage_counters)
+
+    def publish_frame_counters(self, counters: Dict[str, Dict[str, int]]) -> None:
+        """Publish an immutable copy of per-camera handoff counters."""
+        self.frame_counters = {
+            direction: dict(values) for direction, values in counters.items()
+        }
+
+    def get_frame_counters(self) -> Dict[str, Dict[str, int]]:
+        return {
+            direction: dict(values) for direction, values in self.frame_counters.items()
+        }
 
     @classmethod
     def get_instance(cls) -> "ApplicationContext":
@@ -166,6 +178,7 @@ class ApplicationContext:
             "frame_processing_errors": self.frame_processing_errors,
             "inference_latency_ms": inf_ms,
             "stage_counters": self.get_stage_counters(),
+            "frame_counters": self.get_frame_counters(),
             "components": {
                 "ai": {
                     "status": "HEALTHY" if healthy else "DEGRADED",
