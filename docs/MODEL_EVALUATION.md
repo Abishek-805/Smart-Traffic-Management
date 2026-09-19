@@ -129,3 +129,16 @@ print(metrics.to_dict())
 
 - Automated unit and integration tests: [`tests/test_model_evaluation.py`](file:///C:/Users/ashek/Desktop/smart-traffic-management/tests/test_model_evaluation.py) (5/5 passing).
 - Validates IoU calculation, perfect prediction scoring (100% precision/recall), imperfect detection matching, COCO JSON parsing, and YOLO txt parsing.
+
+---
+
+## 7. Experimental Perception Features
+
+Speed estimation, stopped-vehicle detection, lane segmentation, and additional
+vehicle classes are disabled by default. Enabling one requires both a labelled
+accuracy report and a laptop resource report. It remains `experimental` until
+the project's qualification policy is passed.
+
+The registry deliberately does not include emergency-vehicle detection. The
+project must not claim ambulance or fire-engine recognition until a dedicated,
+representative labelled dataset and validated model are available.

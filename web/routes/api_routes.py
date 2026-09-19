@@ -12,10 +12,19 @@ from web.services.camera_service import CameraService
 from web.services.node_service import NodeService
 from web.services.log_service import LogService
 from ai.pipeline.digital_intersection import DigitalIntersection
+from ai.experiments.perception_registry import PerceptionRegistry
+from config.perception_features import load_perception_features
 
 router = APIRouter(prefix="/api/v1", tags=["REST API v1"])
 system_svc, camera_svc, node_svc, log_svc = SystemService(), CameraService(), NodeService(), LogService()
 digital_intersection = DigitalIntersection()
+
+PERCEPTION_EXPERIMENTS = (
+    "speed_estimation",
+    "stopped_vehicle_detection",
+    "lane_segmentation",
+    "additional_vehicle_classes",
+)
 
 
 def wrap_response(data):
@@ -27,6 +36,35 @@ def direction_value(direction):
     if direction not in ("north", "south", "east", "west"):
         raise HTTPException(422, "Choose north, south, east or west")
     return direction
+
+
+@router.get("/perception/features")
+async def get_perception_features():
+    """Report the allow-listed experiments without leaking local evidence paths."""
+    registry = PerceptionRegistry(PERCEPTION_EXPERIMENTS)
+    flags = load_perception_features()
+    for name in PERCEPTION_EXPERIMENTS:
+        if getattr(flags, name):
+            prefix = f"PERCEPTION_{name.upper()}"
+            registry.enable(
+                name,
+                os.getenv(f"{prefix}_EVIDENCE"),
+                os.getenv(f"{prefix}_RESOURCE_EVIDENCE"),
+                qualified=os.getenv(f"{prefix}_QUALIFIED", "false").strip().lower()
+                in {"1", "true", "yes", "on"},
+            )
+    return wrap_response({
+        "features": [
+            {
+                "name": feature.name,
+                "enabled": feature.enabled,
+                "status": feature.status,
+                "accuracyEvidenceAvailable": feature.evidence_path is not None,
+                "resourceEvidenceAvailable": feature.resource_evidence_path is not None,
+            }
+            for feature in registry.status()
+        ]
+    })
 
 
 import hmac
