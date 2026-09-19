@@ -1,0 +1,153 @@
+{
+  "false_negative_examples": [
+    {
+      "bbox": [
+        100,
+        200,
+        260,
+        340
+      ],
+      "class_name": "car",
+      "frame_id": "external-day-001"
+    },
+    {
+      "bbox": [
+        600,
+        400,
+        760,
+        650
+      ],
+      "class_name": "three-wheeler",
+      "frame_id": "project-night-001"
+    }
+  ],
+  "false_positive_examples": [],
+  "metadata": {
+    "configuration": {
+      "confidence": 0.001,
+      "device": "cpu"
+    },
+    "environment": {
+      "device": "cpu"
+    },
+    "git_commit": "6e19039187f9",
+    "input_size": 640,
+    "latency_ms": {},
+    "model_identity": "yolov8n.pt",
+    "model_sha256": "f59b3d833e2ff32e194b5bb8e08d211dc7c5bdf144b90d2c8412c47ccfc83b36",
+    "peak_memory_mb": null,
+    "runtime": "precomputed-predictions",
+    "throughput_fps": null,
+    "trial_count": 1,
+    "warmup_policy": {
+      "iterations": 0
+    }
+  },
+  "per_class": {
+    "car": {
+      "ap50": 0.0,
+      "ap50_95": 0.0,
+      "ground_truths": 1,
+      "precision": null,
+      "predictions": 0,
+      "recall": 0.0
+    },
+    "three-wheeler": {
+      "ap50": 0.0,
+      "ap50_95": 0.0,
+      "ground_truths": 1,
+      "precision": null,
+      "predictions": 0,
+      "recall": 0.0
+    }
+  },
+  "provenance_metrics": {
+    "external": {
+      "count_mae": 1.0,
+      "frames": 1,
+      "ground_truths": 1,
+      "precision": null,
+      "predictions": 0,
+      "recall": 0.0
+    },
+    "project_owned": {
+      "count_mae": 1.0,
+      "frames": 1,
+      "ground_truths": 1,
+      "precision": null,
+      "predictions": 0,
+      "recall": 0.0
+    }
+  },
+  "scene_metrics": {
+    "clear": {
+      "count_mae": 1.0,
+      "frames": 1,
+      "ground_truths": 1,
+      "precision": null,
+      "predictions": 0,
+      "recall": 0.0
+    },
+    "day": {
+      "count_mae": 1.0,
+      "frames": 1,
+      "ground_truths": 1,
+      "precision": null,
+      "predictions": 0,
+      "recall": 0.0
+    },
+    "night": {
+      "count_mae": 1.0,
+      "frames": 1,
+      "ground_truths": 1,
+      "precision": null,
+      "predictions": 0,
+      "recall": 0.0
+    },
+    "occluded": {
+      "count_mae": 1.0,
+      "frames": 1,
+      "ground_truths": 1,
+      "precision": null,
+      "predictions": 0,
+      "recall": 0.0
+    }
+  },
+  "size_metrics": {
+    "large": {
+      "count_mae": 1.0,
+      "frames": 2,
+      "ground_truths": 2,
+      "precision": null,
+      "predictions": 0,
+      "recall": 0.0
+    },
+    "medium": {
+      "count_mae": null,
+      "frames": 0,
+      "ground_truths": 0,
+      "precision": null,
+      "predictions": 0,
+      "recall": null
+    },
+    "small": {
+      "count_mae": null,
+      "frames": 0,
+      "ground_truths": 0,
+      "precision": null,
+      "predictions": 0,
+      "recall": null
+    }
+  },
+  "summary": {
+    "count_mae": 1.0,
+    "ignored_predictions": 0,
+    "map50": 0.0,
+    "map50_95": 0.0,
+    "total_false_negatives": 2,
+    "total_false_positives": 0,
+    "total_frames": 2,
+    "total_ground_truths": 2,
+    "total_predictions": 0
+  }
+}

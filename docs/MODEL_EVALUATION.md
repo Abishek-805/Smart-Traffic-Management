@@ -65,6 +65,12 @@ must remain separate; they must never be combined into a single headline metric.
 The repository may contain small synthetic fixtures, but raw datasets, recordings,
 and trained experiment outputs remain excluded by `.gitignore`.
 
+Reports preserve per-scene, object-size, vehicle-class, and provenance slices.
+Missing classes are reported as unavailable rather than perfect, predictions in
+declared ignore regions are excluded from false-positive counts, and evidence
+metadata records model identity/hash, runtime configuration, latency, throughput,
+memory, warm-up policy, trial count, environment, and source commit.
+
 ### A. COCO JSON Format
 Standard format used by Roboflow, CVAT, and academic benchmarks:
 ```json
