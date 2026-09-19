@@ -64,6 +64,7 @@ def runtime_snapshot(ctx):
         live = bool(ctx.system_running and session and age is not None and age < 3000)
         lane_telemetry = ctx.live_telemetry.get(direction, {})
         temporal = lane_telemetry.get("latency_metrics", {})
+        stage = lane_telemetry.get("stage_latency", {})
         lane.update(frameId=lane_telemetry.get("frame_id"),
                     latestFrameId=lane_telemetry.get("latest_frame_id"),
                     lastDetectionFrameId=lane_telemetry.get("last_detection_frame_id"),
@@ -75,6 +76,18 @@ def runtime_snapshot(ctx):
                     trackingTimeMs=temporal.get("tracking_ms"),
                     serverProcessingMs=lane_telemetry.get("server_processing_ms"),
                     queueWaitMs=lane_telemetry.get("queue_wait_ms"),
+                    stageLatency={
+                        "transportMs": stage.get("arrival_age_ms"),
+                        "decodeMs": stage.get("decode_ms"),
+                        "queueWaitMs": stage.get("coordinator_wait_ms"),
+                        "inferenceMs": stage.get("inference_ms"),
+                        "trackingMs": stage.get("tracking_ms"),
+                        "analyticsMs": stage.get("analytics_ms"),
+                        "schedulerMs": stage.get("scheduler_ms"),
+                        "publicationMs": stage.get("publication_ms"),
+                        "totalMs": stage.get("server_total_ms"),
+                        "frameAgeMs": stage.get("frame_age_ms"),
+                    } if stage else None,
                     frameAgeMs=round(age, 1) if age is not None else None,
                     streamStatus="LIVE" if live else "STALE" if session and seen else "CONNECTING" if session else "OFFLINE",
                     fps=lane_telemetry.get("fps", 0) if live else 0,

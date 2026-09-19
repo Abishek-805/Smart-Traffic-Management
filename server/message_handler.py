@@ -27,6 +27,7 @@ from server.protocol import (
 from server.session_manager import SessionManager
 from server.connection_manager import ConnectionManager
 from server.frame_slots import LatestFrameSlots
+from server.frame_timing import FrameTiming
 from ai.utils.logger import get_logger
 from config.deployment import ACTIVE_PROFILE
 
@@ -465,8 +466,10 @@ class MessageHandler:
             ).lower()
 
             # Log receive timestamp
-            raw_json["backend_receive_timestamp"] = int(time.time() * 1000)
-            raw_json["backend_receive_monotonic"] = time.monotonic()
+            received_wall_ms = time.time() * 1000.0
+            received_monotonic = time.monotonic()
+            raw_json["backend_receive_timestamp"] = int(received_wall_ms)
+            raw_json["backend_receive_monotonic"] = received_monotonic
 
             from core.application_context import ApplicationContext
             ctx = ApplicationContext.get_instance()
@@ -479,6 +482,19 @@ class MessageHandler:
                 session.media_connected = True
                 session.last_frame_at = self.clock()
 
+            cap = payload_raw.get("capture_timestamp")
+            if not isinstance(cap, (float, int)) or not math.isfinite(cap):
+                cap = received_wall_ms
+            payload_raw["capture_timestamp"] = cap
+            upload = payload_raw.get("upload_timestamp", cap)
+            payload_raw["upload_timestamp"] = upload if isinstance(upload,(float,int)) and math.isfinite(upload) else cap
+            payload_raw.setdefault("frame_id", f"{direction}-{time.time_ns()}")
+            raw_json["_frame_timing"] = FrameTiming(
+                received_monotonic=received_monotonic,
+                received_wall_ms=received_wall_ms,
+                capture_wall_ms=cap,
+            )
+
             # Latest-frame wins: replacement is bounded and never becomes a zero observation.
             replaced = self.frame_slots.offer(direction, raw_json)
             if replaced is not None:
@@ -486,13 +502,6 @@ class MessageHandler:
                 ctx.increment_stage_counter("dropped")
                 logger.debug(f"[LATENCY-CONTROL] Dropping stale frame for '{direction}' (Total dropped: {self.dropped_frames_count})")
 
-            cap = payload_raw.get("capture_timestamp")
-            if not isinstance(cap, (float, int)) or not math.isfinite(cap):
-                cap = time.time()*1000
-            payload_raw["capture_timestamp"] = cap
-            upload = payload_raw.get("upload_timestamp", cap)
-            payload_raw["upload_timestamp"] = upload if isinstance(upload,(float,int)) and math.isfinite(upload) else cap
-            payload_raw.setdefault("frame_id", f"{direction}-{time.time_ns()}")
             ctx.publish_frame_counters(self.frame_slots.snapshot())
             if self.batch_ready is None:
                 self.batch_ready = asyncio.Event()
@@ -605,7 +614,7 @@ def _process_frame_worker(frame_b64: str, direction: str, capture_ts: float, upl
         return _process_frame_locked(frame_b64, direction, capture_ts, upload_ts, rx_ts, frame_id, rotation)
 
 
-def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upload_ts: float, rx_ts: float, frame_id: str, rotation: int = 0, decoded=None, precomputed_detection=None, processing_timestamp=None):
+def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upload_ts: float, rx_ts: float, frame_id: str, rotation: int = 0, decoded=None, precomputed_detection=None, processing_timestamp=None, timing=None):
     """
     Worker thread task executing CPU-bound base64/JPEG decoding, passing transport-agnostic np.ndarray
     frame into TrafficPipeline and ControlManager, and building immutable PipelineStateSnapshot.
@@ -685,6 +694,8 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
 
     # 2. Control Layer execution via ControlManager (handles ESP32 hardware command & decision logging)
     ctx.control_manager.process_result(pipeline_result)
+    if timing is not None:
+        timing.mark("scheduler_end")
     scheduler_time = time.time() * 1000.0
 
     # Extract annotated tile frame

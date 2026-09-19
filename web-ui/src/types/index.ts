@@ -68,6 +68,19 @@ export type TelemetryEventType =
   | 'NodeDisconnected'
   | 'LogEntry';
 
+export interface PipelineStageLatency {
+  transportMs: number | null;
+  decodeMs: number;
+  queueWaitMs: number;
+  inferenceMs: number;
+  trackingMs: number;
+  analyticsMs: number;
+  schedulerMs: number;
+  publicationMs: number;
+  totalMs: number;
+  frameAgeMs: number;
+}
+
 export interface LaneTelemetryItem {
   frameAgeMs?: number | null;
   streamStatus?: 'CONNECTING' | 'LIVE' | 'STALE' | 'OFFLINE' | 'DISCONNECTED';
@@ -75,6 +88,7 @@ export interface LaneTelemetryItem {
   inferenceTimeMs?: number;
   serverProcessingMs?: number;
   queueWaitMs?: number;
+  stageLatency?: PipelineStageLatency | null;
   frameId?: string | null;
   latestFrameId?: string | null;
   lastDetectionFrameId?: string | null;
@@ -135,6 +149,7 @@ export interface TelemetryPayload {
     yolo_ms?: number;
     total_ms?: number;
   };
+  stageLatency?: PipelineStageLatency;
 }
 
 export interface TelemetryMessage {

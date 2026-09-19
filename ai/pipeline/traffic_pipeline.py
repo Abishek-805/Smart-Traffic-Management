@@ -202,6 +202,7 @@ class TrafficPipeline:
         multi_annotated_frames: Dict[str, np.ndarray] = {}
         max_inference_ms = 0.0
         max_tracking_ms = 0.0
+        analytics_ms = 0.0
 
         # Step 1-5: Process each camera feed independently
         for lane_name, payload in frames_data.items():
@@ -277,6 +278,7 @@ class TrafficPipeline:
             # Step 4-5: only detector observations mutate vehicle state or
             # authoritative analytics. Predictions remain display-only.
             if detector_due:
+                analytics_start = time.perf_counter()
                 enriched_detections = self.state_managers[lane_name].update(
                     lane_detections, frame_number=frame_num, timestamp=timestamp
                 )
@@ -301,6 +303,7 @@ class TrafficPipeline:
                 elif lane_stat is None:
                     lane_stat = LaneStatistics(lane_name=lane_name, live_count=len(enriched_detections))
                 observed_stats_map[lane_name] = lane_stat
+                analytics_ms += (time.perf_counter() - analytics_start) * 1000.0
             else:
                 enriched_detections = lane_detections
                 lane_stat = self._last_authoritative_stats.get(
@@ -340,11 +343,13 @@ class TrafficPipeline:
         now_mono = time.monotonic()
 
         if observed_stats_map:
+            analytics_start = time.perf_counter()
             stabilized = self.count_stabilizer.stabilize(
                 observed_stats_map, timestamp=time.time()
             )
             self._last_authoritative_stats.update(stabilized)
             lane_stats_map.update(stabilized)
+            analytics_ms += (time.perf_counter() - analytics_start) * 1000.0
 
         # Update persistent history with fresh lane stats
         for l_name, l_stat in lane_stats_map.items():
@@ -395,6 +400,7 @@ class TrafficPipeline:
         )
 
         # Step 6: Signal Decision Engine Execution
+        scheduler_start = time.perf_counter()
         has_emergency = any(s.has_priority_vehicle for s in lane_stats_map.values())
 
         current_mono_time = time.monotonic()
@@ -460,6 +466,8 @@ class TrafficPipeline:
                     multi_annotated_frames=multi_annotated_frames,
                     latency_metrics={"yolo_ms": round(max_inference_ms, 2),
                         "tracking_ms": round(max_tracking_ms, 2),
+                        "analytics_ms": round(analytics_ms, 2),
+                        "scheduler_ms": round((time.perf_counter() - scheduler_start) * 1000.0, 2),
                         "detector_ran": max_inference_ms > 0,
                         "total_ms": round((time.perf_counter() - t_start) * 1000, 2)})
             self.active_decision = self.signal_scheduler.schedule(final_priority_result, phase_id=self.phase_counter)
@@ -498,6 +506,7 @@ class TrafficPipeline:
         intersection_state.active_phase_id = self.phase_counter
         intersection_state.green_lane = self.active_decision.green_lane.value if self.active_decision else None
         intersection_state.remaining_green_sec = remaining_green_sec
+        scheduler_ms = (time.perf_counter() - scheduler_start) * 1000.0
 
         # Pipeline Health Diagnostics
         primary_lane = next(iter(multi_detections.keys())) if multi_detections else "north"
@@ -532,6 +541,8 @@ class TrafficPipeline:
             "timestamp": round(time.time(), 3),
             "yolo_ms": round(max_inference_ms, 2),
             "tracking_ms": round(max_tracking_ms, 2),
+            "analytics_ms": round(analytics_ms, 2),
+            "scheduler_ms": round(scheduler_ms, 2),
             "total_ms": round(t_total_ms, 2),
             "detector_fps_target": DETECTOR_FPS,
             "detector_ran": max_inference_ms > 0,

@@ -62,6 +62,7 @@ export interface MetricStripViewModel {
   processingQueueLength: number;
   pipelineLatencyMs: number;
   frameAgeMs: number;
+  transportLatencyMs: number | null;
   connectionHealth: 'HEALTHY' | 'DEGRADED' | 'DISCONNECTED';
 }
 
@@ -179,8 +180,9 @@ export const useDashboardViewModel = (): DashboardViewModel => {
       avgFps: currentFps,
       inferenceTimeMs: telemetry?.latencyMetrics?.yolo_ms ?? 0,
       processingQueueLength: telemetry?.stageCounters?.dropped ?? 0,
-      pipelineLatencyMs: telemetry?.latencyMetrics?.total_ms || telemetry?.frameAgeMs || 0,
+      pipelineLatencyMs: telemetry?.stageLatency?.totalMs ?? telemetry?.latencyMetrics?.total_ms ?? telemetry?.frameAgeMs ?? 0,
       frameAgeMs,
+      transportLatencyMs: telemetry?.stageLatency?.transportMs ?? null,
       connectionHealth: !isConnected ? 'DISCONNECTED' : pipelineHealthy ? 'HEALTHY' : 'DEGRADED',
     };
 

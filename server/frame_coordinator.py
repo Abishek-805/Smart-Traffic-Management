@@ -25,12 +25,15 @@ def process_batch(packets, frame_slots=None):
     with _frame_worker_lock:
         for packet in packets:
             p = packet['payload']
+            timing = packet.get('_frame_timing')
             if not ctx.system_running or time.time()*1000 - packet['backend_receive_timestamp'] > 2500:
                 ctx.increment_stage_counter('dropped')
                 if frame_slots is not None:
                     frame_slots.mark_stale(p['direction'])
                 continue
             try:
+                if timing is not None:
+                    timing.mark('decode_start')
                 image = p.get('decoded_image')
                 if image is None:
                     data = p['frame_data']
@@ -39,6 +42,8 @@ def process_batch(packets, frame_slots=None):
                 if image is None:
                     raise ValueError('Invalid JPEG')
                 image, orientation = normalize_frame_orientation(image, p.get('rotation', 0))
+                if timing is not None:
+                    timing.mark('decoded')
                 ready.append((packet, image, orientation, time.time() * 1000))
             except (ValueError, TypeError, cv2.error):
                 ctx.increment_stage_counter('decode_failed')
@@ -58,10 +63,18 @@ def process_batch(packets, frame_slots=None):
         try:
             for start in range(0, len(due), size):
                 group = due[start:start+size]
+                for packet, _ in group:
+                    timing = packet.get('_frame_timing')
+                    if timing is not None:
+                        timing.mark('inference_start')
                 boxes, elapsed = ctx.pipeline.detector.detect_batch(
                     [image for _, image in group],
                     [getattr(ctx.pipeline, '_frame_count', 0)+i+1 for i in range(len(group))],
                     [frame_processing_timestamp(packet) for packet, _ in group])
+                for packet, _ in group:
+                    timing = packet.get('_frame_timing')
+                    if timing is not None:
+                        timing.mark('inference_end')
                 for (packet, _), detections in zip(group, boxes):
                     computed[packet['payload']['direction']] = (detections, elapsed)
                     packet['payload']['_inference_batch_size'] = len(group)
@@ -77,7 +90,8 @@ def process_batch(packets, frame_slots=None):
                 p.get('upload_timestamp',p['capture_timestamp']), packet['backend_receive_timestamp'],
                 p['frame_id'], 0, decoded=(image,orientation),
                 precomputed_detection=computed.get(p['direction']),
-                processing_timestamp=frame_processing_timestamp(packet))
+                processing_timestamp=frame_processing_timestamp(packet),
+                timing=packet.get('_frame_timing'))
             if result:
                 result[3]['queue_wait_ms'] = round(max(0, preprocess_done_ms - packet['backend_receive_timestamp']), 2)
                 result[3]['batch_size'] = p.get('_inference_batch_size', 0)
@@ -96,6 +110,10 @@ async def run_coordinator(handler):
         packets = handler.frame_slots.select_due(
             time.monotonic(), max_items=handler.frame_slots.pending_count
         )
+        for packet in packets:
+            timing = packet.get('_frame_timing')
+            if timing is not None:
+                timing.mark('selected')
         ctx.publish_frame_counters(handler.frame_slots.snapshot())
         if not packets:
             continue
@@ -111,6 +129,38 @@ async def run_coordinator(handler):
                     ctx.increment_stage_counter('dropped')
                     continue
                 direction, jpeg, snapshot, telemetry = result
+                timing = packet.get('_frame_timing')
+                if timing is not None:
+                    published_at = time.monotonic()
+                    timing.mark('publication', monotonic=published_at)
+                    stage_metrics = timing.to_metrics(published_at)
+                    pipeline_metrics = telemetry.get('latency_metrics', {})
+                    for key, pipeline_key in (
+                        ('inference_ms', 'yolo_ms'),
+                        ('tracking_ms', 'tracking_ms'),
+                        ('analytics_ms', 'analytics_ms'),
+                        ('scheduler_ms', 'scheduler_ms'),
+                    ):
+                        value = pipeline_metrics.get(pipeline_key)
+                        if value is not None:
+                            stage_metrics[key] = round(float(value), 3)
+                    telemetry['stage_latency'] = stage_metrics
+                    telemetry['server_processing_ms'] = stage_metrics['server_total_ms']
+                    telemetry['queue_wait_ms'] = stage_metrics['coordinator_wait_ms']
+                    telemetry['decode_latency_ms'] = stage_metrics['decode_ms']
+                    telemetry['frame_age_ms'] = stage_metrics['frame_age_ms']
+                    snapshot['payload']['stageLatency'] = {
+                        'transportMs': stage_metrics['arrival_age_ms'],
+                        'decodeMs': stage_metrics['decode_ms'],
+                        'queueWaitMs': stage_metrics['coordinator_wait_ms'],
+                        'inferenceMs': stage_metrics['inference_ms'],
+                        'trackingMs': stage_metrics['tracking_ms'],
+                        'analyticsMs': stage_metrics['analytics_ms'],
+                        'schedulerMs': stage_metrics['scheduler_ms'],
+                        'publicationMs': stage_metrics['publication_ms'],
+                        'totalMs': stage_metrics['server_total_ms'],
+                        'frameAgeMs': stage_metrics['frame_age_ms'],
+                    }
                 previous = ctx.frame_updated_at.get(direction)
                 telemetry['fps'] = round(1/max(.001,time.monotonic()-previous),1) if previous else 0
                 ctx.frame_buffer[direction] = jpeg
