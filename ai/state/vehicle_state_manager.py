@@ -14,6 +14,7 @@ from config.traffic import (
     TRACK_EXPIRATION_TIMEOUT_SEC,
     MIN_CONFIRMATION_FRAMES,
     TRACK_REMOVAL_GRACE_SEC,
+    LANE_SWITCH_CONFIRMATION_FRAMES,
 )
 from ai.utils.logger import get_logger
 
@@ -46,6 +47,8 @@ class VehicleState:
     last_observation_frame_id: int = 0
     last_prediction_frame_id: Optional[int] = None
     last_observation_timestamp: float = 0.0
+    pending_lane: Optional[str] = None
+    pending_lane_observations: int = 0
 
 
 class VehicleStateManager:
@@ -121,13 +124,24 @@ class VehicleStateManager:
                 
                 # Check for lane transition
                 if state.lane != lane_name:
-                    logger.info(f"Vehicle #{tid} switched lane: '{state.lane}' -> '{lane_name}'")
-                    state.lane = lane_name
-                    state.time_in_lane_sec = 0.0
-                    state.queue_time_sec = 0.0
-                    state.consecutive_low_motion_frames = 0
-                elif dt > 0:
-                    state.time_in_lane_sec += dt
+                    if state.pending_lane == lane_name:
+                        state.pending_lane_observations += 1
+                    else:
+                        state.pending_lane = lane_name
+                        state.pending_lane_observations = 1
+                    if state.pending_lane_observations >= LANE_SWITCH_CONFIRMATION_FRAMES:
+                        logger.info(f"Vehicle #{tid} switched lane: '{state.lane}' -> '{lane_name}'")
+                        state.lane = lane_name
+                        state.pending_lane = None
+                        state.pending_lane_observations = 0
+                        state.time_in_lane_sec = 0.0
+                        state.queue_time_sec = 0.0
+                        state.consecutive_low_motion_frames = 0
+                else:
+                    state.pending_lane = None
+                    state.pending_lane_observations = 0
+                    if dt > 0:
+                        state.time_in_lane_sec += dt
 
                 # Compute motion_px_sec (relative pixel displacement over time)
                 prev_cx, prev_cy = state.last_centroid

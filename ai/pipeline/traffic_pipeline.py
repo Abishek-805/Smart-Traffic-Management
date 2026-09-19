@@ -385,6 +385,14 @@ class TrafficPipeline:
 
         lane_stats_map = all_intersection_lanes
 
+        # Queue values remain vehicle counts unless an approach-specific
+        # ground-plane calibration explicitly supplies metric evidence.
+        for lane_stat in lane_stats_map.values():
+            lane_stat.queue_value = float(lane_stat.stopped_count)
+            lane_stat.queue_unit = "vehicles"
+            lane_stat.queue_calibrated = False
+            lane_stat.queue_calibration_id = None
+
         # ── Phase 3.5: Vehicle Count Stabilization ───────────────────────────
         # Apply EMA smoothing to lane counts before scheduler evaluation.
         # This prevents scheduler flicker from one-frame detection noise,

@@ -153,6 +153,8 @@ class CountStabilizer:
             stabilized_stats = copy.copy(stats)
             stabilized_stats.smoothed_count = round(new_ema, 2)
             stabilized_stats.raw_count = raw_count
+            # Preserve queue units/calibration; occupancy smoothing must not
+            # manufacture metric distance from image-space evidence.
 
             # Override live_count with rounded smoothed value for scheduler consumption
             stabilized_stats.live_count = int(round(new_ema))

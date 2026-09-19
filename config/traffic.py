@@ -52,6 +52,7 @@ COUNT_HISTORY_SIZE = 10               # Rolling window size for raw count histor
 MIN_CONFIRMATION_FRAMES = 2           # Minimum frames a track must exist before counting
 TRACK_REMOVAL_GRACE_SEC = 1.8         # Measured grace period before purging a lost track (frame arrival jitter tolerance)
 TRACK_EXPIRATION_TIMEOUT_SEC = 4.0    # Hard purge stale tracks after 4 seconds of inactivity
+LANE_SWITCH_CONFIRMATION_FRAMES = 3  # Observed frames required before committing a lane transition
 
 # Configurable congestion scoring weights
 CONGESTION_WEIGHTS = {

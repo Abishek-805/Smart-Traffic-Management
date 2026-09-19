@@ -95,16 +95,21 @@ def test_approach_calibration_manager_calibrated_vs_uncalibrated():
     # North approach is calibrated
     north_queue = manager.estimate_queue("north", vehicles, stop_line_pixel_y=600.0)
     assert north_queue.queued_count == 2
-    assert north_queue.is_calibrated is True
+    assert north_queue.calibrated is True
+    assert north_queue.unit == "metres"
+    assert north_queue.value > 0.0
+    assert north_queue.calibration_id is not None
     assert north_queue.metric_queue_length_meters > 0.0
     assert north_queue.farthest_vehicle_id == 11
 
-    # South approach is uncalibrated -> uses fallback pixel scale
+    # South approach is uncalibrated -> reports image-space evidence only.
     south_queue = manager.estimate_queue("south", vehicles, stop_line_pixel_y=600.0)
     assert south_queue.queued_count == 2
-    assert south_queue.is_calibrated is False
-    # Max pixel dist: abs(300 - 600) = 300px * 0.1 m/px = 30.0m
-    assert south_queue.metric_queue_length_meters == pytest.approx(30.0, abs=0.1)
+    assert south_queue.calibrated is False
+    assert south_queue.unit == "image_space"
+    assert south_queue.value == pytest.approx(300.0, abs=0.1)
+    assert south_queue.metric_queue_length_meters is None
+    assert south_queue.calibration_id is None
     assert south_queue.farthest_vehicle_id == 11
 
 
@@ -112,6 +117,8 @@ def test_approach_calibration_empty_queue():
     manager = ApproachCalibrationManager()
     queue = manager.estimate_queue("east", [])
     assert queue.queued_count == 0
-    assert queue.metric_queue_length_meters == 0.0
+    assert queue.metric_queue_length_meters is None
     assert queue.pixel_queue_length == 0.0
     assert queue.farthest_vehicle_id is None
+    assert queue.unit == "image_space"
+    assert queue.metric_queue_length_meters is None

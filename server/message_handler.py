@@ -752,6 +752,12 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
                 "vehicles": v_cnt,
                 "historicalCount": int(getattr(l_stat, "historical_count", 0)),
                 "queue": int(getattr(l_stat, "stopped_count", 0)),
+                "queueMetadata": {
+                    "value": float(getattr(l_stat, "queue_value", getattr(l_stat, "stopped_count", 0))),
+                    "unit": getattr(l_stat, "queue_unit", "vehicles"),
+                    "calibrated": bool(getattr(l_stat, "queue_calibrated", False)),
+                    "calibrationId": getattr(l_stat, "queue_calibration_id", None),
+                },
                 "wait": round(float(getattr(l_stat, "max_queue_time_sec", 0)), 1),
                 "pce": round(p_score, 1),
                 "density": den,
@@ -763,6 +769,10 @@ def _process_frame_locked(frame_b64: str, direction: str, capture_ts: float, upl
             lanes_payload[d_name] = {
                 "vehicles": 0,
                 "queue": 0.0,
+                "queueMetadata": {
+                    "value": 0.0, "unit": "vehicles",
+                    "calibrated": False, "calibrationId": None,
+                },
                 "wait": 0.0,
                 "pce": 0.0,
                 "density": "LOW",

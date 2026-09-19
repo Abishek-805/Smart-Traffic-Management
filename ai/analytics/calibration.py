@@ -7,6 +7,7 @@ to estimate physical queue length and road occupancy accurately.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 from typing import Dict, List, Optional, Tuple
 import cv2
 import numpy as np
@@ -16,10 +17,17 @@ import numpy as np
 class QueueMetrics:
     """Queue length and density estimates with calibration provenance."""
     queued_count: int
+    value: float
+    unit: str
+    calibrated: bool
+    calibration_id: Optional[str]
     pixel_queue_length: float
-    metric_queue_length_meters: float
-    is_calibrated: bool
+    metric_queue_length_meters: Optional[float]
     farthest_vehicle_id: Optional[int] = None
+
+    @property
+    def is_calibrated(self) -> bool:
+        return self.calibrated
 
 
 class HomographyCalibrator:
@@ -101,6 +109,7 @@ class ApproachCalibrationManager:
             default_pixel_scale_m_per_px: Fallback scale when homography is uncalibrated (~5cm/pixel).
         """
         self.calibrators: Dict[str, HomographyCalibrator] = {}
+        self.calibration_ids: Dict[str, str] = {}
         self.default_pixel_scale = default_pixel_scale_m_per_px
 
     def set_calibration(
@@ -109,6 +118,7 @@ class ApproachCalibrationManager:
         image_points: np.ndarray,
         metric_points: np.ndarray,
         stop_line_metric_y: float = 0.0,
+        calibration_id: Optional[str] = None,
     ) -> None:
         """Register a 4-point homography calibration for an approach."""
         key = approach.strip().lower()
@@ -117,6 +127,13 @@ class ApproachCalibrationManager:
             metric_points=metric_points,
             stop_line_metric_y=stop_line_metric_y,
         )
+        if calibration_id is None:
+            digest = hashlib.sha256()
+            digest.update(np.asarray(image_points, dtype=np.float32).tobytes())
+            digest.update(np.asarray(metric_points, dtype=np.float32).tobytes())
+            digest.update(str(float(stop_line_metric_y)).encode("ascii"))
+            calibration_id = f"{key}-{digest.hexdigest()[:12]}"
+        self.calibration_ids[key] = calibration_id
 
     def estimate_queue(
         self,
@@ -137,9 +154,12 @@ class ApproachCalibrationManager:
         if count == 0:
             return QueueMetrics(
                 queued_count=0,
+                value=0.0,
+                unit="metres" if key in self.calibrators else "image_space",
+                calibrated=key in self.calibrators,
+                calibration_id=self.calibration_ids.get(key),
                 pixel_queue_length=0.0,
-                metric_queue_length_meters=0.0,
-                is_calibrated=key in self.calibrators,
+                metric_queue_length_meters=0.0 if key in self.calibrators else None,
                 farthest_vehicle_id=None,
             )
 
@@ -152,10 +172,12 @@ class ApproachCalibrationManager:
 
         if calibrator is not None:
             metric_length = calibrator.compute_queue_length(centroids)
-            is_calibrated = True
+            value = round(metric_length, 2)
+            unit = "metres"
         else:
-            metric_length = max_pixel_dist * self.default_pixel_scale
-            is_calibrated = False
+            metric_length = None
+            value = round(max_pixel_dist, 1)
+            unit = "image_space"
 
         # Find farthest vehicle track_id
         farthest_idx = int(np.argmax(pixel_dists)) if pixel_dists else None
@@ -163,8 +185,11 @@ class ApproachCalibrationManager:
 
         return QueueMetrics(
             queued_count=count,
+            value=value,
+            unit=unit,
+            calibrated=calibrator is not None,
+            calibration_id=self.calibration_ids.get(key),
             pixel_queue_length=round(max_pixel_dist, 1),
-            metric_queue_length_meters=round(metric_length, 2),
-            is_calibrated=is_calibrated,
+            metric_queue_length_meters=round(metric_length, 2) if metric_length is not None else None,
             farthest_vehicle_id=farthest_id,
         )

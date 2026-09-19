@@ -35,6 +35,10 @@ class LaneStatistics:
     # Phase 3.5 — Stabilization fields
     raw_count: int = 0          # Unfiltered live_count snapshot before smoothing
     smoothed_count: float = 0.0  # EMA-smoothed vehicle count passed to scheduler
+    queue_value: float = 0.0
+    queue_unit: str = "vehicles"
+    queue_calibrated: bool = False
+    queue_calibration_id: str | None = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert LaneStatistics to dictionary format."""
@@ -53,6 +57,12 @@ class LaneStatistics:
             "breakdown": self.vehicle_breakdown,
             "raw_count": self.raw_count,
             "smoothed_count": round(self.smoothed_count, 2),
+            "queue_estimate": {
+                "value": self.queue_value,
+                "unit": self.queue_unit,
+                "calibrated": self.queue_calibrated,
+                "calibration_id": self.queue_calibration_id,
+            },
         }
 
 
@@ -102,6 +112,9 @@ class AnalyticsExporter:
                 has_priority_vehicle=cong_res["has_priority_vehicle"],
                 vehicle_breakdown=occ_res["counts"],
                 raw_count=occ_res["total_live"],  # Phase 3.5: snapshot raw count
+                queue_value=float(cong_res["stopped_count"]),
+                queue_unit="vehicles",
+                queue_calibrated=False,
             )
             lane_stats[lane_name] = stats_obj
 
